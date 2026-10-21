@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { db, useDatabase } from './db/schema'
@@ -27,7 +27,13 @@ beforeEach(async () => {
   window.history.replaceState(null, '', '#/home')
   await resetAllData()
 })
-afterEach(() => { vi.useRealTimers() })
+afterEach(async () => {
+  vi.useRealTimers()
+  // Unmount first, let any last write finish, then close, so nothing leaks into the next test's database.
+  cleanup()
+  await new Promise((r) => setTimeout(r, 50))
+  db.close()
+})
 
 const tab = async (name: string) => within(await screen.findByRole('navigation', { name: /main navigation/i })).getByRole('button', { name })
 
