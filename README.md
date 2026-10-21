@@ -1,38 +1,57 @@
-# Lift: a free Fitbod-style workout app
+# Lift
 
-A private, subscription-free workout generator and tracker for iPhone, built as a single-file web app (PWA). No backend, no accounts, no App Store.
+A free, private workout planner for you and your friends. It is a web app that you add to your phone's Home Screen. There is no server, no account and no subscription.
 
-## Features
+**Status: Phase 1.** Only the app shell exists. Every schedule and workout you see is labeled "Sample data". Workout generation, saving data, and offline use are not built yet.
 
-- **Workout generator:** picks the muscle groups you've rested longest, filtered by your equipment, goal (strength / muscle / endurance), and session length (30-75 min).
-- **Gym / Home modes:** Planet Fitness (dumbbells, machines, cables, bodyweight) and Home (dumbbells, bodyweight). Each location has its own editable equipment list.
-- **Set logging:** weight and reps per set, with a tap-to-complete check and an automatic rest timer (60-150 s depending on goal).
-- **Progressive overload:** if you hit all target reps last time, it suggests +5 lb (or +2.5 kg).
-- **Swap:** replace any exercise with another for the same muscle.
-- **Progress charts:** top set per session for any exercise you've logged twice or more.
-- **lb / kg switch:** converts your history and current workout.
-- **Exercise demos:** animated start/end photos, a "Watch form" YouTube link, and "How to" steps (from the free-exercise-db library, about 450 strength exercises).
-- **Privacy:** all data stays in each phone's local storage. Nothing is shared between friends.
+## Run it on your computer
 
-## Setup (GitHub Pages)
+You need [Node.js](https://nodejs.org) 20 or newer.
 
-1. Create a new **public** repo on GitHub (e.g. `lift`).
-2. **Add file -> Upload files**, add `index.html`, and commit.
-3. **Settings -> Pages -> Deploy from a branch -> main -> / (root)** -> Save.
-4. After about a minute the app is live at `https://YOUR-USERNAME.github.io/lift/`.
-5. On each iPhone: open the link in Safari -> **Share -> Add to Home Screen**.
+```bash
+npm install      # download the tools the app needs (first time only)
+npm run dev      # start the app, then open the address it prints
+```
 
-## Notes and limits
+## Check that it works
 
-- The exercise library and images load from `raw.githubusercontent.com` (free-exercise-db, public domain). They are cached after first load.
-- Barbell exercises are off by default for Planet Fitness (no barbells, only a Smith machine). Turn Barbell on in Settings if you want them.
-- Safari can clear stored data if the app goes unused for weeks. History is only on that phone.
-- iOS PWAs have limited push notification support, and vibration on timer end may be ignored.
+```bash
+npm run lint       # checks code style
+npm run typecheck  # checks for type mistakes
+npm test           # runs the automated tests
+npm run build      # builds the final files into dist/
+```
 
-## Ideas for later
+## Put it online (GitHub Pages)
 
-- Smith machine exercise list for Planet Fitness
-- Cloud sync (e.g. Supabase free tier) so history survives phone changes
-- Export/import history as JSON
-- Custom workout splits (push/pull/legs)
-- Personal records and weekly volume stats
+1. Put this project in the GitHub repo named `lift` on the `main` branch.
+2. On GitHub open **Settings -> Pages**.
+3. Under **Build and deployment -> Source**, choose **GitHub Actions**.
+4. Push to `main`. Open the **Actions** tab and wait for "Test and deploy to GitHub Pages" to finish.
+5. The site address appears on that run. It normally looks like `https://YOUR-USERNAME.github.io/lift/`. This README does not list a URL because nothing has been deployed yet.
+
+If the repo is not named `lift`, change `base` in `vite.config.ts` to match the repo name.
+
+## Install on iPhone
+
+1. Open the site address in **Safari**.
+2. Tap **Share**, then **Add to Home Screen**.
+3. Open it from the new icon.
+
+Android (Chrome): menu -> **Install app** or **Add to Home screen**.
+
+Installing and offline use have not been tested on a real phone yet.
+
+## Privacy
+
+Never commit workout data or backup files to this repo. Future versions will store data only on each phone.
+
+## Troubleshooting
+
+- **Blank page online:** check that `base` in `vite.config.ts` matches the repo name.
+- **Actions failed:** open the failed run and read the red step; paste it back to Claude.
+- **`npm: command not found`:** install Node.js.
+
+## Roadmap
+
+See `fit_workout_zero_cost_build_spec.md` for the full plan. Next: Phase 2 (local database, profile, equipment, backup).

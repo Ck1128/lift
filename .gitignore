@@ -1,0 +1,6 @@
+node_modules
+dist
+*.local
+.DS_Store
+# Never commit personal workout data or backups
+*backup*.json
