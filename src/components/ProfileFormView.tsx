@@ -1,43 +1,87 @@
 import { useState } from 'react'
 import { WEEKDAY_LABELS } from '../engine/dates'
-import { GOAL_LABEL, type Goal, type Experience, type GymType, type LocationType } from '../engine/types'
-import { validateProfileForm, type FormErrors, type ProfileForm } from '../engine/validateProfile'
+import {
+  GOAL_LABEL, LEVEL_LABEL, type Goal, type GymType, type LocationType, type Sex, type TrainingLevel, type WeightUnit,
+} from '../engine/types'
+import {
+  validateProfileForm, withWeightFieldUnit, type FormErrors, type ProfileForm,
+} from '../engine/validateProfile'
+import { LEVEL_PARAMS } from '../engine/levels'
+import { useUnsavedGuard } from '../router'
 import { Button, Chips, Field } from './ui'
+import { WeightField } from './WeightField'
+import { HeightField } from './HeightField'
 
 export interface ProfileExtra { preferredLocation: LocationType; gymType: GymType }
 
+export const LEVEL_HELP: Record<TrainingLevel, string> = {
+  beginner: 'New to lifting or coming back. Simpler exercises, fewer sets, longer rests and short form cues. Height and weight are needed so loads and calories make sense.',
+  intermediate: 'You train most weeks and know the main lifts. A balanced mix of exercises, sets and rest.',
+  regular: 'You are a regular gym-goer. More variety and volume, and harder exercises where your equipment allows.',
+}
+
+const LEVELS: TrainingLevel[] = ['beginner', 'intermediate', 'regular']
+
 export function ProfileFormView({
-  initial, initialExtra, showLocation, submitLabel, onSubmit,
+  initial, initialExtra, showLocation, submitLabel, onSubmit, onLevelChange,
 }: {
   initial: ProfileForm
   initialExtra: ProfileExtra
   showLocation: boolean
   submitLabel: string
-  onSubmit: (form: ProfileForm, extra: ProfileExtra) => Promise<void> | void
+  onSubmit: (form: ProfileForm, extra: ProfileExtra, opts?: { levelChange?: 'update' | 'keep' }) => Promise<void> | void
+  /** Called when the level is about to change on a saved profile, so the page can ask what to do with upcoming workouts. */
+  onLevelChange?: (from: TrainingLevel, to: TrainingLevel, proceed: (mode: 'update' | 'keep') => void) => void
 }) {
   const [f, setF] = useState<ProfileForm>(initial)
   const [extra, setExtra] = useState<ProfileExtra>(initialExtra)
   const [errors, setErrors] = useState<FormErrors>({})
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
-  const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) => { setF((p) => ({ ...p, [k]: v })); setSaved(false) }
+  const [dirty, setDirty] = useState(false)
+  useUnsavedGuard(dirty)
+  const beginner = f.trainingLevel === 'beginner'
+  const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) => { setF((p) => ({ ...p, [k]: v })); setSaved(false); setDirty(true) }
+  const update = (fn: (p: ProfileForm) => ProfileForm) => { setF(fn); setSaved(false); setDirty(true) }
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const errs = validateProfileForm(f)
-    setErrors(errs)
-    if (Object.keys(errs).length > 0) return
+  const doSubmit = async (levelChange?: 'update' | 'keep') => {
     setBusy(true)
     try {
-      await onSubmit(f, extra)
+      await onSubmit(f, extra, { levelChange })
       setSaved(true)
+      setDirty(false)
     } finally {
       setBusy(false)
     }
   }
 
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errs = validateProfileForm(f)
+    // A beginner needs both measurements.
+    if (beginner) {
+      if (f.heightCm.trim() === '') errs.heightCm = 'Beginner plans need your height. It stays on this phone.'
+      if (f.weightValue.trim() === '') errs.weightValue = 'Beginner plans need your body weight. It stays on this phone.'
+    }
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) return
+    if (onLevelChange && initial.trainingLevel !== f.trainingLevel) {
+      onLevelChange(initial.trainingLevel, f.trainingLevel, (mode) => void doSubmit(mode))
+      return
+    }
+    await doSubmit()
+  }
+
   const toggleDay = (d: number) =>
     set('trainingDays', f.trainingDays.includes(d) ? f.trainingDays.filter((x) => x !== d) : [...f.trainingDays, d])
+
+  const setPageUnit = (u: WeightUnit) =>
+    update((p) => {
+      // The body weight field follows the page unit unless it was given its own unit.
+      const follows = p.weightFieldUnit === p.weightUnit
+      const next = { ...p, weightUnit: u }
+      return follows ? withWeightFieldUnit(next, u) : next
+    })
 
   return (
     <form onSubmit={submit} noValidate>
@@ -53,15 +97,37 @@ export function ProfileFormView({
         )}
       </Field>
 
-      <Field label="Training experience" hint="Beginners get simpler exercises and fewer sets.">
-        {(id) => (
-          <select id={id} value={f.experienceLevel} onChange={(e) => set('experienceLevel', e.target.value as Experience)}>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
-        )}
-      </Field>
+      <fieldset className="field">
+        <legend>Training level</legend>
+        <div role="radiogroup" aria-label="Training level" className="level-list">
+          {LEVELS.map((l) => (
+            <label key={l} className={f.trainingLevel === l ? 'level on' : 'level'}>
+              <input type="radio" name="training-level" value={l} checked={f.trainingLevel === l} onChange={() => set('trainingLevel', l)} />
+              <span><strong>{LEVEL_LABEL[l]}</strong><br /><span className="hint">{LEVEL_HELP[l]}</span></span>
+            </label>
+          ))}
+        </div>
+        <p className="hint">Up to {LEVEL_PARAMS[f.trainingLevel].maxExercises} exercises per workout at this level. You can change it any time.</p>
+      </fieldset>
+
+      <div className={beginner ? 'required-block' : ''}>
+        <p className="label-like">{beginner ? 'Your height and weight (needed for beginners)' : 'Height and weight (optional)'}</p>
+        <HeightField form={f} update={update} error={errors.heightCm} />
+        <WeightField
+          label="Body weight"
+          value={f.weightValue}
+          unit={f.weightFieldUnit}
+          pageUnit={f.weightUnit}
+          error={errors.weightValue}
+          onChange={(v, u) => update((p) => ({ ...p, weightValue: v, weightFieldUnit: u }))}
+        />
+      </div>
+
+      <div className="field">
+        <p className="label-like">Weight units for this page</p>
+        <Chips label="Weight units" options={['lb', 'kg'] as const} value={f.weightUnit} onChange={setPageUnit} />
+        <p className="hint">The default for the weights you lift and your body weight. Each weight box can use its own unit too.</p>
+      </div>
 
       <fieldset className="field">
         <legend>Training days</legend>
@@ -82,16 +148,16 @@ export function ProfileFormView({
         <>
           <Field label="Where do you train?" hint="You can switch any time in Settings.">
             {(id) => (
-              <select id={id} value={extra.preferredLocation} onChange={(e) => setExtra({ ...extra, preferredLocation: e.target.value as LocationType })}>
+              <select id={id} value={extra.preferredLocation} onChange={(e) => { setExtra({ ...extra, preferredLocation: e.target.value as LocationType }); setDirty(true) }}>
                 <option value="gym">Gym</option>
                 <option value="home">Home</option>
               </select>
             )}
           </Field>
           {extra.preferredLocation === 'gym' && (
-            <Field label="Which gym?" hint="A starting equipment list. You will confirm it next.">
+            <Field label="Which gym?" hint="Planet Fitness gets a maintained equipment list. You can exclude anything your club does not have.">
               {(id) => (
-                <select id={id} value={extra.gymType} onChange={(e) => setExtra({ ...extra, gymType: e.target.value as GymType })}>
+                <select id={id} value={extra.gymType} onChange={(e) => { setExtra({ ...extra, gymType: e.target.value as GymType }); setDirty(true) }}>
                   <option value="planet_fitness">Planet Fitness</option>
                   <option value="generic">Another gym</option>
                 </select>
@@ -103,33 +169,25 @@ export function ProfileFormView({
 
       <details className="optional">
         <summary>Optional details</summary>
-        <p className="hint">These are never required. Weight is only used for the rough calorie estimate. Everything stays on this phone.</p>
+        <p className="hint">These are never required. Age and sex are only used for a rough energy estimate. Everything stays on this phone.</p>
         <Field label="Age" error={errors.age}>
           {(id, d) => <input id={id} aria-describedby={d} inputMode="numeric" value={f.age} onChange={(e) => set('age', e.target.value)} />}
         </Field>
-        <Field label="Body weight" error={errors.weightValue}>
-          {(id, d) => (
-            <div className="inline">
-              <input id={id} aria-describedby={d} inputMode="decimal" value={f.weightValue} onChange={(e) => set('weightValue', e.target.value)} />
-              <span className="muted">{f.weightUnit}</span>
-            </div>
+        <Field label="Sex (optional)" hint="Used only in the daily energy estimate on the Food tab. Leave blank to skip it.">
+          {(id) => (
+            <select id={id} value={f.sex} onChange={(e) => set('sex', e.target.value as '' | Sex)}>
+              <option value="">Prefer not to say</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
           )}
         </Field>
-        <Field label="Height" error={errors.heightValue}>
-          {(id, d) => (
-            <div className="inline">
-              <input id={id} aria-describedby={d} inputMode="decimal" value={f.heightValue} onChange={(e) => set('heightValue', e.target.value)} />
-              <Chips label="Height unit" options={['in', 'cm'] as const} value={f.heightUnit} onChange={(v) => set('heightUnit', v)} />
-            </div>
-          )}
-        </Field>
+        <label className="check">
+          <input type="checkbox" checked={f.nutritionGuidance} onChange={(e) => set('nutritionGuidance', e.target.checked)} />
+          <span>Show gentle next-day food guidance (optional)</span>
+        </label>
       </details>
 
-      <div className="field">
-        <p className="label-like">Weight units</p>
-        <Chips label="Weight units" options={['lb', 'kg'] as const} value={f.weightUnit} onChange={(v) => set('weightUnit', v)} />
-        <p className="hint">Used for the weights you lift and your body weight.</p>
-      </div>
       <Button type="submit" disabled={busy}>{busy ? 'Saving...' : submitLabel}</Button>
       {saved && <p className="ok" role="status">Saved.</p>}
     </form>

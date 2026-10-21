@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { isRoot, useRouter } from '../router'
 
 export function Card({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
   return (
@@ -27,9 +28,17 @@ export function EmptyState({ title, hint, children }: { title: string; hint: str
   )
 }
 
-export function ScreenHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+/** A page title. Every page that is not a main tab shows a Back control above it. */
+export function ScreenHeader({ title, subtitle, back }: { title: string; subtitle?: string; back?: boolean }) {
+  const { path, back: goBack } = useRouter()
+  const showBack = back ?? !isRoot(path)
   return (
     <header className="screen-header">
+      {showBack && (
+        <button type="button" className="back-btn" onClick={goBack} aria-label="Back">
+          <span aria-hidden="true">‹</span> Back
+        </button>
+      )}
       <h1>{title}</h1>
       {subtitle && <p className="muted">{subtitle}</p>}
     </header>
@@ -82,12 +91,15 @@ export function Field({
 /** Simple modal. Closes on Escape and when the backdrop is tapped. */
 export function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  useEffect(() => { closeRef.current = onClose })
+  // Focus moves into the dialog once, when it opens. It must not move again while the person types in a field inside it.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current()
     document.addEventListener('keydown', onKey)
     ref.current?.focus()
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
   return (
     <div className="backdrop" onClick={onClose}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} onClick={(e) => e.stopPropagation()}>

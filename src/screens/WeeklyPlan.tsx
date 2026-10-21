@@ -6,10 +6,13 @@ import { addDays, formatDay, startOfWeek, weekdayIndex, WEEKDAY_NAMES } from '..
 import { coverageOf, generateWeeklySchedule } from '../engine/split'
 import { ALL_MUSCLES, MUSCLE_LABEL, type Profile, type ScheduledWorkout } from '../engine/types'
 import { Button, Card, ConfirmDialog, ScreenHeader } from '../components/ui'
+import { ResetDay } from '../components/ResetDay'
+import { useRouter } from '../router'
 
 const STATUS_LABEL = { planned: 'Planned', completed: 'Completed', partial: 'Partly done', skipped: 'Skipped' } as const
 
-export function WeeklyPlan({ profile, today, onOpenSession }: { profile: Profile; today: string; onOpenSession: (id: string) => void }) {
+export function WeeklyPlan({ profile, today }: { profile: Profile; today: string }) {
+  const { navigate } = useRouter()
   const [offset, setOffset] = useState(0)
   const [open, setOpen] = useState<string | null>(today)
   const [suggest, setSuggest] = useState<{ id: string; date: string | null } | null>(null)
@@ -21,7 +24,7 @@ export function WeeklyPlan({ profile, today, onOpenSession }: { profile: Profile
 
   const monday = addDays(startOfWeek(today), offset * 7)
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
-  const split = plan ? generateWeeklySchedule({ trainingDays: plan.trainingDays, goal: profile.goal, experience: profile.experienceLevel }) : null
+  const split = plan ? generateWeeklySchedule({ trainingDays: plan.trainingDays, goal: profile.goal, experience: profile.trainingLevel }) : null
   const coverage = plan ? coverageOf(plan.schedule) : null
 
   const skip = async (r: ScheduledWorkout) => {
@@ -64,11 +67,14 @@ export function WeeklyPlan({ profile, today, onOpenSession }: { profile: Profile
                   </ul>
                 )}
                 {row && !row.workout && row.status === 'planned' && <p className="hint">Exercises are chosen on the day, from your equipment, time and history.</p>}
-                {session && <Button variant="ghost" onClick={() => onOpenSession(session.id)}>View saved workout</Button>}
+                {session && <Button variant="ghost" onClick={() => navigate(`/session/${session.id}`)}>View saved workout</Button>}
                 {row && row.status === 'planned' && date >= today && (
                   <Button variant="ghost" onClick={() => skip(row)}>Skip this day</Button>
                 )}
                 {row?.rescheduledFromId && <p className="hint">Moved here from a skipped day.</p>}
+                {(session || row?.workout || (row && row.status !== 'planned')) && date <= today && (
+                  <ResetDay date={date} today={today} />
+                )}
                 {suggest && row && suggest.id === row.id && (
                   <div className="notice" role="status">
                     {suggest.date ? (

@@ -1,5 +1,3 @@
-import type { WeightUnit } from './types'
-import { toKg } from './units'
 
 /**
  * Approximate energy use: kcal = MET x body weight (kg) x hours.
@@ -19,14 +17,13 @@ export interface CalorieEstimate {
 const round10 = (n: number) => Math.round(n / 10) * 10
 
 export function estimateCalories(opts: {
-  weightValue?: number
-  weightUnit: WeightUnit
+  /** Body weight in kilograms (the canonical stored unit). */
+  weightKg?: number
   activeMinutes: number
   averageEffort?: number
 }): CalorieEstimate | null {
-  const { weightValue, weightUnit, activeMinutes, averageEffort } = opts
-  if (!weightValue || weightValue <= 0 || activeMinutes < 5) return null
-  const kg = toKg(weightValue, weightUnit)
+  const { weightKg: kg, activeMinutes, averageEffort } = opts
+  if (!kg || kg <= 0 || activeMinutes < 5) return null
   const hours = activeMinutes / 60
   let lowMet = MET_LIGHT
   let highMet = MET_VIGOROUS

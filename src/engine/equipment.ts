@@ -1,5 +1,5 @@
 import type { EquipmentId, EquipmentItem, EquipmentSet, GymType, LocationType, WeightUnit } from './types'
-import { LOADABLE } from './types'
+import { ALL_EQUIPMENT, LOADABLE } from './types'
 
 export type PresetKind = 'home' | 'planet_fitness' | 'generic_gym'
 
@@ -16,15 +16,25 @@ function item(id: EquipmentId, available: boolean, unit: WeightUnit, load?: Part
   return { id, available, ...(available ? defaultLoad(id, unit) : null), ...load }
 }
 
-/** Starting points only. The user must confirm what their own location actually has. */
+/** Version and review date of the curated default lists (also in docs/planet-fitness-equipment.md). */
+export const PRESET_VERSION = 'presets-2'
+export const PRESET_REVIEWED = '2026-10-21'
+
+/**
+ * Starting points only. Individual locations differ.
+ * Planet Fitness: a typical club has cardio machines, selectorized strength machines, cables,
+ * Smith machines and dumbbells, but no barbells or squat racks. The user can mark anything missing at their club.
+ */
+export const PRESET_EQUIPMENT: Record<PresetKind, EquipmentId[]> = {
+  home: ['bodyweight', 'mat'],
+  planet_fitness: ['bodyweight', 'mat', 'dumbbell', 'machine', 'cable', 'smith', 'bench', 'treadmill', 'exercise_bike', 'elliptical', 'stair_climber'],
+  generic_gym: ['bodyweight', 'mat', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
+}
+
 export function presetEquipment(kind: PresetKind, unit: WeightUnit): EquipmentSet {
   const lb = unit === 'lb'
-  const ids: EquipmentId[] = ['bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'mat']
-  const on: Record<PresetKind, EquipmentId[]> = {
-    home: ['bodyweight', 'mat'],
-    planet_fitness: ['bodyweight', 'mat', 'dumbbell', 'machine', 'cable', 'smith', 'bench'],
-    generic_gym: ['bodyweight', 'mat', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands'],
-  }
+  const ids: EquipmentId[] = ALL_EQUIPMENT
+  const on = PRESET_EQUIPMENT
   const set: EquipmentSet = {}
   for (const id of ids) {
     const available = on[kind].includes(id)
@@ -45,11 +55,31 @@ export function presetFor(location: LocationType, gymType: GymType): PresetKind 
   return gymType === 'planet_fitness' ? 'planet_fitness' : 'generic_gym'
 }
 
-/** Equipment ids the user has confirmed as available. Bodyweight is always allowed. */
+/**
+ * Equipment ids the user has confirmed as available.
+ * Bodyweight is an ordinary option that is on unless the user explicitly turns it off.
+ * (A missing entry means "on", so older saved lists keep working.)
+ */
 export function availableIds(set: EquipmentSet): Set<EquipmentId> {
-  const out = new Set<EquipmentId>(['bodyweight'])
+  const out = new Set<EquipmentId>()
+  if (set.bodyweight?.available !== false) out.add('bodyweight')
   for (const it of Object.values(set)) if (it?.available) out.add(it.id)
   return out
+}
+
+/** A preset list with the items the user said their club does not have switched off. */
+export function withExclusions(set: EquipmentSet, excluded: EquipmentId[] = []): EquipmentSet {
+  const out: EquipmentSet = { ...set }
+  for (const id of excluded) {
+    const it = out[id]
+    if (it) out[id] = { ...it, available: false }
+  }
+  return out
+}
+
+/** Plain-language summary of what is available, for the "applied equipment" line. */
+export function equipmentSummary(set: EquipmentSet, labels: Record<EquipmentId, string>): string {
+  return [...availableIds(set)].map((id) => labels[id]).join(', ')
 }
 
 export function loadSpec(set: EquipmentSet, id: EquipmentId): { min: number; max: number; increment: number; unit: WeightUnit } | null {

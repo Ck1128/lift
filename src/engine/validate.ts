@@ -1,9 +1,6 @@
-import { ALL_MUSCLES, type EquipmentId, type Exercise } from './types'
+import { ALL_EQUIPMENT, ALL_MUSCLES, type Exercise } from './types'
 
-const EQUIPMENT: EquipmentId[] = [
-  'bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'smith',
-  'bench', 'pullup_bar', 'kettlebell', 'bands', 'mat',
-]
+const EQUIPMENT = ALL_EQUIPMENT
 const PATTERNS = ['push', 'pull', 'squat', 'hinge', 'lunge', 'core', 'isolation']
 
 /** Returns a list of problems. An empty list means the exercise is safe for the engine to use. */

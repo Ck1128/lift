@@ -9,7 +9,7 @@ export function secondsPerSet(goal: Goal): number {
   return goal === 'strength' ? 40 : 45
 }
 
-export function restSecondsFor(goal: Goal, compound: boolean): number {
+export function restSecondsFor(goal: Goal, compound: boolean, bonus = 0): number {
   const table: Record<Goal, [number, number]> = {
     strength: [150, 90],
     muscle: [90, 60],
@@ -17,7 +17,7 @@ export function restSecondsFor(goal: Goal, compound: boolean): number {
     endurance: [45, 45],
     fat_loss: [45, 45],
   }
-  return table[goal][compound ? 0 : 1]
+  return table[goal][compound ? 0 : 1] + bonus
 }
 
 export interface TimedExercise {
@@ -33,12 +33,18 @@ export function warmupSeconds(minutes: number): number {
   return minutes >= MIN_WARMUP_SESSION_MINUTES ? WARMUP_SECONDS : 0
 }
 
-export function estimateSeconds(exercises: TimedExercise[], goal: Goal, minutes: number): number {
-  return warmupSeconds(minutes) + exercises.reduce((sum, e) => sum + exerciseSeconds(e, goal), 0)
+/** Cardio counts in full, plus the time to get onto the machine. */
+export function cardioSeconds(cardioMinutes: number): number {
+  return cardioMinutes > 0 ? cardioMinutes * 60 + TRANSITION_SECONDS : 0
 }
 
-export function assumptionsText(goal: Goal, minutes: number): string[] {
+export function estimateSeconds(exercises: TimedExercise[], goal: Goal, minutes: number, cardioMinutes = 0): number {
+  return warmupSeconds(minutes) + exercises.reduce((sum, e) => sum + exerciseSeconds(e, goal), 0) + cardioSeconds(cardioMinutes)
+}
+
+export function assumptionsText(goal: Goal, minutes: number, cardioMinutes = 0): string[] {
   return [
+    ...(cardioMinutes > 0 ? [`${cardioMinutes} minutes of cardio are included, plus ${TRANSITION_SECONDS} seconds to get on the machine.`] : []),
     `About ${secondsPerSet(goal)} seconds per set.`,
     `Rest between sets depends on your goal (${restSecondsFor(goal, true)} s for big lifts, ${restSecondsFor(goal, false)} s for smaller ones).`,
     `${TRANSITION_SECONDS} seconds to move between exercises.`,

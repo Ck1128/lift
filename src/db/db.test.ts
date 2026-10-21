@@ -9,20 +9,25 @@ import { backupFilename, exportBackup, importBackup, parseBackup, previewBackup,
 import { buildLastPerformance, exerciseTrend, personalRecords, setsPerMuscle, workoutsPerWeek, activeMinutes } from '../engine/history'
 import { presetEquipment } from '../engine/equipment'
 import { exerciseById } from '../data/catalog'
+import { GENERATOR_VERSION } from '../engine/generate'
 
 const TODAY = '2026-10-21' // a Wednesday
 const TODAY_DATE = new Date(2026, 9, 21)
 
-async function setup(days = [0, 2, 4]) {
+async function setup(days = [0, 2, 4], level: 'beginner' | 'intermediate' | 'regular' = 'intermediate') {
   await resetAllData()
-  const form = { ...profileToForm(), weightValue: '180', trainingDays: days }
+  const form = { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: level, trainingDays: days }
   return saveProfile(form, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
 }
 
 async function doSession(scheduledId: string, reps = 10, weight = 100) {
   const s = await startSession(scheduledId, 'lb')
   const logs = await logsOf(s.id)
-  for (const l of logs) await updateSet(l.id, { actualReps: reps, actualWeight: weight, completed: true })
+  for (const l of logs) {
+    // Cardio has minutes, not reps and weight.
+    if (!exerciseById(l.exerciseId)) await updateSet(l.id, { actualMinutes: 10, completed: true })
+    else await updateSet(l.id, { actualReps: reps, actualWeight: weight, completed: true })
+  }
   return finishSession(s.id, 'finish')
 }
 
@@ -40,7 +45,7 @@ describe('profile and equipment persistence', () => {
     const p = await setup()
     expect((await getProfile())?.id).toBe(p.id)
     expect(p.preferredLocation).toBe('gym')
-    const upd = await saveProfile({ ...profileToForm(p), displayName: 'Sam', weightUnit: 'kg', weightValue: '80' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
+    const upd = await saveProfile({ ...profileToForm(p), displayName: 'Sam', weightUnit: 'kg', weightFieldUnit: 'kg', weightValue: '80' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
     const again = await getProfile()
     expect(again?.displayName).toBe('Sam')
     expect(again?.weightUnit).toBe('kg')
@@ -116,7 +121,7 @@ describe('weekly plan and scheduling', () => {
   })
 
   it('says there is no good day when every neighbour repeats the same muscles (full-body split)', async () => {
-    await setup([0, 2, 4])
+    await setup([0, 2, 4], 'beginner')
     const sc = (await scheduledOn(TODAY))!
     expect((await skipScheduled(sc.id, TODAY)).suggestion).toBeNull()
   })
@@ -148,7 +153,7 @@ describe('generation cache', () => {
     expect((await db.scheduled.get(sc.id))!.updatedAt).not.toBe(stamp)
     const c = await generateFor(sc.id, 30, { today: TODAY })
     if (c.kind === 'workout') expect(c.workout.availableMinutes).toBe(30)
-    expect((await db.scheduled.get(sc.id))!.generatorVersion).toBe('gen-1.0')
+    expect((await db.scheduled.get(sc.id))!.generatorVersion).toBe(GENERATOR_VERSION)
   })
 })
 
@@ -265,8 +270,8 @@ describe('progress metrics come from saved records', () => {
     expect(wk[3].count).toBe(1)
     expect(wk[0].count).toBe(0)
     const per = setsPerMuscle(sessions, logs, TODAY, 7, (id) => exerciseById(id)?.primaryMuscles ?? [])
-    expect(Object.values(per).reduce((a, b) => a + (b ?? 0), 0)).toBe(logs.length)
-    const exId = logs[0].exerciseId
+    expect(Object.values(per).reduce((a, b) => a + (b ?? 0), 0)).toBe(logs.filter((l) => exerciseById(l.exerciseId)).length)
+    const exId = logs.find((l) => exerciseById(l.exerciseId))!.exerciseId
     expect(exerciseTrend(exId, sessions, logs)[0].topWeight).toBe(100)
     expect(personalRecords(sessions, logs).find((r) => r.exerciseId === exId)?.weight).toBe(100)
     expect(done.status).toBe('completed')
@@ -298,8 +303,46 @@ describe('schema migration', () => {
     expect(s.pausedMs).toBe(0)
     expect(await upgraded.soreness.count()).toBe(0) // new tables exist
     expect(await upgraded.bodyWeights.count()).toBe(0)
-    expect(upgraded.verno).toBe(2)
+    expect(upgraded.verno).toBe(3)
+    expect(await upgraded.yogaSessions.count()).toBe(0)
+    expect(await upgraded.foodLog.count()).toBe(0)
     upgraded.close()
+    await Dexie.delete(name)
+  })
+
+  it('upgrades a version-2 profile: height to cm, weight to kg, level names mapped, nothing dropped', async () => {
+    const name = 'migration-v2-fixture'
+    await Dexie.delete(name)
+    const old = new Dexie(name)
+    old.version(1).stores({
+      profile: 'id', equipment: 'location', plans: 'id, profileId, startDate', scheduled: 'id, date, planId, status',
+      sessions: 'id, date, status, scheduledWorkoutId', setLogs: 'id, sessionId, exerciseId, slotId', settings: 'key',
+    })
+    old.version(2).stores({ soreness: 'id, date, muscle', bodyWeights: 'id, date' })
+    await old.table('profile').add({
+      id: 'p2', displayName: 'Sam', age: 30, heightValue: 70, heightUnit: 'in', weightValue: 180, weightUnit: 'lb',
+      goal: 'muscle', experienceLevel: 'advanced', trainingDays: [0, 2, 4], preferredDurationMinutes: 45,
+      preferredLocation: 'gym', gymType: 'planet_fitness', excludedExerciseIds: ['x'], excludedPatterns: [],
+    })
+    await old.table('sessions').add({ id: 's2', date: '2026-02-02', status: 'completed', plannedExercises: [], actualExercises: [], startedAt: '2026-02-02T10:00:00Z', generatorVersion: 'gen-1.0', pausedMs: 0, targetMuscles: [] })
+    await old.table('setLogs').add({ id: 'l2', sessionId: 's2', exerciseId: 'e', slotId: 's1', setNumber: 1, weightUnit: 'lb', completed: true, actualReps: 8, actualWeight: 135 })
+    old.close()
+
+    const up = new LiftDB(name)
+    await up.open()
+    const p = (await up.profile.get('p2'))! as unknown as Record<string, unknown>
+    expect(p.heightCm).toBeCloseTo(177.8, 1)
+    expect(p.heightDisplayUnit).toBe('ft-in')
+    expect(p.weightKg).toBeCloseTo(81.65, 1)
+    expect(p.trainingLevel).toBe('regular')
+    expect(p.nutritionGuidance).toBe(false)
+    for (const gone of ['heightValue', 'heightUnit', 'weightValue', 'experienceLevel']) expect(p[gone]).toBeUndefined()
+    // everything else survived
+    expect(p.displayName).toBe('Sam')
+    expect(p.excludedExerciseIds).toEqual(['x'])
+    expect((await up.setLogs.get('l2'))?.actualWeight).toBe(135)
+    expect((await up.sessions.get('s2'))?.updatedAt).toBe('2026-02-02T10:00:00Z')
+    up.close()
     await Dexie.delete(name)
   })
 })
@@ -317,7 +360,8 @@ describe('backup and restore', () => {
     const p = await seed()
     const file = await exportBackup()
     expect(file.format).toBe('lift-backup')
-    expect(file.version).toBe(1)
+    expect(file.version).toBe(2)
+    expect(file.includesFood).toBe(false)
     expect(file.exportedAt).toMatch(/^\d{4}-/)
     expect(backupFilename(new Date('2026-10-21T12:00:00Z'))).toBe('lift-backup-2026-10-21.json')
     const parsed = parseBackup(JSON.stringify(file))
@@ -334,6 +378,43 @@ describe('backup and restore', () => {
       const sortKey = (r: unknown) => JSON.stringify(r)
       expect(again.data[t].map(sortKey).sort()).toEqual(file.data[t].map(sortKey).sort())
     }
+  })
+
+  it('an old version 1 backup still imports, with height and weight converted', async () => {
+    await seed()
+    const file = await exportBackup()
+    const v1 = JSON.parse(JSON.stringify(file)) as BackupFile & { data: Record<string, Record<string, unknown>[]> }
+    v1.version = 1
+    const p = v1.data.profile[0] as Record<string, unknown>
+    for (const k of ['heightCm', 'heightDisplayUnit', 'weightKg', 'trainingLevel', 'nutritionGuidance']) delete p[k]
+    Object.assign(p, { heightValue: 70, heightUnit: 'in', weightValue: 180, experienceLevel: 'intermediate' })
+    delete (v1 as { includesFood?: boolean }).includesFood
+    delete (v1.data as Record<string, unknown>).yogaSessions
+    delete (v1.data as Record<string, unknown>).foodLog
+    const parsed = parseBackup(JSON.stringify(v1))
+    if (!parsed.ok) throw new Error(parsed.error)
+    await importBackup(parsed.backup, 'replace')
+    const got = (await getProfile())!
+    expect(got.heightCm).toBeCloseTo(177.8, 1)
+    expect(got.weightKg).toBeCloseTo(81.65, 1)
+    expect(got.trainingLevel).toBe('intermediate')
+  })
+
+  it('food is only in a backup when asked for, and a file without food leaves the food log alone', async () => {
+    await seed()
+    await db.foodLog.add({
+      id: 'f1', date: TODAY, mealCategory: 'lunch', name: 'Rice', provider: 'local', providerId: 'rice', source: 'test', state: 'cooked',
+      portionValue: 100, portionUnit: 'g', kcal: 130, basis: { basis: 'g', kcalPer100: 130, unitSize: {} }, createdAt: 'x', updatedAt: 'x',
+    } as never)
+    const without = await exportBackup()
+    expect(without.data.foodLog).toEqual([])
+    const withFood = await exportBackup({ includeFood: true })
+    expect(withFood.includesFood).toBe(true)
+    expect(withFood.data.foodLog).toHaveLength(1)
+    const parsed = parseBackup(JSON.stringify(without))
+    if (!parsed.ok) throw new Error(parsed.error)
+    await importBackup(parsed.backup, 'replace')
+    expect(await db.foodLog.count()).toBe(1) // untouched
   })
 
   it('merge keeps existing data and adds only new records', async () => {

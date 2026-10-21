@@ -7,7 +7,7 @@ import { estimateCalories } from './calories'
 import { suggestReschedule } from './reschedule'
 import { estimateSeconds, restSecondsFor } from './time'
 import { validateExercise } from './validate'
-import { validateProfileForm, type ProfileForm } from './validateProfile'
+import { profileFormFrom, validateProfileForm, type ProfileForm } from './validateProfile'
 import { convertWeight } from './units'
 import { addDays, weekdayIndex, startOfWeek } from './dates'
 import type { LastPerformance, EquipmentId, Exercise } from './types'
@@ -33,6 +33,9 @@ function workoutOf(input: GenerateInput) {
   if (r.kind !== 'workout') throw new Error('expected workout, got ' + r.kind)
   return r.workout
 }
+
+/** Strength exercises only. Cardio blocks are not in the exercise catalog. */
+const lifts = (w: { exercises: { kind?: string }[] }) => w.exercises.filter((e) => e.kind !== 'cardio') as ReturnType<typeof workoutOf>['exercises']
 
 describe('catalog', () => {
   it('has stable unique ids and only valid entries', () => {
@@ -67,7 +70,7 @@ describe('equipment and exclusions', () => {
       for (const muscles of [['chest', 'back'], ['quads', 'hamstrings', 'glutes', 'calves'], ['shoulders', 'biceps', 'triceps', 'core']] as const) {
         const r = generateWorkout(base({ equipment, planDay: { focus: 't', muscles: [...muscles] } }))
         if (r.kind !== 'workout') continue
-        for (const pe of r.workout.exercises) {
+        for (const pe of lifts(r.workout)) {
           const ex = CATALOG.find((e) => e.id === pe.exerciseId)!
           for (const q of ex.equipmentIds) expect(avail.has(q as EquipmentId)).toBe(true)
         }
@@ -77,27 +80,27 @@ describe('equipment and exclusions', () => {
 
   it('removing equipment changes future workouts', () => {
     const eq = presetEquipment('planet_fitness', 'lb')
-    const withDb = workoutOf(base({ equipment: eq })).exercises.map((e) => e.exerciseId)
+    const withDb = lifts(workoutOf(base({ equipment: eq }))).map((e) => e.exerciseId)
     eq.dumbbell = { ...eq.dumbbell!, available: false }
-    const without = workoutOf(base({ equipment: eq })).exercises
+    const without = lifts(workoutOf(base({ equipment: eq })))
     for (const e of without) expect(CATALOG.find((c) => c.id === e.exerciseId)!.equipmentIds).not.toContain('dumbbell')
     expect(without.map((e) => e.exerciseId)).not.toEqual(withDb)
   })
 
   it('home with only bodyweight still returns a workout using no equipment', () => {
     const w = workoutOf(base({ equipment: presetEquipment('home', 'lb'), planDay: { focus: 'Lower', muscles: ['quads', 'glutes', 'core'] } }))
-    for (const pe of w.exercises) {
+    for (const pe of lifts(w)) {
       const ex = CATALOG.find((e) => e.id === pe.exerciseId)!
       expect(ex.equipmentIds.every((q) => q === 'bodyweight')).toBe(true)
     }
   })
 
   it('never selects excluded exercises or patterns', () => {
-    const first = workoutOf(base()).exercises.map((e) => e.exerciseId)
+    const first = lifts(workoutOf(base())).map((e) => e.exerciseId)
     const w = workoutOf(base({ excludedExerciseIds: first }))
-    for (const e of w.exercises) expect(first).not.toContain(e.exerciseId)
+    for (const e of lifts(w)) expect(first).not.toContain(e.exerciseId)
     const w2 = workoutOf(base({ excludedPatterns: ['push'] }))
-    for (const pe of w2.exercises) expect(CATALOG.find((e) => e.id === pe.exerciseId)!.movementPattern).not.toBe('push')
+    for (const pe of lifts(w2)) expect(CATALOG.find((e) => e.id === pe.exerciseId)!.movementPattern).not.toBe('push')
   })
 
   it('returns a clear error when nothing is eligible', () => {
@@ -109,7 +112,7 @@ describe('equipment and exclusions', () => {
 
   it('beginners only get beginner exercises', () => {
     const w = workoutOf(base({ experience: 'beginner' }))
-    for (const pe of w.exercises) expect(CATALOG.find((e) => e.id === pe.exerciseId)!.difficulty).toBe('beginner')
+    for (const pe of lifts(w)) expect(CATALOG.find((e) => e.id === pe.exerciseId)!.difficulty).toBe('beginner')
   })
 
   it('alternatives respect exclusions and equipment', () => {
@@ -141,26 +144,26 @@ describe('time and fit', () => {
   it('every generated session that claims to fit really fits its own estimate', () => {
     for (const minutes of [20, 30, 45, 60, 75]) {
       const w = workoutOf(base({ minutes }))
-      const secs = estimateSeconds(w.exercises, 'muscle', minutes)
+      const secs = estimateSeconds(lifts(w), 'muscle', minutes, w.cardioMinutes ?? 0)
       expect(Math.ceil(secs / 60)).toBe(w.estimatedMinutes)
       if (w.fits) expect(secs).toBeLessThanOrEqual(minutes * 60)
     }
   })
 
   it('says so when it cannot fit, instead of claiming it does', () => {
-    const w = workoutOf(base({ minutes: 10, goal: 'strength' }))
+    const w = workoutOf(base({ minutes: 15, goal: 'strength' }))
     if (!w.fits) expect(w.notes.join(' ')).toMatch(/longer than/)
-    else expect(w.estimatedMinutes).toBeLessThanOrEqual(10)
+    else expect(w.estimatedMinutes).toBeLessThanOrEqual(15)
   })
 
   it('a short session still starts with the scheduled muscles', () => {
     const w = workoutOf(base({ minutes: 20 }))
-    const muscles = new Set(w.exercises.flatMap((e) => CATALOG.find((c) => c.id === e.exerciseId)!.primaryMuscles))
+    const muscles = new Set(lifts(w).flatMap((e) => CATALOG.find((c) => c.id === e.exerciseId)!.primaryMuscles))
     expect([...muscles].every((m) => base().planDay!.muscles.includes(m))).toBe(true)
   })
 
   it('every exercise has sets, reps, rest and an explanation', () => {
-    for (const e of workoutOf(base()).exercises) {
+    for (const e of lifts(workoutOf(base()))) {
       expect(e.sets).toBeGreaterThanOrEqual(2)
       expect(e.repMin).toBeLessThanOrEqual(e.repMax)
       expect(e.restSeconds).toBeGreaterThan(0)
@@ -269,7 +272,7 @@ describe('progression', () => {
 
 describe('calories', () => {
   it('returns a labelled rough range', () => {
-    const c = estimateCalories({ weightValue: 180, weightUnit: 'lb', activeMinutes: 45 })!
+    const c = estimateCalories({ weightKg: 81.65, activeMinutes: 45 })!
     expect(c.low).toBeLessThan(c.high)
     expect(c.text).toMatch(/rough estimate/)
     // 180 lb = 81.6 kg, 0.75 h: 3.5 MET ~ 214, 6 MET ~ 367
@@ -277,19 +280,19 @@ describe('calories', () => {
     expect(c.high).toBe(370)
   })
   it('changes with body weight and duration', () => {
-    const a = estimateCalories({ weightValue: 150, weightUnit: 'lb', activeMinutes: 30 })!
-    const b = estimateCalories({ weightValue: 200, weightUnit: 'lb', activeMinutes: 30 })!
-    const c = estimateCalories({ weightValue: 150, weightUnit: 'lb', activeMinutes: 60 })!
+    const a = estimateCalories({ weightKg: 68, activeMinutes: 30 })!
+    const b = estimateCalories({ weightKg: 90.7, activeMinutes: 30 })!
+    const c = estimateCalories({ weightKg: 68, activeMinutes: 60 })!
     expect(b.high).toBeGreaterThan(a.high)
     expect(c.high).toBeGreaterThan(a.high)
   })
   it('omits the estimate when there is not enough information', () => {
-    expect(estimateCalories({ weightUnit: 'lb', activeMinutes: 45 })).toBeNull()
-    expect(estimateCalories({ weightValue: 150, weightUnit: 'lb', activeMinutes: 2 })).toBeNull()
+    expect(estimateCalories({ activeMinutes: 45 })).toBeNull()
+    expect(estimateCalories({ weightKg: 68, activeMinutes: 2 })).toBeNull()
   })
   it('uses effort to narrow the range', () => {
-    const hard = estimateCalories({ weightValue: 150, weightUnit: 'lb', activeMinutes: 45, averageEffort: 9 })!
-    const easy = estimateCalories({ weightValue: 150, weightUnit: 'lb', activeMinutes: 45, averageEffort: 5 })!
+    const hard = estimateCalories({ weightKg: 68, activeMinutes: 45, averageEffort: 9 })!
+    const easy = estimateCalories({ weightKg: 68, activeMinutes: 45, averageEffort: 5 })!
     expect(hard.low).toBeGreaterThan(easy.low)
     expect(hard.high).toBeGreaterThan(easy.high)
   })
@@ -311,22 +314,19 @@ describe('rescheduling', () => {
 })
 
 describe('validation, units and dates', () => {
-  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({
-    displayName: '', age: '', heightValue: '', heightUnit: 'in', weightValue: '', weightUnit: 'lb',
-    goal: 'muscle', experienceLevel: 'beginner', trainingDays: [0, 2, 4], preferredDurationMinutes: '45', ...o,
-  })
+  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), ...o })
   it('accepts a minimal profile', () => expect(validateProfileForm(form())).toEqual({}))
   it('rejects bad numbers with understandable messages', () => {
-    const e = validateProfileForm(form({ age: '7', heightValue: '5', weightValue: '20', trainingDays: [], preferredDurationMinutes: 'abc' }))
+    const e = validateProfileForm(form({ age: '7', heightCm: '50', weightValue: '20', trainingDays: [], preferredDurationMinutes: 'abc' }))
     expect(e.age).toMatch(/13 and 100/)
-    expect(e.heightValue).toMatch(/40 and 100 in/)
-    expect(e.weightValue).toMatch(/66 and 660 lb/)
+    expect(e.heightCm).toMatch(/ft .* in/)
+    expect(e.weightValue).toMatch(/66 and 66\d lb/)
     expect(e.trainingDays).toMatch(/at least one/)
-    expect(e.preferredDurationMinutes).toMatch(/15 and 120/)
+    expect(e.preferredDurationMinutes).toMatch(/15 and 180/)
   })
-  it('validates ranges in the chosen unit, never silently', () => {
-    expect(validateProfileForm(form({ weightUnit: 'kg', weightValue: '80' })).weightValue).toBeUndefined()
-    expect(validateProfileForm(form({ weightUnit: 'lb', weightValue: '25' })).weightValue).toBeDefined()
+  it('validates ranges in the unit of the field, never silently', () => {
+    expect(validateProfileForm(form({ weightFieldUnit: 'kg', weightValue: '80' })).weightValue).toBeUndefined()
+    expect(validateProfileForm(form({ weightFieldUnit: 'lb', weightValue: '25' })).weightValue).toBeDefined()
   })
   it('converts units both ways', () => {
     expect(convertWeight(100, 'kg', 'lb')).toBeCloseTo(220.46, 1)

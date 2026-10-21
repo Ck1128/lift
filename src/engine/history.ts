@@ -1,4 +1,5 @@
-import type { LastPerformance, Muscle, SetLog, WorkoutSession } from './types'
+import type { LastPerformance, Muscle, SetLog, WeightUnit, WorkoutSession } from './types'
+import { convertWeight, tidy } from './units'
 import { addDays, daysBetween, startOfWeek } from './dates'
 
 const counted = (s: WorkoutSession) => s.status === 'completed' || s.status === 'partial'
@@ -70,32 +71,41 @@ export function setsPerMuscle(
 
 export interface TrendPoint { date: string; topWeight: number; totalReps: number; unit: string }
 
-export function exerciseTrend(exerciseId: string, sessions: WorkoutSession[], logs: SetLog[]): TrendPoint[] {
+/**
+ * Heaviest weight per session. Sets entered in different units are converted to `unit` (default: the unit of the first set),
+ * so a session in kg and one in lb are drawn on the same line without mixing the numbers.
+ */
+export function exerciseTrend(exerciseId: string, sessions: WorkoutSession[], logs: SetLog[], unit?: WeightUnit): TrendPoint[] {
   const pts: TrendPoint[] = []
+  const target: WeightUnit | undefined = unit ?? logs.find((l) => l.exerciseId === exerciseId && l.completed)?.weightUnit
+  const w = (l: SetLog) => (l.actualWeight === undefined ? 0 : target ? tidy(convertWeight(l.actualWeight, l.weightUnit, target)) : l.actualWeight)
   for (const s of sessions.filter(counted).sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
     const mine = logs.filter((l) => l.sessionId === s.id && l.exerciseId === exerciseId && l.completed && (l.actualReps ?? 0) > 0)
     if (mine.length === 0) continue
     pts.push({
       date: s.date,
-      topWeight: Math.max(0, ...mine.map((l) => l.actualWeight ?? 0)),
+      topWeight: Math.max(0, ...mine.map(w)),
       totalReps: mine.reduce((n, l) => n + (l.actualReps ?? 0), 0),
-      unit: mine[0].weightUnit,
+      unit: target ?? mine[0].weightUnit,
     })
   }
   return pts
 }
 
 /** Personal record = the heaviest weight lifted for at least one rep in a completed set (same unit only). */
-export function personalRecords(sessions: WorkoutSession[], logs: SetLog[]): { exerciseId: string; weight: number; reps: number; unit: string; date: string }[] {
+export function personalRecords(sessions: WorkoutSession[], logs: SetLog[], unit?: WeightUnit): { exerciseId: string; weight: number; reps: number; unit: string; date: string }[] {
   const dateOf = new Map(sessions.filter(counted).map((s) => [s.id, s.date]))
   const best = new Map<string, { exerciseId: string; weight: number; reps: number; unit: string; date: string }>()
   for (const l of logs) {
     const date = dateOf.get(l.sessionId)
     if (!date || !l.completed || !(l.actualWeight && l.actualWeight > 0) || !(l.actualReps && l.actualReps > 0)) continue
-    const key = `${l.exerciseId}|${l.weightUnit}`
+    // With a chosen unit every set is converted into it, so kg and lb sets compete fairly.
+    const u = unit ?? l.weightUnit
+    const weight = unit ? tidy(convertWeight(l.actualWeight, l.weightUnit, unit)) : l.actualWeight
+    const key = `${l.exerciseId}|${u}`
     const cur = best.get(key)
-    if (!cur || l.actualWeight > cur.weight || (l.actualWeight === cur.weight && l.actualReps > cur.reps)) {
-      best.set(key, { exerciseId: l.exerciseId, weight: l.actualWeight, reps: l.actualReps, unit: l.weightUnit, date })
+    if (!cur || weight > cur.weight || (weight === cur.weight && l.actualReps > cur.reps)) {
+      best.set(key, { exerciseId: l.exerciseId, weight, reps: l.actualReps, unit: u, date })
     }
   }
   return [...best.values()].sort((a, b) => a.exerciseId.localeCompare(b.exerciseId))

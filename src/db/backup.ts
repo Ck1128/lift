@@ -1,9 +1,14 @@
-import { APP_VERSION, db, DB_SCHEMA_VERSION, nowIso } from './schema'
+import { APP_VERSION, db, DB_SCHEMA_VERSION, nowIso, upgradeProfileV2 } from './schema'
+import { ALL_EQUIPMENT } from '../engine/types'
 
 export const BACKUP_FORMAT = 'lift-backup'
-export const BACKUP_VERSION = 1
+/** Version 2 adds yoga sessions and an optional food log, and stores height and weight in cm and kg. Version 1 files still import. */
+export const BACKUP_VERSION = 2
 
-const TABLES = ['profile', 'equipment', 'plans', 'scheduled', 'sessions', 'setLogs', 'settings', 'soreness', 'bodyWeights'] as const
+const CORE_TABLES = ['profile', 'equipment', 'plans', 'scheduled', 'sessions', 'setLogs', 'settings', 'soreness', 'bodyWeights', 'yogaSessions'] as const
+/** Food is personal, so it is only in a backup when the person chose to include it. */
+const OPTIONAL_TABLES = ['foodLog'] as const
+const TABLES = [...CORE_TABLES, ...OPTIONAL_TABLES] as const
 type TableName = (typeof TABLES)[number]
 
 export interface BackupFile {
@@ -12,13 +17,16 @@ export interface BackupFile {
   exportedAt: string
   appVersion: string
   schemaVersion: number
+  /** True when the food log is part of this file. */
+  includesFood?: boolean
   data: Record<TableName, unknown[]>
 }
 
-export async function exportBackup(): Promise<BackupFile> {
+export async function exportBackup(opts: { includeFood?: boolean } = {}): Promise<BackupFile> {
   const data = {} as Record<TableName, unknown[]>
-  for (const t of TABLES) data[t] = await db.table(t).toArray()
-  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: nowIso(), appVersion: APP_VERSION, schemaVersion: DB_SCHEMA_VERSION, data }
+  for (const t of CORE_TABLES) data[t] = await db.table(t).toArray()
+  data.foodLog = opts.includeFood ? await db.table('foodLog').toArray() : []
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, includesFood: !!opts.includeFood, exportedAt: nowIso(), appVersion: APP_VERSION, schemaVersion: DB_SCHEMA_VERSION, data }
 }
 
 export function backupFilename(d = new Date()): string {
@@ -36,7 +44,7 @@ const GOALS = ['muscle', 'strength', 'general', 'endurance', 'fat_loss'] as cons
 const MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'core'] as const
 const SESSION_STATUS = ['in_progress', 'completed', 'partial', 'abandoned'] as const
 const SCHEDULED_STATUS = ['planned', 'completed', 'partial', 'skipped'] as const
-const EQUIPMENT = ['bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'mat'] as const
+const EQUIPMENT: readonly string[] = ALL_EQUIPMENT
 
 type Check = (r: Record<string, unknown>) => string | null
 
@@ -45,7 +53,10 @@ const CHECKS: Record<TableName, Check> = {
     !isStr(r.id) ? 'missing id'
     : !oneOf(r.goal, GOALS) ? 'unknown goal'
     : !oneOf(r.weightUnit, UNITS) ? 'bad weight unit'
-    : !oneOf(r.heightUnit, ['cm', 'in']) ? 'bad height unit'
+    : r.heightDisplayUnit !== undefined && !oneOf(r.heightDisplayUnit, ['cm', 'ft-in']) ? 'bad height unit'
+    : r.heightCm !== undefined && (!isNum(r.heightCm) || r.heightCm < 50 || r.heightCm > 300) ? 'bad height'
+    : r.weightKg !== undefined && (!isNum(r.weightKg) || r.weightKg < 10 || r.weightKg > 700) ? 'bad body weight'
+    : !oneOf(r.trainingLevel, ['beginner', 'intermediate', 'regular']) ? 'bad training level'
     : !Array.isArray(r.trainingDays) || r.trainingDays.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? 'bad training days'
     : !isNum(r.preferredDurationMinutes) ? 'bad duration' : null,
   equipment: (r) =>
@@ -73,11 +84,20 @@ const CHECKS: Record<TableName, Check> = {
     : r.actualWeight !== undefined && (!isNum(r.actualWeight) || r.actualWeight < 0 || r.actualWeight > 2000) ? 'bad weight' : null,
   settings: (r) => (!isStr(r.key) ? 'missing key' : null),
   soreness: (r) => (!isStr(r.id) ? 'missing id' : !oneOf(r.muscle, MUSCLES) ? 'bad muscle' : ![1, 2, 3].includes(r.level as number) ? 'bad level' : !isStr(r.date) || !DATE.test(r.date) ? 'bad date' : null),
+  yogaSessions: (r) =>
+    !isStr(r.id) ? 'missing id'
+    : !isStr(r.date) || !DATE.test(r.date) ? 'bad date'
+    : !isStr(r.status) ? 'bad status' : null,
+  foodLog: (r) =>
+    !isStr(r.id) ? 'missing id'
+    : !isStr(r.date) || !DATE.test(r.date) ? 'bad date'
+    : !oneOf(r.mealCategory, ['breakfast', 'lunch', 'dinner', 'evening_snacks', 'other']) ? 'bad meal category'
+    : r.calories !== undefined && (!isNum(r.calories) || r.calories < 0 || r.calories > 20000) ? 'bad calories' : null,
   bodyWeights: (r) => (!isStr(r.id) ? 'missing id' : !isNum(r.value) || r.value <= 0 ? 'bad value' : !oneOf(r.unit, UNITS) ? 'bad unit' : !isStr(r.date) || !DATE.test(r.date) ? 'bad date' : null),
 }
 
 const KEY: Record<TableName, string> = {
-  profile: 'id', equipment: 'location', plans: 'id', scheduled: 'id', sessions: 'id', setLogs: 'id', settings: 'key', soreness: 'id', bodyWeights: 'id',
+  profile: 'id', equipment: 'location', plans: 'id', scheduled: 'id', sessions: 'id', setLogs: 'id', settings: 'key', soreness: 'id', bodyWeights: 'id', yogaSessions: 'id', foodLog: 'id',
 }
 
 export type ParseResult = { ok: true; backup: BackupFile } | { ok: false; error: string }
@@ -96,7 +116,11 @@ export function parseBackup(text: string): ParseResult {
   if (!isObj(raw.data)) return { ok: false, error: 'The backup has no data section.' }
   const data = {} as Record<TableName, unknown[]>
   for (const t of TABLES) {
-    const rows = (raw.data as Record<string, unknown>)[t] ?? []
+    let rows = (raw.data as Record<string, unknown>)[t] ?? []
+    // Older backups store height and weight as typed. Convert them the same way the database upgrade does.
+    if (t === 'profile' && Array.isArray(rows) && raw.version < 2) {
+      rows = rows.map((p) => (isObj(p) ? upgradeProfileV2(p) : p))
+    }
     if (!Array.isArray(rows)) return { ok: false, error: `The "${t}" section is damaged.` }
     const seen = new Set<string>()
     for (const [i, row] of rows.entries()) {
@@ -118,7 +142,8 @@ export function parseBackup(text: string): ParseResult {
     ok: true,
     backup: {
       format: BACKUP_FORMAT, version: raw.version, exportedAt: String(raw.exportedAt ?? ''),
-      appVersion: String(raw.appVersion ?? ''), schemaVersion: Number(raw.schemaVersion ?? 0), data,
+      appVersion: String(raw.appVersion ?? ''), schemaVersion: Number(raw.schemaVersion ?? 0),
+      includesFood: raw.includesFood === true, data,
     },
   }
 }
@@ -127,6 +152,9 @@ export interface BackupPreview {
   exportedAt: string
   profileName?: string
   workouts: number
+  yogaSessions: number
+  foodEntries: number
+  includesFood: boolean
   sets: number
   firstDate?: string
   lastDate?: string
@@ -138,7 +166,7 @@ export function previewBackup(b: BackupFile): BackupPreview {
   const profile = b.data.profile[0] as { displayName?: string } | undefined
   return {
     exportedAt: b.exportedAt, profileName: profile?.displayName, workouts: sessions.length,
-    sets: b.data.setLogs.length, firstDate: dates[0], lastDate: dates[dates.length - 1],
+    sets: b.data.setLogs.length, yogaSessions: b.data.yogaSessions.length, foodEntries: b.data.foodLog.length, includesFood: !!b.includesFood, firstDate: dates[0], lastDate: dates[dates.length - 1],
   }
 }
 
@@ -153,6 +181,8 @@ export async function importBackup(b: BackupFile, mode: 'replace' | 'merge'): Pr
     for (const t of TABLES) {
       const table = db.table(t)
       const rows = b.data[t]
+      // A file without food leaves the food log on this phone exactly as it is.
+      if (t === 'foodLog' && !b.includesFood) continue
       if (mode === 'replace') {
         await table.clear()
         await table.bulkAdd(rows)

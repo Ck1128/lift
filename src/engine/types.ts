@@ -20,13 +20,24 @@ export type Pattern = 'push' | 'pull' | 'squat' | 'hinge' | 'lunge' | 'core' | '
 export type EquipmentId =
   | 'bodyweight' | 'dumbbell' | 'barbell' | 'machine' | 'cable' | 'smith'
   | 'bench' | 'pullup_bar' | 'kettlebell' | 'bands' | 'mat'
+  | 'treadmill' | 'exercise_bike' | 'elliptical' | 'rower' | 'stair_climber'
+
+export const ALL_EQUIPMENT: EquipmentId[] = [
+  'bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'mat',
+  'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber',
+]
 
 export const EQUIPMENT_LABEL: Record<EquipmentId, string> = {
-  bodyweight: 'Bodyweight only', dumbbell: 'Dumbbells', barbell: 'Barbell and plates',
+  bodyweight: 'Bodyweight / no equipment', dumbbell: 'Dumbbells', barbell: 'Barbell and plates',
   machine: 'Weight machines', cable: 'Cable machines', smith: 'Smith machine',
   bench: 'Bench', pullup_bar: 'Pull-up bar', kettlebell: 'Kettlebells',
   bands: 'Resistance bands', mat: 'Exercise mat',
+  treadmill: 'Treadmill', exercise_bike: 'Exercise bike', elliptical: 'Elliptical',
+  rower: 'Rowing machine', stair_climber: 'Stair climber',
 }
+
+/** Equipment used for cardio only. */
+export const CARDIO_EQUIPMENT: EquipmentId[] = ['treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber']
 
 /** Equipment that has a weight range and increment the user can configure. */
 export const LOADABLE: EquipmentId[] = ['dumbbell', 'kettlebell', 'barbell']
@@ -34,9 +45,16 @@ export const LOADABLE: EquipmentId[] = ['dumbbell', 'kettlebell', 'barbell']
 export type ExerciseType = 'machine' | 'dumbbell' | 'barbell' | 'cable' | 'bodyweight' | 'smith' | 'kettlebell' | 'bands'
 export type Level = 'beginner' | 'intermediate'
 export type WeightUnit = 'lb' | 'kg'
-export type HeightUnit = 'cm' | 'in'
+/** How height is shown and typed. It is always stored in centimetres. */
+export type HeightUnit = 'cm' | 'ft-in'
 export type Goal = 'muscle' | 'strength' | 'general' | 'endurance' | 'fat_loss'
-export type Experience = 'beginner' | 'intermediate' | 'advanced'
+/** "regular" is the Regular gym-goer choice. It describes habits, not a guarantee of advanced ability. */
+export type TrainingLevel = 'beginner' | 'intermediate' | 'regular'
+export type Experience = TrainingLevel
+export const LEVEL_LABEL: Record<TrainingLevel, string> = {
+  beginner: 'Beginner', intermediate: 'Intermediate', regular: 'Regular gym-goer',
+}
+export type Sex = 'female' | 'male'
 export type LocationType = 'home' | 'gym'
 export type GymType = 'planet_fitness' | 'generic'
 
@@ -79,12 +97,22 @@ export interface Profile {
   id: string
   displayName?: string
   age?: number
-  heightValue?: number
-  heightUnit: HeightUnit
-  weightValue?: number
+  /** Canonical height in centimetres. */
+  heightCm?: number
+  /** Only how height is displayed and typed. */
+  heightDisplayUnit: HeightUnit
+  /** Canonical body weight in kilograms. */
+  weightKg?: number
+  /** The app-wide default unit for weights (lifting and body weight). */
   weightUnit: WeightUnit
   goal: Goal
-  experienceLevel: Experience
+  trainingLevel: TrainingLevel
+  /** Yoga has its own level. It is never assumed from the strength level. */
+  yogaLevel?: TrainingLevel
+  /** Optional. Only used by the energy estimate equation. */
+  sex?: Sex
+  /** Optional next-day activity guidance. Off unless the user turns it on. */
+  nutritionGuidance: boolean
   /** 0 = Monday ... 6 = Sunday. */
   trainingDays: number[]
   preferredDurationMinutes: number
@@ -100,6 +128,8 @@ export interface Profile {
 export interface DayPlan {
   focus: string
   muscles: Muscle[]
+  /** A cardio-only session: no strength exercises. */
+  cardioOnly?: boolean
 }
 
 /** Weekday index (0 = Monday) -> plan, or null for a rest day. */
@@ -120,6 +150,13 @@ export interface PlannedExercise {
   loadNote: string
   /** Why this exercise is in the session. */
   why: string
+  /** Missing means strength. Cardio items use `durationMinutes` instead of sets and reps. */
+  kind?: 'strength' | 'cardio'
+  durationMinutes?: number
+  /** Plain-language effort guide for cardio, for example the talk test. */
+  intensityCue?: string
+  /** Short form cues, more of them for beginners. */
+  cues?: string[]
 }
 
 export interface GeneratedWorkout {
@@ -129,6 +166,8 @@ export interface GeneratedWorkout {
   availableMinutes: number
   estimatedMinutes: number
   fits: boolean
+  /** Minutes of cardio included in the estimate (0 when none). */
+  cardioMinutes: number
   exercises: PlannedExercise[]
   notes: string[]
   assumptions: string[]
@@ -152,6 +191,8 @@ export interface SetLog {
   plannedWeight?: number
   actualReps?: number
   actualWeight?: number
+  /** Cardio only: minutes actually done. */
+  actualMinutes?: number
   weightUnit: WeightUnit
   completed: boolean
   effortRating?: number
@@ -186,6 +227,11 @@ export interface WorkoutSession {
   pausedMs: number
   pausedAt?: string
   weightUnit: WeightUnit
+  /** Minutes the user chose for this session. Each day can differ. */
+  plannedMinutes?: number
+  updatedAt?: string
+  /** Set when a finished session was reopened. Not shown as a new workout. */
+  reopenedAt?: string
 }
 
 export type ScheduledStatus = 'planned' | 'completed' | 'partial' | 'skipped'
@@ -202,6 +248,12 @@ export interface ScheduledWorkout {
   generatorVersion?: string
   /** Hash of the inputs used to generate `workout`; used to invalidate stale plans. */
   configHash?: string
+  /** The user chose to keep this workout when their training level changed. */
+  keepPlan?: boolean
+  /** 'none' skips cardio; a cardio id picks that activity; missing lets the app choose. */
+  cardioChoice?: string
+  /** A cardio-only session (no strength exercises). */
+  cardioOnly?: boolean
   workout?: GeneratedWorkout
   rescheduledFromId?: string
   createdAt: string

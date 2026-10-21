@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
-import { finishSession, pauseSession, replaceExercise, resumeSession, setPain, setSkipped, updateSet } from '../db/repo'
+import {
+  addSet, finishSession, pauseSession, replaceExercise, resumeSession, setExerciseUnit, setPain, setSessionUnit, setSkipped, updateSet,
+} from '../db/repo'
 import { CATALOG, exerciseById } from '../data/catalog'
 import { findAlternatives } from '../engine/generate'
 import { EQUIPMENT_LABEL, type EquipmentSet, type PlannedExercise, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
 import { useNow } from '../hooks/app'
+import { addRest, formatClock, isFinished, isPaused, pauseRest, remainingMs, resumeRest, startRest, type RestTimer } from '../engine/restTimer'
+import type { WeightUnit } from '../engine/types'
 import { ExerciseMedia } from '../components/ExerciseMedia'
-import { Button, Card, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
+import { Button, Card, Chips, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
 
-const clock = (ms: number) => {
-  const s = Math.max(0, Math.floor(ms / 1000))
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
+const clock = (ms: number) => formatClock(ms)
 
 export function Player({ session, profile, equipment, onFinished }: {
   session: WorkoutSession
@@ -21,11 +22,12 @@ export function Player({ session, profile, equipment, onFinished }: {
   onFinished: (id: string) => void
 }) {
   const logs = useLiveQuery(() => db.setLogs.where('sessionId').equals(session.id).toArray(), [session.id], [] as SetLog[])
-  const [rest, setRest] = useState<{ end: number } | null>(null)
+  const [rest, setRest] = useState<RestTimer | null>(null)
   const [replacing, setReplacing] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'finish' | 'abandon' | null>(null)
   const paused = !!session.pausedAt
   const now = useNow(rest || !paused ? 250 : 1000)
+  const reopened = !!session.reopenedAt
 
   const elapsed = (paused ? new Date(session.pausedAt!).getTime() : now) - new Date(session.startedAt).getTime() - session.pausedMs
   const sorted = useMemo(
@@ -36,14 +38,14 @@ export function Player({ session, profile, equipment, onFinished }: {
   const relevant = sorted.filter((l) => activeSlots.includes(l.slotId))
   const done = relevant.filter((l) => l.completed).length
   const pending = relevant.length - done
-  const remaining = rest ? Math.max(0, Math.ceil((rest.end - now) / 1000)) : 0
-
+  
+  // The rest timer ends itself. It uses timestamps, so a locked screen or background tab cannot make it drift.
   useEffect(() => {
-    if (!rest) return
+    if (!rest || isPaused(rest)) return
     const t = setTimeout(() => {
       try { navigator.vibrate?.(250) } catch { /* not supported on iPhone Safari */ }
       setRest(null)
-    }, Math.max(0, rest.end - Date.now()))
+    }, Math.max(0, rest.endAt - Date.now()))
     return () => clearTimeout(t)
   }, [rest])
 
@@ -59,10 +61,16 @@ export function Player({ session, profile, equipment, onFinished }: {
       <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={relevant.length} aria-valuenow={done} aria-label="Workout progress">
         <div className="progress-fill" style={{ width: `${relevant.length ? (done / relevant.length) * 100 : 0}%` }} />
       </div>
+      {reopened && <p className="notice" role="status">You reopened this workout. Change anything, then finish again to save it.</p>}
       <div className="inline">
         <Button variant="small" onClick={() => (paused ? resumeSession(session.id) : pauseSession(session.id))}>{paused ? 'Resume' : 'Pause'}</Button>
-        <Button variant="small" onClick={() => setConfirm('finish')}>Finish</Button>
-        <Button variant="small" onClick={() => setConfirm('abandon')}>Discard</Button>
+        <Button variant="small" className="finish-top" onClick={() => setConfirm('finish')}>Finish workout</Button>
+        {!reopened && <Button variant="small" onClick={() => setConfirm('abandon')}>Discard</Button>}
+      </div>
+      <div className="field">
+        <p className="label-like">Weight units for this workout</p>
+        <Chips label="Workout weight units" options={['lb', 'kg'] as const} value={session.weightUnit} onChange={(u) => void setSessionUnit(session.id, u)} />
+        <p className="hint">Each exercise can use its own unit too. The weight itself never changes, only how it is shown.</p>
       </div>
 
       {session.plannedExercises.map((slot) => {
@@ -75,22 +83,29 @@ export function Player({ session, profile, equipment, onFinished }: {
             actual={actual}
             sessionId={session.id}
             logs={sorted.filter((l) => l.slotId === slot.slotId)}
-            unit={session.weightUnit}
-            onSetDone={() => setRest({ end: Date.now() + slot.restSeconds * 1000 })}
+            pageUnit={session.weightUnit}
+            onSetDone={() => setRest(startRest(Date.now(), slot.restSeconds))}
             onReplace={() => setReplacing(slot.slotId)}
           />
         )
       })}
 
+      <Button className="finish-bottom" onClick={() => setConfirm('finish')}>Finish workout</Button>
+      {!reopened && <Button variant="ghost" onClick={() => setConfirm('abandon')}>Discard workout</Button>}
+
       {rest && (
-        <div className="rest-bar" role="timer" aria-live="off">
-          <span>Rest {clock(remaining * 1000)}</span>
+        <div className="rest-bar" role="timer" aria-label="Rest timer">
+          <span>{isPaused(rest) ? 'Rest paused' : 'Rest'} {clock(remainingMs(rest, now))}</span>
           <span>
-            <button type="button" onClick={() => setRest({ end: rest.end + 15000 })}>+15s</button>
+            {isPaused(rest)
+              ? <button type="button" onClick={() => setRest(resumeRest(rest, Date.now()))}>Resume</button>
+              : <button type="button" onClick={() => setRest(pauseRest(rest, Date.now()))}>Pause</button>}
+            <button type="button" onClick={() => setRest(addRest(rest, 15, Date.now()))}>+15s</button>
             <button type="button" onClick={() => setRest(null)}>Skip</button>
           </span>
         </div>
       )}
+      {rest && isFinished(rest, now) && <p className="sr-only" role="status">Rest is over.</p>}
 
       {replacing && (
         <ReplaceDialog
@@ -124,32 +139,58 @@ export function Player({ session, profile, equipment, onFinished }: {
   )
 }
 
-function ExerciseCard({ slot, actual, sessionId, logs, unit, onSetDone, onReplace }: {
+function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace }: {
   slot: PlannedExercise
   actual: WorkoutSession['actualExercises'][number]
   sessionId: string
   logs: SetLog[]
-  unit: string
+  pageUnit: WeightUnit
   onSetDone: () => void
   onReplace: () => void
 }) {
   const ex = exerciseById(actual.exerciseId)
   const original = actual.replacedFromId ? exerciseById(actual.replacedFromId) : undefined
+  const cardio = slot.kind === 'cardio'
+  const unit: WeightUnit = logs[0]?.weightUnit ?? pageUnit
   return (
     <Card className={actual.skipped ? 'skipped' : ''}>
-      <p className="big">{ex?.name ?? slot.name}</p>
+      <p className="big">{cardio ? slot.name : (ex?.name ?? slot.name)}</p>
       {original && <p className="hint">Replaced {original.name}</p>}
-      <p className="muted">Target {slot.sets} × {slot.repMin}-{slot.repMax} reps · rest {slot.restSeconds}s</p>
+      {cardio ? (
+        <p className="muted">Target {slot.durationMinutes} min{slot.intensityCue ? ` · ${slot.intensityCue}` : ''}</p>
+      ) : (
+        <p className="muted">Target {slot.sets} × {slot.repMin}-{slot.repMax} reps · rest {slot.restSeconds}s</p>
+      )}
+      {slot.cues && slot.cues.length > 0 && !actual.skipped && (
+        <ul className="plain cues" aria-label="Form cues">{slot.cues.map((c, i) => <li key={i}>{c}</li>)}</ul>
+      )}
       {actual.skipped ? (
         <div className="inline">
           <span className="muted">Skipped</span>
           <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, false)}>Undo skip</Button>
         </div>
+      ) : cardio ? (
+        <>
+          {logs.map((l) => <CardioRow key={l.id} log={l} planned={slot.durationMinutes ?? 0} onDone={onSetDone} />)}
+          <div className="inline">
+            <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, true)}>Skip</Button>
+          </div>
+        </>
       ) : (
         <>
+          <div className="inline unit-row">
+            <label className="mini"><span>Unit for this exercise</span>
+              <select value={unit} aria-label={`${slot.name} weight unit`} onChange={(e) => void setExerciseUnit(sessionId, slot.slotId, e.target.value as WeightUnit)}>
+                <option value="lb">lb</option>
+                <option value="kg">kg</option>
+              </select>
+            </label>
+            {unit !== pageUnit && <span className="hint">Different from the workout default ({pageUnit}).</span>}
+          </div>
           <div className="set-head" aria-hidden="true"><span>Set</span><span>{unit}</span><span>Reps</span><span>RPE</span><span /></div>
           {logs.map((l) => <SetRow key={l.id} log={l} onDone={onSetDone} />)}
           <div className="inline">
+            <Button variant="small" onClick={() => void addSet(sessionId, slot.slotId)}>Add set</Button>
             <Button variant="small" onClick={onReplace}>Replace</Button>
             <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, true)}>Skip</Button>
             <Button variant="small" aria-pressed={actual.painReported} onClick={() => setPain(sessionId, slot.slotId, !actual.painReported)}>
@@ -168,11 +209,38 @@ function ExerciseCard({ slot, actual, sessionId, logs, unit, onSetDone, onReplac
   )
 }
 
+function CardioRow({ log, planned, onDone }: { log: SetLog; planned: number; onDone: () => void }) {
+  const [m, setM] = useState(String(log.actualMinutes ?? planned))
+  const [err, setErr] = useState('')
+  void onDone // cardio does not start a rest timer
+  const save = async (completed: boolean) => {
+    const n = Number(m)
+    if (!Number.isFinite(n) || n < 0 || n > 600) { setErr('Minutes must be a number from 0 to 600.'); return }
+    setErr('')
+    await updateSet(log.id, { actualMinutes: n, completed })
+  }
+  return (
+    <div className="set-row-wrap">
+      <div className={log.completed ? 'set-row cardio done' : 'set-row cardio'}>
+        <label className="mini"><span>Minutes done</span>
+          <input inputMode="decimal" value={m} aria-label="Cardio minutes done" onChange={(e) => setM(e.target.value)} onBlur={() => void save(log.completed)} />
+        </label>
+        <button type="button" className={log.completed ? 'check-btn on' : 'check-btn'} aria-pressed={log.completed}
+          aria-label={log.completed ? 'Cardio done. Tap to undo' : 'Mark cardio done'} onClick={() => void save(!log.completed)}>✓</button>
+      </div>
+      {err && <p className="error" role="alert">{err}</p>}
+    </div>
+  )
+}
+
 function SetRow({ log, onDone }: { log: SetLog; onDone: () => void }) {
   const [w, setW] = useState(log.actualWeight?.toString() ?? '')
   const [r, setR] = useState(log.actualReps?.toString() ?? String(log.plannedRepMax))
   const [e, setE] = useState(log.effortRating?.toString() ?? '')
   const [err, setErr] = useState('')
+  // Keep the box in step when the unit of this exercise is changed from elsewhere on the page.
+  const [seenWeight, setSeenWeight] = useState(log.actualWeight)
+  if (seenWeight !== log.actualWeight) { setSeenWeight(log.actualWeight); setW(log.actualWeight?.toString() ?? '') }
 
   const parse = (): { reps?: number; weight?: number; effort?: number } | null => {
     const reps = r.trim() === '' ? undefined : Number(r)
@@ -215,7 +283,7 @@ function ReplaceDialog({ session, slotId, profile, equipment, onClose }: {
   const alts = current
     ? findAlternatives(current, {
         catalog: CATALOG, equipment, excludedExerciseIds: profile.excludedExerciseIds,
-        excludedPatterns: profile.excludedPatterns, experience: profile.experienceLevel,
+        excludedPatterns: profile.excludedPatterns, experience: profile.trainingLevel,
       }, inSession).slice(0, 12)
     : []
   return (

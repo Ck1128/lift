@@ -1,4 +1,47 @@
+import { useRef, useState, type ReactNode } from 'react'
+import { pngSupported, svgToPngBlob } from '../export/png'
+import { deliverFile } from '../export/deliver'
+
 /** Small dependency-free SVG charts that stay readable on a phone. */
+
+/** The numbers behind a chart, as a table, for screen readers and for anyone who wants exact values. */
+export function DataTable({ columns, rows, caption }: { columns: string[]; rows: (string | number)[][]; caption: string }) {
+  return (
+    <details className="chart-table">
+      <summary className="muted">View the data as a table</summary>
+      <table className="sets">
+        <caption className="sr-only">{caption}</caption>
+        <thead><tr>{columns.map((c) => <th key={c} scope="col">{c}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j}>{v}</td>)}</tr>)}</tbody>
+      </table>
+    </details>
+  )
+}
+
+/** A chart with its data table and a "Save image" button where the browser can do it. */
+export function ChartBlock({ title, children, columns, rows }: { title: string; children: ReactNode; columns: string[]; rows: (string | number)[][] }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [msg, setMsg] = useState('')
+  const save = async () => {
+    const svg = ref.current?.querySelector('svg.chart') as SVGSVGElement | null
+    if (!svg) return setMsg('There is no chart to save yet.')
+    try {
+      const blob = await svgToPngBlob(svg, title)
+      const r = await deliverFile(`${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, blob, 'image/png')
+      setMsg(r === 'cancelled' ? 'Cancelled.' : r === 'shared' ? 'Image shared.' : 'Image saved to your downloads.')
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'The image could not be saved.')
+    }
+  }
+  return (
+    <div ref={ref}>
+      {children}
+      {rows.length > 0 && <DataTable columns={columns} rows={rows} caption={title} />}
+      {pngSupported() && rows.length > 0 && <button type="button" className="link-btn" onClick={() => void save()}>Save chart as image</button>}
+      {msg && <p className="hint" role="status">{msg}</p>}
+    </div>
+  )
+}
 
 export function BarChart({ data, label }: { data: { label: string; value: number }[]; label: string }) {
   const max = Math.max(1, ...data.map((d) => d.value))

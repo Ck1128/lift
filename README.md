@@ -14,6 +14,12 @@ A free, private workout planner for you and your friends, inspired by the genera
 - **Backup and restore:** export/import a JSON file (merge or replace) with validation and an all-or-nothing import.
 - **Offline:** after the first load, the app and your data work without a connection.
 
+## New in 2.0
+
+Three training levels, kg/lb and ft/in everywhere, cardio, yoga, food logging, charts with export, a rest timer, Back navigation and a safe day reset. Details: `CHANGELOG.md`, `docs/PHASE_B_AUDIT.md`, `docs/yoga-catalog.md`, `docs/food-providers.md`, `docs/planet-fitness-equipment.md`, `docs/apple-health-native-notes.md`.
+
+Food and yoga are general wellness tools, not medical advice. Apple Health is not connected.
+
 ## Run it on your computer
 
 You need [Node.js](https://nodejs.org) 20 or newer.

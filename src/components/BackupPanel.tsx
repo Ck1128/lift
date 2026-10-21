@@ -1,42 +1,21 @@
 import { useRef, useState } from 'react'
 import { backupFilename, exportBackup, importBackup, parseBackup, previewBackup, type BackupFile, type BackupPreview } from '../db/backup'
+import { deliverFile } from '../export/deliver'
 import { Button, ConfirmDialog } from './ui'
-
-async function deliver(filename: string, text: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
-  const file = new File([text], filename, { type: 'application/json' })
-  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
-  if (nav.canShare?.({ files: [file] })) {
-    try {
-      await nav.share({ files: [file], title: 'Lift backup' })
-      return 'shared'
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled'
-      // fall through to a normal download
-    }
-  }
-  const url = URL.createObjectURL(file)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 5000)
-  return 'downloaded'
-}
 
 export function BackupPanel() {
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [pending, setPending] = useState<{ backup: BackupFile; preview: BackupPreview } | null>(null)
   const [mode, setMode] = useState<'replace' | 'merge'>('merge')
   const [confirm, setConfirm] = useState(false)
+  const [includeFood, setIncludeFood] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
   const doExport = async () => {
     setMsg(null)
     try {
-      const file = await exportBackup()
-      const result = await deliver(backupFilename(), JSON.stringify(file, null, 2))
+      const file = await exportBackup({ includeFood })
+      const result = await deliverFile(backupFilename(), JSON.stringify(file, null, 2), 'application/json')
       setMsg(result === 'cancelled' ? { kind: 'ok', text: 'Export cancelled. Nothing was changed.' } : { kind: 'ok', text: `Backup ${result === 'shared' ? 'shared' : 'downloaded'}. Keep it somewhere private.` })
     } catch (e) {
       setMsg({ kind: 'error', text: `Could not create the backup. Your data on this phone is unchanged. (${e instanceof Error ? e.message : 'unknown error'})` })
@@ -69,6 +48,10 @@ export function BackupPanel() {
   return (
     <div>
       <p className="notice">A backup contains your profile, body weight and workout history. Treat it as private health information and store it somewhere safe. Never upload it to GitHub.</p>
+      <label className="check">
+        <input type="checkbox" checked={includeFood} onChange={(e) => setIncludeFood(e.target.checked)} />
+        <span>Include my food log (off by default, because it is personal)</span>
+      </label>
       <Button onClick={doExport}>Export backup</Button>
       <hr />
       <div className="field">
@@ -81,7 +64,8 @@ export function BackupPanel() {
           <ul className="plain">
             <li>Made on {pending.preview.exportedAt ? new Date(pending.preview.exportedAt).toLocaleString() : 'unknown date'}</li>
             {pending.preview.profileName && <li>Profile: {pending.preview.profileName}</li>}
-            <li>{pending.preview.workouts} workouts, {pending.preview.sets} logged sets</li>
+            <li>{pending.preview.workouts} workouts, {pending.preview.sets} logged sets, {pending.preview.yogaSessions} yoga sessions</li>
+            <li>{pending.preview.includesFood ? `${pending.preview.foodEntries} food entries` : 'No food log in this file. The food log on this phone is left as it is.'}</li>
             {pending.preview.firstDate && <li>From {pending.preview.firstDate} to {pending.preview.lastDate}</li>}
           </ul>
           <fieldset className="field">

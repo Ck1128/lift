@@ -38,6 +38,7 @@ export function suggestLoad(
   unit: WeightUnit,
   repMin: number,
   repMax: number,
+  effortCeiling: number = HIGH_EFFORT,
 ): LoadSuggestion {
   const weighted = last?.sets.filter((s) => (s.weight ?? 0) > 0 && s.reps > 0) ?? []
   if (!last || weighted.length === 0) {
@@ -55,7 +56,7 @@ export function suggestLoad(
     return { weight: same, note: `You reported pain last time (${didText}), so the weight stays at ${same} ${unit}. If something hurts, stop and consider asking a qualified professional.` }
   }
   const hitTop = weighted.length >= 2 && weighted.every((s) => s.reps >= last.repMax)
-  const tooHard = weighted.some((s) => (s.effort ?? 0) >= HIGH_EFFORT)
+  const tooHard = weighted.some((s) => (s.effort ?? 0) >= effortCeiling)
   const hitBottom = weighted.every((s) => s.reps >= last.repMin)
 
   if (hitTop && !tooHard) {

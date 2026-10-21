@@ -3,15 +3,20 @@ import { CATALOG, CATALOG_VERSION, exerciseById } from '../data/catalog'
 import { addDays, startOfWeek, weekdayIndex } from '../engine/dates'
 import { generateWeeklySchedule } from '../engine/split'
 import { configHash, generateWorkout, GENERATOR_VERSION } from '../engine/generate'
-import { presetEquipment, presetFor, convertEquipmentUnit } from '../engine/equipment'
+import {
+  presetEquipment, presetFor, convertEquipmentUnit, withExclusions, type PresetKind,
+} from '../engine/equipment'
 import { buildLastDone, buildLastPerformance } from '../engine/history'
 import { suggestReschedule } from '../engine/reschedule'
 import { convertWeight, tidy } from '../engine/units'
+import { gapsMessage, requiredProfileGaps } from '../engine/levels'
 import type {
-  ActualExercise, DayPlan, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, ScheduledWorkout,
-  SetLog, SorenessEntry, WeeklyPlan, WeightUnit, WorkoutSession,
+  ActualExercise, DayPlan, EquipmentId, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, ScheduledWorkout,
+  SetLog, SorenessEntry, TrainingLevel, WeeklyPlan, WeightUnit, WorkoutSession,
 } from '../engine/types'
-import { parseOptional, type ProfileForm } from '../engine/validateProfile'
+import {
+  formHeightCm, formWeightKg, parseOptional, profileFormFrom, type ProfileForm,
+} from '../engine/validateProfile'
 
 // ---------- profile ----------
 export async function getProfile(): Promise<Profile | undefined> {
@@ -19,18 +24,15 @@ export async function getProfile(): Promise<Profile | undefined> {
 }
 
 export function profileToForm(p?: Profile): ProfileForm {
-  return {
-    displayName: p?.displayName ?? '',
-    age: p?.age?.toString() ?? '',
-    heightValue: p?.heightValue?.toString() ?? '',
-    heightUnit: p?.heightUnit ?? 'in',
-    weightValue: p?.weightValue?.toString() ?? '',
-    weightUnit: p?.weightUnit ?? 'lb',
-    goal: p?.goal ?? 'muscle',
-    experienceLevel: p?.experienceLevel ?? 'beginner',
-    trainingDays: p?.trainingDays ?? [0, 2, 4],
-    preferredDurationMinutes: String(p?.preferredDurationMinutes ?? 45),
-  }
+  return profileFormFrom(p)
+}
+
+export interface SaveProfileOptions {
+  /**
+   * What to do with upcoming workouts when the training level changed.
+   * 'update' (default) builds fresh upcoming workouts. 'keep' leaves the ones already built. Finished history is never touched.
+   */
+  levelChange?: 'update' | 'keep'
 }
 
 /** Creates or updates the single local profile, then rebuilds the weekly plan if the schedule inputs changed. */
@@ -38,20 +40,24 @@ export async function saveProfile(
   form: ProfileForm,
   extra: { preferredLocation: LocationType; gymType: Profile['gymType'] },
   today = new Date(),
+  options: SaveProfileOptions = {},
 ): Promise<Profile> {
   const existing = await getProfile()
   const now = nowIso()
-  const weightValue = parseOptional(form.weightValue)
+  const weightKg = formWeightKg(form)
   const profile: Profile = {
     id: existing?.id ?? uid(),
     displayName: form.displayName.trim() || undefined,
     age: parseOptional(form.age),
-    heightValue: parseOptional(form.heightValue),
-    heightUnit: form.heightUnit,
-    weightValue,
+    sex: form.sex === '' ? undefined : form.sex,
+    heightCm: formHeightCm(form),
+    heightDisplayUnit: form.heightUnit,
+    weightKg,
     weightUnit: form.weightUnit,
     goal: form.goal,
-    experienceLevel: form.experienceLevel,
+    trainingLevel: form.trainingLevel,
+    yogaLevel: existing?.yogaLevel,
+    nutritionGuidance: form.nutritionGuidance,
     trainingDays: [...form.trainingDays].sort((a, b) => a - b),
     preferredDurationMinutes: Number(form.preferredDurationMinutes),
     preferredLocation: extra.preferredLocation,
@@ -62,10 +68,13 @@ export async function saveProfile(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   }
+  const levelChanged = !!existing && existing.trainingLevel !== profile.trainingLevel
   await db.transaction('rw', [db.profile, db.bodyWeights, db.equipment], async () => {
     await db.profile.put(profile)
-    if (weightValue !== undefined && (!existing || existing.weightValue !== weightValue || existing.weightUnit !== form.weightUnit)) {
-      await db.bodyWeights.add({ id: uid(), date: now.slice(0, 10), value: weightValue, unit: form.weightUnit })
+    const weightMoved = weightKg !== undefined && (existing?.weightKg === undefined || Math.abs(existing.weightKg - weightKg) > 0.05)
+    if (weightMoved && weightKg !== undefined) {
+      const v = form.weightFieldUnit === 'kg' ? weightKg : convertWeight(weightKg, 'kg', form.weightFieldUnit)
+      await db.bodyWeights.add({ id: uid(), date: now.slice(0, 10), value: tidy(v), unit: form.weightFieldUnit })
     }
     // Keep saved equipment ranges in the user's weight unit.
     if (existing && existing.weightUnit !== form.weightUnit) {
@@ -74,12 +83,59 @@ export async function saveProfile(
       }
     }
   })
+  if (!existing) await applyDefaultEquipment(profile.preferredLocation, profile.gymType, profile.weightUnit)
+  const keep = levelChanged && options.levelChange === 'keep'
   const scheduleChanged = !existing
     || existing.trainingDays.join() !== profile.trainingDays.join()
     || existing.goal !== profile.goal
-    || existing.experienceLevel !== profile.experienceLevel
+    || (levelChanged && !keep)
   if (scheduleChanged) await rebuildPlan(profile, today)
+  if (levelChanged) await applyLevelChoice(options.levelChange ?? 'update', toKey(today))
   return profile
+}
+
+/** Upcoming, not-yet-started workouts either get rebuilt for the new level or are kept as they are. */
+async function applyLevelChoice(mode: 'update' | 'keep', todayKey: string): Promise<void> {
+  const rows = await db.scheduled.where('status').equals('planned').filter((s) => s.date >= todayKey).toArray()
+  for (const r of rows) {
+    if ((await db.sessions.where('scheduledWorkoutId').equals(r.id).count()) > 0) continue
+    if (mode === 'keep') {
+      if (r.workout) await db.scheduled.put({ ...r, keepPlan: true, updatedAt: nowIso() })
+    } else {
+      await db.scheduled.put({ ...r, workout: undefined, configHash: undefined, keepPlan: false, updatedAt: nowIso() })
+    }
+  }
+}
+
+/** Changes only the training level. Completed history is never rewritten. */
+export async function changeTrainingLevel(level: TrainingLevel, mode: 'update' | 'keep', today = new Date()): Promise<void> {
+  const p = await getProfile()
+  if (!p || p.trainingLevel === level) return
+  const next = { ...p, trainingLevel: level, updatedAt: nowIso() }
+  await db.profile.put(next)
+  if (mode === 'update') await rebuildPlan(next, today)
+  await applyLevelChoice(mode, toKey(today))
+}
+
+export async function setYogaLevel(level: TrainingLevel): Promise<void> {
+  const p = await getProfile()
+  if (p) await db.profile.put({ ...p, yogaLevel: level, updatedAt: nowIso() })
+}
+
+export async function setNutritionGuidance(on: boolean): Promise<void> {
+  const p = await getProfile()
+  if (p) await db.profile.put({ ...p, nutritionGuidance: on, updatedAt: nowIso() })
+}
+
+/** Height and weight only, for the beginner prompt on Home. */
+export async function saveBodyBasics(heightCm: number | undefined, weightKg: number | undefined): Promise<void> {
+  const p = await getProfile()
+  if (!p) return
+  await db.profile.put({ ...p, heightCm: heightCm ?? p.heightCm, weightKg: weightKg ?? p.weightKg, updatedAt: nowIso() })
+  if (weightKg !== undefined && weightKg !== p.weightKg) {
+    const unit = p.weightUnit
+    await db.bodyWeights.add({ id: uid(), date: nowIso().slice(0, 10), value: tidy(unit === 'kg' ? weightKg : convertWeight(weightKg, 'kg', unit)), unit })
+  }
 }
 
 export async function updateExclusions(
@@ -93,18 +149,49 @@ export async function updateExclusions(
 export async function setLocation(location: LocationType, gymType?: Profile['gymType']): Promise<void> {
   const p = await getProfile()
   if (!p) return
-  await db.profile.put({ ...p, preferredLocation: location, gymType: gymType ?? p.gymType, updatedAt: nowIso() })
+  const nextGym = gymType ?? p.gymType
+  await db.profile.put({ ...p, preferredLocation: location, gymType: nextGym, updatedAt: nowIso() })
+  // Choosing a gym type applies that gym's maintained equipment list. History is never touched.
+  if (location === 'gym' && ((gymType !== undefined && gymType !== p.gymType) || !(await db.equipment.get('gym')))) {
+    await applyDefaultEquipment('gym', nextGym, p.weightUnit)
+  }
 }
 
 // ---------- equipment ----------
+/** The list a location uses right now: a maintained preset (minus anything the user excluded), or the user's own list. */
 export async function getEquipment(location: LocationType, unit: WeightUnit, gymType: Profile['gymType'] = 'planet_fitness'): Promise<EquipmentSet> {
   const rec = await db.equipment.get(location)
+  if (rec?.preset) return withExclusions(presetEquipment(rec.preset, unit), rec.excluded)
   if (rec) return rec.items
   return presetEquipment(presetFor(location, gymType), unit)
 }
 
+export async function getEquipmentRecord(location: LocationType) {
+  return db.equipment.get(location)
+}
+
+/** Manual edits turn a preset list into the user's own list. */
 export async function saveEquipment(location: LocationType, items: EquipmentSet): Promise<void> {
   await db.equipment.put({ location, items, updatedAt: nowIso() })
+}
+
+/** Applies the starting list for a location. Planet Fitness follows the maintained preset; other lists are editable copies. */
+export async function applyDefaultEquipment(location: LocationType, gymType: Profile['gymType'], unit: WeightUnit): Promise<void> {
+  const kind: PresetKind = presetFor(location, gymType)
+  const prev = await db.equipment.get(location)
+  const keepExcluded = prev?.preset === kind ? prev.excluded : undefined
+  if (kind === 'planet_fitness') {
+    await db.equipment.put({ location, items: presetEquipment(kind, unit), preset: kind, excluded: keepExcluded ?? [], updatedAt: nowIso() })
+  } else {
+    await db.equipment.put({ location, items: presetEquipment(kind, unit), updatedAt: nowIso() })
+  }
+}
+
+/** Items the user's club does not have. Only for a preset list. */
+export async function setExcludedEquipment(location: LocationType, excluded: EquipmentId[]): Promise<void> {
+  const rec = await db.equipment.get(location)
+  if (!rec?.preset) return
+  await db.equipment.put({ ...rec, excluded: [...new Set(excluded)], updatedAt: nowIso() })
 }
 
 // ---------- weekly plan and schedule ----------
@@ -118,7 +205,7 @@ export async function rebuildPlan(profile: Profile, today = new Date()): Promise
   const { schedule } = generateWeeklySchedule({
     trainingDays: profile.trainingDays,
     goal: profile.goal,
-    experience: profile.experienceLevel,
+    experience: profile.trainingLevel,
   })
   const prev = await getPlan()
   const now = nowIso()
@@ -180,7 +267,7 @@ export async function createExtraWorkout(date: string, day: DayPlan, minutes: nu
   const now = nowIso()
   const row: ScheduledWorkout = {
     id: uid(), planId: plan?.id ?? 'none', date, focus: day.focus, targetMuscles: day.muscles,
-    availableMinutes: minutes, status: 'planned', createdAt: now, updatedAt: now,
+    availableMinutes: minutes, status: 'planned', cardioOnly: day.cardioOnly || undefined, createdAt: now, updatedAt: now,
   }
   await db.scheduled.add(row)
   return row
@@ -205,22 +292,29 @@ export async function recentSoreness(today: string): Promise<Partial<Record<Musc
 }
 
 // ---------- generation (with cache) ----------
+/** What is missing before a personalised plan can be built, or an empty list. */
+export function profileGaps(p: Profile): string[] {
+  return requiredProfileGaps(p.trainingLevel, p.heightCm, p.weightKg)
+}
+
 export async function generateFor(
   scheduledId: string, minutes: number, opts: { force?: boolean; today: string },
 ): Promise<GenerationResult> {
   const sched = await db.scheduled.get(scheduledId)
   const profile = await getProfile()
   if (!sched || !profile) return { kind: 'error', message: 'Create your profile first.' }
+  const gaps = profileGaps(profile)
+  if (gaps.length > 0) return { kind: 'error', message: gapsMessage(gaps) }
   const equipment = await getEquipment(profile.preferredLocation, profile.weightUnit, profile.gymType)
   const sessions = await db.sessions.toArray()
   const logs = await db.setLogs.toArray()
   const soreness = await recentSoreness(opts.today)
-  const planDay: DayPlan = { focus: sched.focus, muscles: sched.targetMuscles }
+  const planDay: DayPlan = { focus: sched.focus, muscles: sched.targetMuscles, cardioOnly: sched.cardioOnly }
   const input = {
-    date: sched.date, planDay, minutes, goal: profile.goal, experience: profile.experienceLevel, equipment,
+    date: sched.date, planDay, minutes, goal: profile.goal, experience: profile.trainingLevel, equipment,
     excludedExerciseIds: profile.excludedExerciseIds, excludedPatterns: profile.excludedPatterns,
     catalog: CATALOG, lastPerformance: buildLastPerformance(sessions, logs), lastDone: buildLastDone(sessions, logs),
-    soreness, weightUnit: profile.weightUnit,
+    soreness, weightUnit: profile.weightUnit, cardioChoice: sched.cardioChoice, weightKg: profile.weightKg,
   }
   const { catalog: _catalog, ...rest } = input
   void _catalog
@@ -228,18 +322,25 @@ export async function generateFor(
     ...rest, catalogVersion: CATALOG_VERSION,
     recentSessionIds: sessions.filter((s) => s.status === 'completed' || s.status === 'partial').map((s) => s.id).sort(),
   })
-  // Reuse a cached workout only if nothing that feeds it has changed.
-  if (!opts.force && sched.workout && sched.configHash === hash && sched.availableMinutes === minutes) {
+  // Reuse a cached workout only if nothing that feeds it has changed (or the user chose to keep it).
+  const sameMinutes = sched.availableMinutes === minutes
+  if (!opts.force && sched.workout && sameMinutes && (sched.configHash === hash || sched.keepPlan)) {
     return { kind: 'workout', workout: sched.workout }
   }
   const result = generateWorkout(input)
   if (result.kind === 'workout') {
     await db.scheduled.put({
-      ...sched, availableMinutes: minutes, workout: result.workout, configHash: hash,
+      ...sched, availableMinutes: minutes, workout: result.workout, configHash: hash, keepPlan: false,
       generatorVersion: GENERATOR_VERSION, updatedAt: nowIso(),
     })
   }
   return result
+}
+
+/** Skip cardio, or choose a specific activity, for one day. The next generate call applies it. */
+export async function setCardioChoice(scheduledId: string, choice: string | undefined): Promise<void> {
+  const sc = await db.scheduled.get(scheduledId)
+  if (sc) await db.scheduled.put({ ...sc, cardioChoice: choice, keepPlan: false, updatedAt: nowIso() })
 }
 
 // ---------- sessions and set logs ----------
@@ -247,9 +348,22 @@ export async function getActiveSession(): Promise<WorkoutSession | undefined> {
   return (await db.sessions.where('status').equals('in_progress').toArray())[0]
 }
 
+/** The saved (not discarded) session for a scheduled day, if any. */
+export async function sessionForScheduled(scheduledId: string): Promise<WorkoutSession | undefined> {
+  const rows = await db.sessions.where('scheduledWorkoutId').equals(scheduledId).toArray()
+  return rows.filter((s) => s.status !== 'abandoned').sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
+}
+
 export async function startSession(scheduledId: string, unit: WeightUnit): Promise<WorkoutSession> {
   const existing = await getActiveSession()
   if (existing) return existing
+  // A day that already has a saved workout is reopened, never duplicated.
+  const saved = await sessionForScheduled(scheduledId)
+  if (saved) {
+    const reopened = await reopenSession(saved.id)
+    if (reopened.ok) return reopened.session
+    return saved
+  }
   const sched = await db.scheduled.get(scheduledId)
   if (!sched?.workout) throw new Error('Generate the workout before starting it.')
   const w = sched.workout
@@ -261,7 +375,7 @@ export async function startSession(scheduledId: string, unit: WeightUnit): Promi
     plannedExercises: structuredClone(w.exercises),
     actualExercises: w.exercises.map((e): ActualExercise => ({ slotId: e.slotId, exerciseId: e.exerciseId, skipped: false, painReported: false })),
     title: w.title, planVersion: plan?.planVersion ?? 0, generatorVersion: w.generatorVersion,
-    targetMuscles: w.targetMuscles, pausedMs: 0, weightUnit: unit,
+    targetMuscles: w.targetMuscles, pausedMs: 0, weightUnit: unit, plannedMinutes: w.availableMinutes, updatedAt: now,
   }
   const logs: SetLog[] = w.exercises.flatMap((e) =>
     Array.from({ length: e.sets }, (_, i): SetLog => ({
@@ -269,6 +383,7 @@ export async function startSession(scheduledId: string, unit: WeightUnit): Promi
       plannedRepMin: e.repMin, plannedRepMax: e.repMax,
       plannedWeight: e.suggestedWeight === undefined ? undefined : convertWeight(e.suggestedWeight, e.loadUnit ?? unit, unit),
       actualWeight: e.suggestedWeight === undefined ? undefined : tidy(convertWeight(e.suggestedWeight, e.loadUnit ?? unit, unit)),
+      actualMinutes: e.kind === 'cardio' ? e.durationMinutes : undefined,
       weightUnit: unit, completed: false, createdAt: now, updatedAt: now,
     })),
   )
@@ -279,16 +394,37 @@ export async function startSession(scheduledId: string, unit: WeightUnit): Promi
   return session
 }
 
-export async function updateSet(id: string, patch: Partial<Pick<SetLog, 'actualReps' | 'actualWeight' | 'completed' | 'effortRating'>>): Promise<void> {
+async function touchSession(id: string): Promise<void> {
+  const s = await db.sessions.get(id)
+  if (s) await db.sessions.put({ ...s, updatedAt: nowIso() })
+}
+
+export async function updateSet(
+  id: string,
+  patch: Partial<Pick<SetLog, 'actualReps' | 'actualWeight' | 'actualMinutes' | 'completed' | 'effortRating' | 'weightUnit'>>,
+): Promise<void> {
   const l = await db.setLogs.get(id)
   if (!l) return
   await db.setLogs.put({ ...l, ...patch, updatedAt: nowIso() })
+  await touchSession(l.sessionId)
+}
+
+/** Adds one more set to an exercise, for example when editing a saved workout. */
+export async function addSet(sessionId: string, slotId: string): Promise<void> {
+  const logs = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId).toArray()
+  const last = [...logs].sort((a, b) => a.setNumber - b.setNumber).pop()
+  if (!last) return
+  const now = nowIso()
+  await db.setLogs.add({
+    ...last, id: uid(), setNumber: last.setNumber + 1, completed: false, actualReps: undefined, effortRating: undefined, createdAt: now, updatedAt: now,
+  })
+  await touchSession(sessionId)
 }
 
 async function patchActual(sessionId: string, slotId: string, f: (a: ActualExercise) => ActualExercise): Promise<void> {
   const s = await db.sessions.get(sessionId)
   if (!s || s.status !== 'in_progress') return
-  await db.sessions.put({ ...s, actualExercises: s.actualExercises.map((a) => (a.slotId === slotId ? f(a) : a)) })
+  await db.sessions.put({ ...s, actualExercises: s.actualExercises.map((a) => (a.slotId === slotId ? f(a) : a)), updatedAt: nowIso() })
 }
 
 export const setSkipped = (sid: string, slot: string, skipped: boolean) => patchActual(sid, slot, (a) => ({ ...a, skipped }))
@@ -307,6 +443,7 @@ export async function replaceExercise(sessionId: string, slotId: string, newExer
       ...s,
       actualExercises: s.actualExercises.map((a) =>
         a.slotId === slotId ? { ...a, exerciseId: newExerciseId, replacedFromId: a.replacedFromId ?? a.exerciseId } : a),
+      updatedAt: nowIso(),
     })
     const pending = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId && !l.completed).toArray()
     for (const l of pending) await db.setLogs.put({ ...l, exerciseId: newExerciseId, plannedWeight: undefined, actualWeight: undefined, updatedAt: nowIso() })
@@ -324,21 +461,27 @@ export async function resumeSession(id: string): Promise<void> {
   }
 }
 
+type StatusResult = { status: WorkoutSession['status']; anyDone: boolean }
+
+async function statusFromLogs(s: WorkoutSession): Promise<StatusResult> {
+  const logs = await db.setLogs.where('sessionId').equals(s.id).toArray()
+  const anyDone = logs.some((l) => l.completed)
+  if (!anyDone) return { status: 'abandoned', anyDone }
+  const active = s.actualExercises.filter((a) => !a.skipped)
+  const allDone = active.every((a) => logs.filter((l) => l.slotId === a.slotId).every((l) => l.completed))
+  return { status: allDone && active.length > 0 ? 'completed' : 'partial', anyDone }
+}
+
 export async function finishSession(id: string, mode: 'finish' | 'abandon'): Promise<WorkoutSession | undefined> {
   const s = await db.sessions.get(id)
+  // Finishing twice (for example from the top and bottom buttons) is harmless: the second call changes nothing.
   if (!s || s.status !== 'in_progress') return s
   if (s.pausedAt) await resumeSession(id)
   const fresh = (await db.sessions.get(id))!
-  const logs = await db.setLogs.where('sessionId').equals(id).toArray()
-  const anyDone = logs.some((l) => l.completed)
   let status: WorkoutSession['status']
-  if (mode === 'abandon' || !anyDone) status = 'abandoned'
-  else {
-    const active = fresh.actualExercises.filter((a) => !a.skipped)
-    const allDone = active.every((a) => logs.filter((l) => l.slotId === a.slotId).every((l) => l.completed))
-    status = allDone && active.length > 0 ? 'completed' : 'partial'
-  }
-  const done: WorkoutSession = { ...fresh, status, finishedAt: nowIso() }
+  if (mode === 'abandon') status = 'abandoned'
+  else status = (await statusFromLogs(fresh)).status
+  const done: WorkoutSession = { ...fresh, status, finishedAt: nowIso(), updatedAt: nowIso() }
   await db.transaction('rw', [db.sessions, db.scheduled], async () => {
     await db.sessions.put(done)
     if (fresh.scheduledWorkoutId && status !== 'abandoned') {
@@ -347,6 +490,88 @@ export async function finishSession(id: string, mode: 'finish' | 'abandon'): Pro
     }
   })
   return done
+}
+
+/**
+ * Reopens a finished (or accidentally discarded) workout on the same day, as the same session.
+ * It never creates a second session. The time between finishing and reopening is not counted as workout time.
+ */
+export async function reopenSession(id: string, today?: string): Promise<{ ok: true; session: WorkoutSession } | { ok: false; reason: string }> {
+  const s = await db.sessions.get(id)
+  if (!s) return { ok: false, reason: 'That workout was not found.' }
+  if (s.status === 'in_progress') return { ok: true, session: s }
+  const active = await getActiveSession()
+  if (active) return { ok: false, reason: `Finish or save "${active.title}" first. Only one workout can be open at a time.` }
+  if (today && s.date !== today) return { ok: false, reason: 'You can resume a workout on the day you did it. You can still edit it.' }
+  const gap = s.finishedAt ? Math.max(0, Date.now() - new Date(s.finishedAt).getTime()) : 0
+  const next: WorkoutSession = {
+    ...s, status: 'in_progress', pausedMs: s.pausedMs + gap, pausedAt: undefined, reopenedAt: nowIso(), updatedAt: nowIso(),
+  }
+  await db.sessions.put(next)
+  return { ok: true, session: next }
+}
+
+/** After editing a saved workout: recalculates its status from the sets and stamps the update time. */
+export async function markComplete(id: string): Promise<WorkoutSession | undefined> {
+  const s = await db.sessions.get(id)
+  if (!s || s.status === 'in_progress') return s
+  const { status } = await statusFromLogs(s)
+  const next: WorkoutSession = { ...s, status, updatedAt: nowIso(), finishedAt: s.finishedAt ?? nowIso() }
+  await db.transaction('rw', [db.sessions, db.scheduled], async () => {
+    await db.sessions.put(next)
+    if (s.scheduledWorkoutId && status !== 'abandoned') {
+      const sc = await db.scheduled.get(s.scheduledWorkoutId)
+      if (sc) await db.scheduled.put({ ...sc, status: status === 'completed' ? 'completed' : 'partial', updatedAt: nowIso() })
+    }
+  })
+  return next
+}
+
+/** Marks a whole exercise as not done (or skipped) in a saved workout. */
+export async function setExerciseDone(sessionId: string, slotId: string, done: boolean): Promise<void> {
+  const logs = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId).toArray()
+  for (const l of logs) await db.setLogs.put({ ...l, completed: done && (l.actualReps !== undefined || l.actualMinutes !== undefined), updatedAt: nowIso() })
+  await touchSession(sessionId)
+}
+
+// ---------- reset one day ----------
+export interface ResetPreview {
+  date: string
+  sessions: number
+  sets: number
+  plannedRows: number
+}
+
+export async function previewResetDay(date: string): Promise<ResetPreview> {
+  const sessions = await db.sessions.where('date').equals(date).toArray()
+  let sets = 0
+  for (const s of sessions) sets += await db.setLogs.where('sessionId').equals(s.id).count()
+  return { date, sessions: sessions.length, sets, plannedRows: await db.scheduled.where('date').equals(date).count() }
+}
+
+/**
+ * Removes one date's workout session(s) and set logs and puts that day back to "not started".
+ * Everything else stays: profile, settings, other dates, yoga, food, body weight, soreness.
+ * It is one transaction, so either all of it happens or none of it does.
+ */
+export async function resetDay(date: string): Promise<{ sessions: number; sets: number }> {
+  const plan = await getPlan()
+  return db.transaction('rw', [db.sessions, db.setLogs, db.scheduled], async () => {
+    const sessions = await db.sessions.where('date').equals(date).toArray()
+    let sets = 0
+    for (const s of sessions) {
+      sets += await db.setLogs.where('sessionId').equals(s.id).delete()
+      await db.sessions.delete(s.id)
+    }
+    const rows = await db.scheduled.where('date').equals(date).toArray()
+    const template = plan?.schedule[weekdayIndex(date)] ?? null
+    for (const r of rows) {
+      // A one-off extra workout on a rest day has nothing to go back to, so it is removed.
+      if (!template && !r.rescheduledFromId) await db.scheduled.delete(r.id)
+      else await db.scheduled.put({ ...r, status: 'planned', workout: undefined, configHash: undefined, keepPlan: false, cardioChoice: undefined, updatedAt: nowIso() })
+    }
+    return { sessions: sessions.length, sets }
+  })
 }
 
 // ---------- skipping and rescheduling ----------
@@ -378,5 +603,41 @@ export async function acceptReschedule(skippedId: string, newDate: string): Prom
 export async function resetAllData(): Promise<void> {
   await db.transaction('rw', db.tables, async () => {
     for (const t of db.tables) await t.clear()
+  })
+}
+
+// ---------- per-page and per-exercise weight units ----------
+async function convertSlotUnit(sessionId: string, slotId: string | null, from: WeightUnit, to: WeightUnit): Promise<void> {
+  if (from === to) return
+  const logs = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => (slotId === null || l.slotId === slotId)).toArray()
+  for (const l of logs) {
+    if (l.weightUnit !== from) continue // already overridden to something else
+    await db.setLogs.put({
+      ...l, weightUnit: to,
+      plannedWeight: l.plannedWeight === undefined ? undefined : tidy(convertWeight(l.plannedWeight, from, to)),
+      actualWeight: l.actualWeight === undefined ? undefined : tidy(convertWeight(l.actualWeight, from, to)),
+      updatedAt: nowIso(),
+    })
+  }
+}
+
+/** The default unit for the whole workout screen. Exercises with their own unit keep it. The physical weight never changes. */
+export async function setSessionUnit(sessionId: string, unit: WeightUnit): Promise<void> {
+  const s = await db.sessions.get(sessionId)
+  if (!s || s.weightUnit === unit) return
+  await db.transaction('rw', [db.sessions, db.setLogs], async () => {
+    await convertSlotUnit(sessionId, null, s.weightUnit, unit)
+    await db.sessions.put({ ...s, weightUnit: unit, updatedAt: nowIso() })
+  })
+}
+
+/** Gives one exercise its own unit (an override of the page default). Its numbers are converted so the weight stays the same. */
+export async function setExerciseUnit(sessionId: string, slotId: string, unit: WeightUnit): Promise<void> {
+  const logs = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId).toArray()
+  const from = logs[0]?.weightUnit
+  if (!from || from === unit) return
+  await db.transaction('rw', [db.sessions, db.setLogs], async () => {
+    await convertSlotUnit(sessionId, slotId, from, unit)
+    await touchSession(sessionId)
   })
 }

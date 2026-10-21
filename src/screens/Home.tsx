@@ -1,26 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
-import { addSoreness, clearSoreness, createExtraWorkout, ensureScheduled, generateFor, getActiveSession, recentSoreness, scheduledOn } from '../db/repo'
+import {
+  addSoreness, changeTrainingLevel, clearSoreness, createExtraWorkout, ensureScheduled, generateFor, getActiveSession, profileGaps,
+  recentSoreness, scheduledOn,
+} from '../db/repo'
 import { formatDay, startOfWeek } from '../engine/dates'
-import { ALL_MUSCLES, MUSCLE_LABEL, type DayPlan, type Muscle, type Profile } from '../engine/types'
-import { Button, Card, Chips, ScreenHeader } from '../components/ui'
+import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type DayPlan, type Muscle, type Profile } from '../engine/types'
+import { Button, Card, ScreenHeader } from '../components/ui'
+import { BodyBasicsCard, DurationPicker, LevelDialog } from '../components/HomeParts'
 import { useQuery } from '../hooks/app'
-import type { ScreenId } from '../components/BottomNav'
+import { useRouter } from '../router'
 
-const DURATIONS: readonly number[] = [20, 30, 45, 60]
 const EXTRA: Record<string, DayPlan> = {
   upper: { focus: 'Upper body (extra)', muscles: ['chest', 'back', 'shoulders', 'biceps', 'triceps'] },
   lower: { focus: 'Lower body (extra)', muscles: ['quads', 'hamstrings', 'glutes', 'calves', 'core'] },
   full: { focus: 'Full body (extra)', muscles: ['quads', 'chest', 'back', 'shoulders', 'core'] },
+  cardio: { focus: 'Cardio', muscles: [], cardioOnly: true },
 }
 
-export function Home({ profile, today, onNavigate }: { profile: Profile; today: string; onNavigate: (id: ScreenId) => void }) {
-  const [minutes, setMinutes] = useState<number>(profile.preferredDurationMinutes)
-  const [custom, setCustom] = useState('')
+export function Home({ profile, today }: { profile: Profile; today: string }) {
+  const { navigate } = useRouter()
+  const [minutes, setMinutes] = useState<number | null>(profile.preferredDurationMinutes)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [pickExtra, setPickExtra] = useState(false)
+  const [levelOpen, setLevelOpen] = useState(false)
 
   useEffect(() => { void ensureScheduled(today, 14, profile) }, [today, profile])
   const schedQ = useQuery(() => scheduledOn(today), [today])
@@ -30,6 +35,7 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
   const loading = schedQ.loading || activeQ.loading
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
   const soreness = useLiveQuery(() => recentSoreness(today), [today], {} as Partial<Record<Muscle, 1 | 2 | 3>>)
+  const gaps = profileGaps(profile)
 
   const isTraining = sched && sched.status !== 'skipped'
   const finished = sessions.filter((s) => s.status === 'completed' || s.status === 'partial')
@@ -37,14 +43,13 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
   const last = [...finished].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
   const greeting = profile.displayName ? `Hi, ${profile.displayName}` : 'Today'
 
-  const effectiveMinutes = custom.trim() !== '' ? Number(custom) : minutes
-
   const generate = async (id: string) => {
+    if (minutes === null) { setMessage('Choose a workout length first.'); return }
     setBusy(true)
     setMessage(null)
     try {
-      const r = await generateFor(id, effectiveMinutes, { today })
-      if (r.kind === 'workout') onNavigate('workout')
+      const r = await generateFor(id, minutes, { today })
+      if (r.kind === 'workout') navigate('/workout')
       else setMessage(r.message)
     } finally {
       setBusy(false)
@@ -52,7 +57,8 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
   }
 
   const trainAnyway = async (key: string) => {
-    const row = await createExtraWorkout(today, EXTRA[key], effectiveMinutes)
+    if (minutes === null) { setMessage('Choose a workout length first.'); return }
+    const row = await createExtraWorkout(today, EXTRA[key], minutes)
     setPickExtra(false)
     await generate(row.id)
   }
@@ -61,10 +67,19 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
     <>
       <ScreenHeader title={greeting} subtitle={formatDay(today)} />
 
+      <Card title="Training level">
+        <div className="row">
+          <strong>{LEVEL_LABEL[profile.trainingLevel]}</strong>
+          <Button variant="small" onClick={() => setLevelOpen(true)}>Change</Button>
+        </div>
+      </Card>
+
+      {gaps.length > 0 && <BodyBasicsCard profile={profile} />}
+
       {active && (
         <Card title="Workout in progress">
           <p>{active.title} started {new Date(active.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</p>
-          <Button onClick={() => onNavigate('workout')}>Resume workout</Button>
+          <Button onClick={() => navigate('/workout')}>Resume workout</Button>
         </Card>
       )}
 
@@ -80,16 +95,15 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
           </Card>
           {(sched.status === 'planned' || sched.status === 'partial') && (
             <Card title="How much time do you have?">
-              <Chips label="Available minutes" options={DURATIONS} value={custom ? -1 : minutes} onChange={(v) => { setMinutes(v); setCustom('') }} format={(v) => `${v} min`} />
-              <div className="field">
-                <label htmlFor="custom-min">Or enter minutes</label>
-                <input id="custom-min" inputMode="numeric" placeholder="e.g. 50" value={custom} onChange={(e) => setCustom(e.target.value.replace(/\D/g, ''))} />
-              </div>
-              <Button disabled={busy} onClick={() => generate(sched.id)}>
-                {sched.workout ? `View / update workout (${effectiveMinutes} min)` : `Generate workout (${effectiveMinutes} min)`}
+              <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
+              <Button disabled={busy || minutes === null || gaps.length > 0} onClick={() => generate(sched.id)}>
+                {sched.workout ? `View / update workout (${minutes ?? '?'} min)` : `Generate workout (${minutes ?? '?'} min)`}
               </Button>
               {message && <p className="error" role="alert">{message}</p>}
             </Card>
+          )}
+          {sched.status === 'completed' && (
+            <Card><Button variant="ghost" onClick={() => navigate('/workout')}>View today's workout</Button></Card>
           )}
         </>
       )}
@@ -101,17 +115,24 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
             <Button variant="ghost" onClick={() => setPickExtra(true)}>I want to train anyway</Button>
           ) : (
             <>
-              <p className="muted">Choose a focus for an extra session:</p>
+              <p className="muted">How long, and what focus, for an extra session?</p>
+              <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
               <div className="stack">
-                <Button variant="ghost" onClick={() => trainAnyway('upper')}>Upper body</Button>
-                <Button variant="ghost" onClick={() => trainAnyway('lower')}>Lower body</Button>
-                <Button variant="ghost" onClick={() => trainAnyway('full')}>Full body</Button>
+                <Button variant="ghost" disabled={gaps.length > 0 || busy} onClick={() => trainAnyway('upper')}>Upper body</Button>
+                <Button variant="ghost" disabled={gaps.length > 0 || busy} onClick={() => trainAnyway('lower')}>Lower body</Button>
+                <Button variant="ghost" disabled={gaps.length > 0 || busy} onClick={() => trainAnyway('full')}>Full body</Button>
+                <Button variant="ghost" disabled={gaps.length > 0 || busy} onClick={() => trainAnyway('cardio')}>Cardio only</Button>
               </div>
               {message && <p className="error" role="alert">{message}</p>}
             </>
           )}
         </Card>
       )}
+
+      <Card title="Yoga">
+        <p className="muted">A guided session in 13 styles, for any level. No equipment needed.</p>
+        <Button variant="ghost" onClick={() => navigate('/yoga')}>Plan a yoga session</Button>
+      </Card>
 
       <Card title="Feeling sore? (optional)">
         <details>
@@ -145,6 +166,10 @@ export function Home({ profile, today, onNavigate }: { profile: Profile; today: 
           </>
         )}
       </Card>
+
+      {levelOpen && (
+        <LevelDialog current={profile.trainingLevel} onClose={() => setLevelOpen(false)} onApply={(level, mode) => changeTrainingLevel(level, mode)} />
+      )}
     </>
   )
 }

@@ -7,9 +7,10 @@ import { availableIds, loadSpec } from './equipment'
 import { assumptionsText, estimateSeconds, restSecondsFor } from './time'
 import { suggestLoad, type LoadSpec } from './progression'
 import { validateExercise } from './validate'
+import { LEVEL_PARAMS, setsFor } from './levels'
+import { cardioCalories, MAX_SESSION_MINUTES, MIN_SESSION_MINUTES, pickCardio } from './cardio'
 
-export const GENERATOR_VERSION = 'gen-1.0'
-const MAX_EXERCISES = 9
+export const GENERATOR_VERSION = 'gen-2.0'
 
 export interface GenerateInput {
   date: string
@@ -27,6 +28,10 @@ export interface GenerateInput {
   lastDone?: Record<string, string>
   soreness: Partial<Record<Muscle, 1 | 2 | 3>>
   weightUnit: WeightUnit
+  /** 'none' skips cardio; a cardio id picks that activity; missing lets the app choose. */
+  cardioChoice?: string
+  /** Canonical body weight, used only for the rough cardio calorie range. */
+  weightKg?: number
 }
 
 const REPS: Record<Goal, { compound: [number, number]; iso: [number, number] }> = {
@@ -35,14 +40,6 @@ const REPS: Record<Goal, { compound: [number, number]; iso: [number, number] }> 
   general: { compound: [8, 12], iso: [10, 15] },
   endurance: { compound: [12, 20], iso: [15, 20] },
   fat_loss: { compound: [10, 15], iso: [12, 20] },
-}
-
-function setsFor(goal: Goal, experience: Experience, compound: boolean): number {
-  let s = compound ? 3 : 2
-  if (experience !== 'beginner') s = 3
-  if (goal === 'strength' && compound && experience !== 'beginner') s = 4
-  if (goal === 'endurance' && experience === 'beginner') s = 2
-  return s
 }
 
 const PATTERN_LABEL: Record<Pattern, string> = {
@@ -56,7 +53,7 @@ function eligible(ex: Exercise, input: Rules, avail: Set<EquipmentId>): boolean 
   if (validateExercise(ex).length > 0) return false
   if (input.excludedExerciseIds.includes(ex.id)) return false
   if (input.excludedPatterns.includes(ex.movementPattern)) return false
-  if (input.experience === 'beginner' && ex.difficulty !== 'beginner') return false
+  if (LEVEL_PARAMS[input.experience].maxDifficulty === 'beginner' && ex.difficulty !== 'beginner') return false
   return ex.equipmentIds.every((q) => avail.has(q))
 }
 
@@ -91,23 +88,65 @@ function sortCandidates(list: Exercise[], lastDone: Record<string, string>): Exe
  * No randomness and no network calls.
  */
 export function generateWorkout(input: GenerateInput): GenerationResult {
-  if (!Number.isInteger(input.minutes) || input.minutes < 10 || input.minutes > 180) {
-    return { kind: 'error', message: 'Choose a workout length between 10 and 180 minutes.' }
+  if (!Number.isInteger(input.minutes) || input.minutes < MIN_SESSION_MINUTES || input.minutes > MAX_SESSION_MINUTES) {
+    return {
+      kind: 'error',
+      message: input.minutes < MIN_SESSION_MINUTES
+        ? `${input.minutes} minutes is too short for a useful session. Try ${MIN_SESSION_MINUTES} minutes or more.`
+        : `Choose a workout length between ${MIN_SESSION_MINUTES} and ${MAX_SESSION_MINUTES} minutes.`,
+    }
   }
   if (input.planDay === null) {
     return { kind: 'rest', message: 'Today is a rest day. Recovery is part of training. You can still choose a workout if you want one.' }
   }
   const { planDay } = input
-  if (planDay.muscles.length === 0) return { kind: 'error', message: 'Today has no target muscle groups.' }
+  const cardioOnly = planDay.cardioOnly === true
+  if (planDay.muscles.length === 0 && !cardioOnly) return { kind: 'error', message: 'Today has no target muscle groups.' }
 
+  const level = LEVEL_PARAMS[input.experience]
   const avail = availableIds(input.equipment)
+  const lastDone = input.lastDone ?? {}
+  const notes: string[] = []
+
+  // ---- cardio ----
+  const cardio = pickCardio({
+    goal: input.goal, level: input.experience, minutes: input.minutes, available: avail,
+    excludedIds: input.excludedExerciseIds, lastDone, choice: input.cardioChoice, cardioOnly,
+  })
+  if (cardioOnly && !cardio) {
+    return { kind: 'error', message: 'No cardio option fits your equipment, level and exclusions. Walking needs no equipment, so check that Bodyweight is switched on in Settings.' }
+  }
+  const budget = input.minutes * 60
+  const cardioPE = (minutes: number): PlannedExercise => ({
+    slotId: 'c1', exerciseId: cardio!.activity.id, name: cardio!.activity.name, sets: 1, repMin: 0, repMax: 0,
+    restSeconds: 0, loadNote: '', why: `Cardio for your heart and endurance. ${cardio!.activity.name} ${cardio!.activity.equipmentIds.includes('bodyweight') ? 'needs no equipment' : 'uses equipment you have'}.`,
+    kind: 'cardio', durationMinutes: minutes, intensityCue: cardio!.intensityCue, cues: cardio!.activity.instructions,
+  })
+
+  if (cardioOnly && cardio) {
+    const seconds = cardio.minutes * 60
+    notes.push('Spend the first 5 minutes at an easy pace as your warm-up.')
+    if (cardio.minutes < Math.floor(input.minutes / 5) * 5) {
+      notes.push(`Continuous cardio is capped at ${cardio.minutes} minutes for your level. Longer blocks are best built up gradually.`)
+    }
+    const kcal = cardioCalories(cardio.activity, cardio.minutes, input.weightKg)
+    if (kcal) notes.push(`Rough estimate: ${kcal.low} to ${kcal.high} calories. This is not a measurement.`)
+    return {
+      kind: 'workout',
+      workout: {
+        title: planDay.focus, date: input.date, targetMuscles: [], availableMinutes: input.minutes,
+        estimatedMinutes: Math.ceil(seconds / 60), fits: seconds <= budget, cardioMinutes: cardio.minutes,
+        exercises: [cardioPE(cardio.minutes)], notes, assumptions: ['Cardio time is the whole session. Your real pace will differ.'],
+        generatorVersion: GENERATOR_VERSION, catalogVersion: input.catalog[0]?.catalogVersion ?? 'unknown',
+      },
+    }
+  }
+
+  // ---- strength ----
   const pool = input.catalog.filter((e) => eligible(e, input, avail))
   if (pool.length === 0) {
     return { kind: 'error', message: 'No exercises match your equipment and exclusions. Check Settings: confirm your equipment or remove an exclusion.' }
   }
-
-  const lastDone = input.lastDone ?? {}
-  const notes: string[] = []
   const pools = new Map<Muscle, Exercise[]>()
   for (const m of planDay.muscles) {
     const primary = pool.filter((e) => e.primaryMuscles[0] === m)
@@ -141,13 +180,14 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
 
   const reps = REPS[input.goal]
   const soreFor = (ex: Exercise) => Math.max(0, ...ex.primaryMuscles.map((m) => input.soreness[m] ?? 0))
+  const rest = (ex: Exercise) => restSecondsFor(input.goal, ex.compound, level.restBonus)
   const build = (ex: Exercise, slot: number, sets: number): PlannedExercise => {
     const [repMin, repMax] = ex.compound ? reps.compound : reps.iso
     const spec = loadSpecFor(ex, input.equipment, input.weightUnit)
     const noLoad = ex.exerciseType === 'bodyweight' || ex.exerciseType === 'bands'
     const sug = noLoad
       ? { weight: undefined, note: 'No weight needed. Use a variation that lets you reach the target reps with good form.' }
-      : suggestLoad(input.lastPerformance[ex.id], spec, input.weightUnit, repMin, repMax)
+      : suggestLoad(input.lastPerformance[ex.id], spec, input.weightUnit, repMin, repMax, level.effortCeiling)
     return {
       slotId: `s${slot + 1}`,
       exerciseId: ex.id,
@@ -155,11 +195,13 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
       sets,
       repMin,
       repMax,
-      restSeconds: restSecondsFor(input.goal, ex.compound),
+      restSeconds: rest(ex),
       suggestedWeight: sug.weight,
       loadUnit: sug.weight === undefined ? undefined : input.weightUnit,
       loadNote: sug.note,
       why: why(ex),
+      kind: 'strength',
+      cues: ex.instructions.slice(0, level.cues),
     }
   }
   const defaultSets = (ex: Exercise) => {
@@ -168,21 +210,32 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     return s
   }
 
-  // Add exercises in rank order while the time estimate fits.
-  const budget = input.minutes * 60
+  // Add exercises in rank order while the time estimate fits. Cardio time is reserved first.
+  let cardioMinutes = cardio?.minutes ?? 0
+  const timed = (list: { ex: Exercise; sets: number }[], cm: number) =>
+    estimateSeconds(list.map((c) => ({ sets: c.sets, restSeconds: rest(c.ex) })), input.goal, input.minutes, cm)
+  if (cardio && ranked.length > 0) {
+    const first = { ex: ranked[0].ex, sets: 2 }
+    while (cardioMinutes > 0 && timed([first], cardioMinutes) > budget) cardioMinutes -= 5
+    if (cardioMinutes < cardio.minutes) {
+      notes.push(cardioMinutes > 0
+        ? `Cardio was shortened to ${cardioMinutes} minutes to leave room for strength work in ${input.minutes} minutes.`
+        : `There was not enough time for cardio in ${input.minutes} minutes, so today is strength only.`)
+    }
+  }
   const chosen: { ex: Exercise; sets: number }[] = []
   let misses = 0
+  let droppedForTime = 0
+  const cap = level.maxExercises
   for (const r of ranked) {
-    if (chosen.length >= MAX_EXERCISES) break
+    if (chosen.length >= cap) break
     let sets = defaultSets(r.ex)
-    const trial = (s: number) => estimateSeconds(
-      [...chosen, { ex: r.ex, sets: s }].map((c) => ({ sets: c.sets, restSeconds: restSecondsFor(input.goal, c.ex.compound) })),
-      input.goal, input.minutes,
-    )
+    const trial = (n: number) => timed([...chosen, { ex: r.ex, sets: n }], cardioMinutes)
     if (trial(sets) > budget && sets > 2) sets = 2
     if (trial(sets) > budget) {
       if (chosen.length === 0) { chosen.push({ ex: r.ex, sets }); break } // always return at least one exercise, flagged as not fitting
-      if (++misses >= 2) break
+      droppedForTime += 1
+      if (++misses >= 2) { droppedForTime += ranked.length - ranked.indexOf(r) - 1; break }
       continue
     }
     chosen.push({ ex: r.ex, sets })
@@ -190,15 +243,25 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
 
   // Heavier lifts first, accessories last. Stable within each group.
   const ordered = [...chosen].sort((a, b) => Number(b.ex.compound) - Number(a.ex.compound))
-  const exercises = ordered.map((c, i) => build(c.ex, i, c.sets))
-  const seconds = estimateSeconds(exercises, input.goal, input.minutes)
+  const exercises: PlannedExercise[] = ordered.map((c, i) => build(c.ex, i, c.sets))
+  if (cardio && cardioMinutes > 0) exercises.push({ ...cardioPE(cardioMinutes), slotId: `s${exercises.length + 1}` })
+  const seconds = estimateSeconds(
+    exercises.filter((e) => e.kind !== 'cardio'), input.goal, input.minutes, cardioMinutes,
+  )
   const fits = seconds <= budget
 
   const covered = new Set(ordered.flatMap((c) => c.ex.primaryMuscles))
   for (const m of planDay.muscles) {
     if (pools.has(m) && !covered.has(m)) notes.push(`There was not enough time for ${MUSCLE_LABEL[m].toLowerCase()} in ${input.minutes} minutes. Try a longer session to include it.`)
   }
-  if (!fits) notes.push(`Even a minimal session is estimated at about ${Math.ceil(seconds / 60)} minutes, longer than the ${input.minutes} you chose.`)
+  if (droppedForTime > 0) {
+    notes.push(`To fit ${input.minutes} minutes, ${droppedForTime} lower-priority exercise${droppedForTime === 1 ? ' was' : 's were'} left out. Compound lifts come first, and muscles that are targeted today are covered before extras are added.`)
+  }
+  if (!fits) notes.push(`Even a minimal session is estimated at about ${Math.ceil(seconds / 60)} minutes, longer than the ${input.minutes} you chose. A longer session or fewer exercises would help.`)
+  if (cardio && cardioMinutes > 0) {
+    const kcal = cardioCalories(cardio.activity, cardioMinutes, input.weightKg)
+    notes.push(`Cardio: ${cardio.activity.name} for ${cardioMinutes} minutes. ${cardio.intensityCue}${kcal ? ` Rough estimate: ${kcal.low} to ${kcal.high} calories (not a measurement).` : ''} You can skip it or switch it before you start.`)
+  }
   const sorest = planDay.muscles.filter((m) => (input.soreness[m] ?? 0) >= 2)
   if (sorest.length > 0) {
     notes.push(`You reported soreness in ${sorest.map((m) => MUSCLE_LABEL[m].toLowerCase()).join(', ')}, so those exercises have one fewer set. If you feel unwell or something hurts, rest or choose a lighter day.`)
@@ -211,9 +274,10 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     availableMinutes: input.minutes,
     estimatedMinutes: Math.ceil(seconds / 60),
     fits,
+    cardioMinutes,
     exercises,
     notes,
-    assumptions: assumptionsText(input.goal, input.minutes),
+    assumptions: assumptionsText(input.goal, input.minutes, cardioMinutes),
     generatorVersion: GENERATOR_VERSION,
     catalogVersion: input.catalog[0]?.catalogVersion ?? 'unknown',
   }
@@ -246,7 +310,7 @@ export function configHash(input: Omit<GenerateInput, 'catalog'> & { catalogVers
     .map((i) => `${i!.id}:${i!.minWeight ?? ''}-${i!.maxWeight ?? ''}-${i!.increment ?? ''}`)
     .sort()
   return JSON.stringify([
-    input.planDay, input.minutes, input.goal, input.experience, eq,
+    input.planDay, input.minutes, input.goal, input.experience, input.cardioChoice ?? '', eq,
     [...input.excludedExerciseIds].sort(), [...input.excludedPatterns].sort(),
     input.soreness, input.weightUnit, input.catalogVersion, GENERATOR_VERSION, input.recentSessionIds,
   ])

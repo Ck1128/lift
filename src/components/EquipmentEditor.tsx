@@ -1,17 +1,58 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
-import { saveEquipment } from '../db/repo'
-import { defaultLoad, presetEquipment, presetFor } from '../engine/equipment'
+import { applyDefaultEquipment, saveEquipment, setExcludedEquipment } from '../db/repo'
+import {
+  availableIds, defaultLoad, equipmentSummary, PRESET_EQUIPMENT, PRESET_REVIEWED, PRESET_VERSION, presetEquipment, presetFor, withExclusions,
+} from '../engine/equipment'
 import type { EquipmentId, EquipmentItem, GymType, LocationType, WeightUnit } from '../engine/types'
-import { EQUIPMENT_LABEL, LOADABLE } from '../engine/types'
+import { ALL_EQUIPMENT, EQUIPMENT_LABEL, LOADABLE } from '../engine/types'
+import { useQuery } from '../hooks/app'
 import { Button } from './ui'
 
-const ORDER: EquipmentId[] = ['bodyweight', 'dumbbell', 'kettlebell', 'barbell', 'bench', 'pullup_bar', 'bands', 'mat', 'machine', 'cable', 'smith']
-
 export function EquipmentEditor({ location, gymType, unit }: { location: LocationType; gymType: GymType; unit: WeightUnit }) {
-  const rec = useLiveQuery(() => db.equipment.get(location), [location])
-  const items = rec?.items ?? presetEquipment(presetFor(location, gymType), unit)
-  const preset = location === 'home' ? 'an empty home setup (bodyweight only)' : gymType === 'planet_fitness' ? 'Planet Fitness (no barbells; Smith machine, dumbbells up to 75 lb, machines, cables)' : 'a typical commercial gym'
+  const q = useQuery(() => db.equipment.get(location), [location])
+  if (q.loading) return <p className="muted">Loading...</p>
+  const rec = q.value
+  const kind = presetFor(location, gymType)
+  const preset = rec?.preset
+  const excluded = rec?.excluded ?? []
+  const items = preset
+    ? withExclusions(presetEquipment(preset, unit), excluded)
+    : (rec?.items ?? presetEquipment(kind, unit))
+  const summary = equipmentSummary(items, EQUIPMENT_LABEL)
+
+  if (preset) {
+    const base = PRESET_EQUIPMENT[preset]
+    const toggle = (id: EquipmentId, on: boolean) =>
+      setExcludedEquipment(location, on ? excluded.filter((x) => x !== id) : [...excluded, id])
+    return (
+      <div>
+        <p className="notice">
+          <strong>Planet Fitness equipment applied automatically.</strong>{' '}
+          List {PRESET_VERSION}, last reviewed {PRESET_REVIEWED}. It is a typical club, not a record of every location, so
+          untick anything your club does not have.
+        </p>
+        <p className="hint"><strong>Applied now:</strong> {summary}</p>
+        {base.map((id) => {
+          const on = !excluded.includes(id)
+          return (
+            <div key={id} className="equip">
+              <label className="check">
+                <input type="checkbox" checked={on} onChange={(e) => void toggle(id, e.target.checked)} />
+                <span>{EQUIPMENT_LABEL[id]}</span>
+              </label>
+              {on && id === 'dumbbell' && items.dumbbell?.maxWeight && <p className="hint">Dumbbells up to {items.dumbbell.maxWeight} {items.dumbbell.unit}.</p>}
+            </div>
+          )
+        })}
+        <p className="hint">Not on the standard list: {ALL_EQUIPMENT.filter((id) => !base.includes(id)).map((id) => EQUIPMENT_LABEL[id]).join(', ')}.</p>
+        <details>
+          <summary>Edit the list myself instead</summary>
+          <p className="hint">Your club has something different? Switch to your own list. It starts from the current one and you can tick anything. It will no longer follow updates to the Planet Fitness list.</p>
+          <Button variant="ghost" onClick={() => void saveEquipment(location, items)}>Use my own list</Button>
+        </details>
+      </div>
+    )
+  }
 
   const set = (id: EquipmentId, patch: Partial<EquipmentItem>) => {
     const cur = items[id] ?? { id, available: false }
@@ -20,21 +61,23 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
     return saveEquipment(location, { ...items, [id]: next })
   }
   const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
+  const have = availableIds(items)
+  const presetName = location === 'home' ? 'an empty home setup (bodyweight and a mat)' : gymType === 'planet_fitness' ? 'the Planet Fitness list' : 'a typical commercial gym'
 
   return (
     <div>
       <p className="hint">
         {location === 'home' ? 'Tick only what you own.' : 'Tick what your gym has today.'} The workout generator uses only the ticked items.
-        {location === 'gym' && ' The starting list is a guess, not a record of every location, so please confirm it.'}
-        {' '}Untick something that is broken or taken, then generate again to get alternatives.
+        {' '}Bodyweight is an ordinary option: untick it if you do not want bodyweight exercises.
       </p>
-      {ORDER.map((id) => {
+      <p className="hint"><strong>Applied now:</strong> {summary}</p>
+      {ALL_EQUIPMENT.map((id) => {
         const it = items[id] ?? { id, available: false }
-        const locked = id === 'bodyweight'
+        const checked = id === 'bodyweight' ? have.has('bodyweight') : it.available
         return (
           <div key={id} className="equip">
             <label className="check">
-              <input type="checkbox" checked={locked ? true : it.available} disabled={locked} onChange={(e) => set(id, { available: e.target.checked })} />
+              <input type="checkbox" checked={checked} onChange={(e) => void set(id, { available: e.target.checked })} />
               <span>{EQUIPMENT_LABEL[id]}</span>
             </label>
             {it.available && LOADABLE.includes(id) && (
@@ -47,7 +90,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
                       key={`${id}-${k}-${it[k] ?? ''}`}
                       onBlur={(e) => {
                         const v = num(e.target.value)
-                        if (v !== undefined && v > 0) set(id, { [k]: v, unit })
+                        if (v !== undefined && v > 0) void set(id, { [k]: v, unit })
                       }}
                     />
                   </label>
@@ -58,8 +101,8 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
           </div>
         )
       })}
-      <Button variant="ghost" onClick={() => saveEquipment(location, presetEquipment(presetFor(location, gymType), unit))}>
-        Reset list to {preset}
+      <Button variant="ghost" onClick={() => void applyDefaultEquipment(location, gymType, unit)}>
+        Reset list to {presetName}
       </Button>
     </div>
   )

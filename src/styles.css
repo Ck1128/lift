@@ -133,3 +133,29 @@ details > summary { cursor: pointer; padding: 6px 0; min-height: 32px; }
 .dialog-actions .btn { margin-top: 0; }
 hr { border: 0; border-top: 1px solid var(--bd); margin: 16px 0; }
 @media (min-width: 700px) { .backdrop { align-items: center; } .dialog { border-radius: 18px; } }
+
+/* ---- Phase B additions ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.back-btn { all: unset; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 8px 0 0; color: var(--ac); font-weight: 600; cursor: pointer; }
+.back-btn:focus-visible, .chip:focus-visible, .btn:focus-visible, .nav-item:focus-visible, .alt:focus-visible { outline: 3px solid var(--ac); outline-offset: 2px; }
+.level-list { display: flex; flex-direction: column; gap: 8px; }
+.level { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--bd); border-radius: 12px; font-weight: 400; margin: 0; }
+.level.on { border-color: var(--ac); background: color-mix(in srgb, var(--ac) 8%, var(--card)); }
+.required-block { border-left: 3px solid var(--ac); padding-left: 10px; margin: 12px 0; }
+.weight-field.compact .inline { margin: 0; }
+.weight-field select, .inline select { width: auto; min-width: 72px; }
+.unit-row { align-items: flex-end; }
+.cues { font-size: 13px; margin: 6px 0; }
+.danger-zone { border-color: #d92d20; }
+.danger-zone .card-title { color: #d92d20; }
+.rest-bar { gap: 8px; flex-wrap: wrap; }
+.finish-bottom { margin-top: 16px; margin-bottom: 8px; }
+.food-row .inline { margin-top: 0; }
+.date-input { width: auto; flex: 1; text-align: center; }
+.edit-row { display: grid; grid-template-columns: 28px 1fr 1fr 48px; gap: 6px; align-items: center; margin: 6px 0; }
+.edit-row .n { text-align: center; color: var(--mu); }
+.set-row.cardio { grid-template-columns: 1fr 48px; }
+.chart-table { margin-top: 6px; }
+caption.sr-only { display: block; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+@media (forced-colors: active) { .chip.on, .btn { border: 2px solid ButtonText; } }

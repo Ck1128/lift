@@ -1,17 +1,34 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  BodyWeightEntry, EquipmentSet, LocationType, Profile, ScheduledWorkout, SetLog, SorenessEntry,
+  BodyWeightEntry, EquipmentId, EquipmentSet, LocationType, Profile, ScheduledWorkout, SetLog, SorenessEntry,
   WeeklyPlan, WorkoutSession,
 } from '../engine/types'
+import type { PresetKind } from '../engine/equipment'
+import type { YogaPlan, YogaSession } from '../engine/yoga'
+import type { FoodCacheEntry, FoodLogEntry } from '../engine/food'
 
-export const APP_VERSION = '1.0.0'
-export const DB_SCHEMA_VERSION = 2
+export const APP_VERSION = '2.0.0'
+export const DB_SCHEMA_VERSION = 3
 
 /** Equipment is stored once per location (home / gym). */
 export interface EquipmentRecord {
   location: LocationType
   items: EquipmentSet
   updatedAt: string
+  /**
+   * When set, `items` follows this maintained preset (for example Planet Fitness) and only `excluded` is the user's choice.
+   * Missing means the user edited the list by hand.
+   */
+  preset?: PresetKind
+  /** Items the user said their club does not have. Only used with `preset`. */
+  excluded?: EquipmentId[]
+}
+
+export interface YogaPlanRecord {
+  /** Cache key built from every input that changes the plan. */
+  key: string
+  plan: YogaPlan
+  createdAt: string
 }
 
 export interface SettingRecord {
@@ -29,6 +46,10 @@ export class LiftDB extends Dexie {
   settings!: Table<SettingRecord, string>
   soreness!: Table<SorenessEntry, string>
   bodyWeights!: Table<BodyWeightEntry, string>
+  yogaSessions!: Table<YogaSession, string>
+  yogaPlans!: Table<YogaPlanRecord, string>
+  foodLog!: Table<FoodLogEntry, string>
+  foodCache!: Table<FoodCacheEntry, string>
 
   constructor(name = 'lift-db') {
     super(name)
@@ -56,7 +77,53 @@ export class LiftDB extends Dexie {
           if (!s.targetMuscles) s.targetMuscles = []
         })
       })
+    // Version 3 (Phase B): yoga, food, canonical height and weight, three training levels.
+    // Nothing is deleted. Old profile fields are converted, and every new table starts empty.
+    this.version(3)
+      .stores({
+        yogaSessions: 'id, date, status',
+        yogaPlans: 'key',
+        foodLog: 'id, date, mealCategory',
+        foodCache: 'key',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('profile').toCollection().modify((p: Record<string, unknown>) => {
+          const next = upgradeProfileV2(p)
+          for (const k of Object.keys(p)) delete p[k]
+          Object.assign(p, next)
+        })
+        await tx.table('sessions').toCollection().modify((s: Partial<WorkoutSession>) => {
+          if (!s.updatedAt) s.updatedAt = s.finishedAt ?? s.startedAt
+        })
+      })
   }
+}
+
+/**
+ * Converts a version 1 or 2 profile into the version 3 shape. Used by the database upgrade and when importing an old backup.
+ * Old values are converted, never dropped: height becomes centimetres, weight becomes kilograms.
+ */
+export function upgradeProfileV2(p: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...p }
+  const hUnit = p.heightUnit === 'cm' ? 'cm' : 'in'
+  if (typeof p.heightValue === 'number' && out.heightCm === undefined) {
+    out.heightCm = Math.round((hUnit === 'cm' ? p.heightValue : p.heightValue * 2.54) * 10) / 10
+  }
+  if (out.heightDisplayUnit === undefined) out.heightDisplayUnit = hUnit === 'cm' ? 'cm' : 'ft-in'
+  const wUnit = p.weightUnit === 'kg' ? 'kg' : 'lb'
+  if (typeof p.weightValue === 'number' && out.weightKg === undefined) {
+    out.weightKg = Math.round((wUnit === 'kg' ? p.weightValue : p.weightValue / 2.2046226218) * 100) / 100
+  }
+  if (out.trainingLevel === undefined) {
+    const old = p.experienceLevel
+    out.trainingLevel = old === 'advanced' ? 'regular' : old === 'intermediate' ? 'intermediate' : 'beginner'
+  }
+  if (out.nutritionGuidance === undefined) out.nutritionGuidance = false
+  delete out.heightValue
+  delete out.heightUnit
+  delete out.weightValue
+  delete out.experienceLevel
+  return out
 }
 
 export let db = new LiftDB()

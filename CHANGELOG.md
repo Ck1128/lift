@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.0 - Phase B (branch feature/v2-complete)
+- Three training levels (beginner, intermediate, regular gym-goer); beginners provide height and weight.
+- Height in ft/in or cm, kg/lb selector beside every weight field, page default with per-field override; stored as cm and kg.
+- Fixed bodyweight greyed-out bug; Planet Fitness equipment applies automatically, with exclusions.
+- Durations 30/45/60/75/90 or custom (15 minimum); cardio in workouts and cardio-only days.
+- Finish button at top and bottom; rest timer with pause, resume, skip and +15s; resume or edit a completed workout.
+- Reset a day with three separate confirmations.
+- Yoga: 13 styles, levels, location, props, history and charts.
+- Food: five meals, raw/cooked, units, edit/duplicate/delete, daily summary, optional non-punitive guidance, opt-in Open Food Facts search.
+- Charts with data tables, date ranges, CSV / JSON / PNG export.
+- Back navigation with a hash router and unsaved-changes guard; in-app Help.
+- Database schema v3 with tested migration; backup v2 (v1 files still import).
+- Honest Apple Health panel (not connected).
+- See docs/PHASE_B_AUDIT.md.
+
 ## 1.0.0 - Full local-first app (branch feature/v2-complete)
 - Local profile, goals, training days, units, exercise exclusions (Dexie / IndexedDB, schema v2 with migration).
 - 234-exercise bundled catalog (public-domain source + manual entries) with validation.

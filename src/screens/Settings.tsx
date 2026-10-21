@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { CATALOG } from '../data/catalog'
-import { profileToForm, rebuildPlan, resetAllData, saveProfile, setLocation, updateExclusions } from '../db/repo'
+import { profileToForm, rebuildPlan, resetAllData, saveProfile, setLocation, setNutritionGuidance, setYogaLevel, updateExclusions } from '../db/repo'
 import { APP_VERSION, DB_SCHEMA_VERSION } from '../db/schema'
 import { BackupPanel } from '../components/BackupPanel'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
-import { Button, Card, Chips, ConfirmDialog, ScreenHeader } from '../components/ui'
-import type { LocationType, Pattern, Profile } from '../engine/types'
+import { Button, Card, Chips, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
+import { LEVEL_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
+import { APPLE_HEALTH_NOTE } from '../engine/guidance'
 
 const PATTERNS: { id: Pattern; label: string }[] = [
   { id: 'push', label: 'Pushing' }, { id: 'pull', label: 'Pulling' }, { id: 'squat', label: 'Squats' },
@@ -18,6 +19,7 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
   const [search, setSearch] = useState('')
   const [confirmReset, setConfirmReset] = useState(false)
   const [note, setNote] = useState(profile.limitationNote ?? '')
+  const [levelAsk, setLevelAsk] = useState<{ proceed: (m: 'update' | 'keep') => void } | null>(null)
 
   const matches = search.trim().length < 2 ? [] : CATALOG.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 25)
   const excluded = profile.excludedExerciseIds
@@ -38,9 +40,26 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
             initialExtra={{ preferredLocation: profile.preferredLocation, gymType: profile.gymType }}
             showLocation={false}
             submitLabel="Save profile"
-            onSubmit={(form) => void saveProfile(form, { preferredLocation: profile.preferredLocation, gymType: profile.gymType })}
+            onLevelChange={(_from, _to, proceed) => setLevelAsk({ proceed })}
+            onSubmit={async (form, _extra, opts) => { await saveProfile(form, { preferredLocation: profile.preferredLocation, gymType: profile.gymType }, new Date(), { levelChange: opts?.levelChange }) }}
           />
         </details>
+      </Card>
+
+      <Card title="Yoga and food">
+        <div className="field">
+          <label htmlFor="yoga-level">Yoga level</label>
+          <select id="yoga-level" value={profile.yogaLevel ?? ''} onChange={(e) => void setYogaLevel(e.target.value as TrainingLevel)}>
+            <option value="" disabled>Choose when you plan your first yoga session</option>
+            {(['beginner', 'intermediate', 'regular'] as const).map((l) => <option key={l} value={l}>{LEVEL_LABEL[l]}</option>)}
+          </select>
+          <p className="hint">Separate from your lifting level. A beginner lifter can be an experienced yogi.</p>
+        </div>
+        <label className="check">
+          <input type="checkbox" checked={profile.nutritionGuidance} onChange={(e) => void setNutritionGuidance(e.target.checked)} />
+          <span>Show gentle next-day food guidance after I log food</span>
+        </label>
+        <p className="hint">Optional and off by default. It is never a diet plan and never tells you to make up for what you ate.</p>
       </Card>
 
       <Card title="Where you train">
@@ -93,6 +112,22 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
         <Button variant="ghost" onClick={() => void rebuildPlan(profile)}>Rebuild upcoming plan</Button>
       </Card>
 
+      <Card title="Apple Health and wearables">
+        <p className="notice">{APPLE_HEALTH_NOTE.status}</p>
+        <p className="hint">{APPLE_HEALTH_NOTE.why}</p>
+        <p className="hint">{APPLE_HEALTH_NOTE.alternative}</p>
+      </Card>
+
+      <Card title="Help">
+        <ul className="list-tight">
+          <li><strong>Back:</strong> use the Back button at the top of any screen. Unsaved changes ask before you leave.</li>
+          <li><strong>Units:</strong> pick kg or lb at the top of a page; change one field with the selector beside it.</li>
+          <li><strong>Finish a workout:</strong> use Finish at the top or bottom. You can reopen it later to edit sets.</li>
+          <li><strong>Reset a day:</strong> from the day's page. It asks three separate times.</li>
+          <li><strong>Food and yoga:</strong> general wellness guidance, not medical advice. Online food search is off unless you turn it on.</li>
+          <li><strong>Export:</strong> Progress, then Export for CSV, JSON or a chart image.</li>
+        </ul>
+      </Card>
       <Card title="Backup and restore"><BackupPanel /></Card>
 
       <Card title="Delete my data">
@@ -105,6 +140,18 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
         <p className="hint">Your data is stored only on this phone, in the browser's local database. There is no account and no server. If you clear Safari's website data or delete the app, it is gone, so export a backup now and then.</p>
         <p className="hint">Exercise names, steps and photos come from the public-domain free-exercise-db project. Time, weight and calorie figures are estimates.</p>
       </Card>
+
+      {levelAsk && (
+        <Dialog title="Training level changed" onClose={() => setLevelAsk(null)}>
+          <p>What should happen to workouts that are already planned?</p>
+          <p className="hint">Workouts you already did are never changed.</p>
+          <div className="stack">
+            <Button onClick={() => { const a = levelAsk; setLevelAsk(null); a.proceed('update') }}>Rebuild upcoming workouts for the new level</Button>
+            <Button variant="ghost" onClick={() => { const a = levelAsk; setLevelAsk(null); a.proceed('keep') }}>Keep upcoming workouts as they are</Button>
+            <Button variant="ghost" onClick={() => setLevelAsk(null)}>Cancel, do not save</Button>
+          </div>
+        </Dialog>
+      )}
 
       {confirmReset && (
         <ConfirmDialog
