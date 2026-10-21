@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import {
   addSoreness, changeTrainingLevel, clearSoreness, createExtraWorkout, ensureScheduled, generateFor, getActiveSession, profileGaps,
-  recentSoreness, scheduledOn,
+  recentSoreness, scheduledOn, setTrack,
 } from '../db/repo'
 import { formatDay, startOfWeek } from '../engine/dates'
 import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type DayPlan, type Muscle, type Profile } from '../engine/types'
@@ -150,6 +150,19 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
       )}
 
       {tracks.workout && tracks.yoga && yogaCard(false)}
+
+      {!tracks.yoga && (
+        <Card title="Yoga is turned off">
+          <p className="muted">Yoga sessions, history and charts are hidden, not deleted.</p>
+          <Button variant="ghost" onClick={() => void setTrack('yoga', true)}>Turn on Yoga</Button>
+        </Card>
+      )}
+      {!tracks.workout && (
+        <Card title="Workouts are turned off">
+          <p className="muted">Turn them on to see your plan and generate workouts. Your history is kept.</p>
+          <Button variant="ghost" onClick={() => void setTrack('workout', true)}>Turn on Workouts</Button>
+        </Card>
+      )}
 
       {/* ---- progress ---- */}
       <Card title="This week">

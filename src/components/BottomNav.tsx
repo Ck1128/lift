@@ -2,12 +2,13 @@ import { useProfile } from '../hooks/app'
 import { tracksOf } from '../engine/tracks'
 import { useRouter } from '../router'
 
-export type ScreenId = 'home' | 'plan' | 'workout' | 'food' | 'progress' | 'settings'
+export type ScreenId = 'home' | 'plan' | 'workout' | 'yoga' | 'food' | 'progress' | 'settings'
 
 export const SCREENS: { id: ScreenId; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: '🏠' },
   { id: 'plan', label: 'Plan', icon: '📅' },
   { id: 'workout', label: 'Workout', icon: '🏋️' },
+  { id: 'yoga', label: 'Yoga', icon: '🧘' },
   { id: 'food', label: 'Food', icon: '🍽️' },
   { id: 'progress', label: 'Progress', icon: '📈' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -16,8 +17,7 @@ export const SCREENS: { id: ScreenId; label: string; icon: string }[] = [
 /** The tab a path belongs to, so a sub-page keeps its tab highlighted. */
 export function tabOf(path: string): ScreenId {
   const p = path.split('?')[0]
-  if (p.startsWith('/yoga')) return 'home'
-  if (p.startsWith('/session')) return 'progress'
+    if (p.startsWith('/session')) return 'progress'
   const first = p.split('/')[1] as ScreenId
   return SCREENS.some((s) => s.id === first) ? first : 'home'
 }
@@ -26,9 +26,9 @@ export function BottomNav() {
   const { path, navigate } = useRouter()
   const current = tabOf(path)
   const profile = useProfile()
-  const workout = tracksOf(profile).workout
+  const { workout, yoga } = tracksOf(profile)
   // Plan and Workout only make sense when Workout is on. Their history stays in Progress.
-  const screens = SCREENS.filter((s) => workout || (s.id !== 'plan' && s.id !== 'workout'))
+  const screens = SCREENS.filter((s) => (workout || (s.id !== 'plan' && s.id !== 'workout')) && (yoga || s.id !== 'yoga'))
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
       {screens.map((s) => (

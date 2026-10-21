@@ -11,7 +11,7 @@ import { suggestReschedule } from '../engine/reschedule'
 import { convertWeight, tidy } from '../engine/units'
 import { gapsMessage, requiredProfileGaps } from '../engine/levels'
 import { tracksOf } from '../engine/tracks'
-import { ALL_TRACKS } from '../engine/types'
+import { ALL_TRACKS, type Track } from '../engine/types'
 import type {
   ActualExercise, DayPlan, EquipmentId, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, ScheduledWorkout,
   SetLog, SorenessEntry, TrainingLevel, WeeklyPlan, WeightUnit, WorkoutSession,
@@ -128,6 +128,16 @@ export async function changeTrainingLevel(level: TrainingLevel, mode: 'update' |
 export async function setYogaLevel(level: TrainingLevel): Promise<void> {
   const p = await getProfile()
   if (p) await db.profile.put({ ...p, yogaLevel: level, updatedAt: nowIso() })
+}
+
+/** Turn one activity on or off. At least one stays on, and history is never touched. */
+export async function setTrack(track: Track, on: boolean): Promise<void> {
+  const p = await getProfile()
+  if (!p) return
+  const cur = tracksOf(p).list
+  const next = ALL_TRACKS.filter((t) => (t === track ? on : cur.includes(t)))
+  if (next.length === 0) return
+  await db.profile.put({ ...p, tracks: next, updatedAt: nowIso() })
 }
 
 export async function setNutritionGuidance(on: boolean): Promise<void> {
