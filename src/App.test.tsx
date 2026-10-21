@@ -607,6 +607,26 @@ describe('yoga', () => {
     const select = await screen.findByLabelText('Yoga style')
     expect(within(select).getAllByRole('option')).toHaveLength(13)
   })
+
+  it('filters styles by intent and offers an explicit No props choice', async () => {
+    await seed()
+    await db.profile.toCollection().modify({ yogaLevel: 'beginner' })
+    const user = userEvent.setup()
+    render(<App />)
+    window.history.replaceState(null, '', '#/yoga')
+    window.dispatchEvent(new Event('hashchange'))
+    const select = await screen.findByLabelText('Yoga style')
+    await user.click(screen.getByRole('button', { name: 'Relaxation' }))
+    const count = within(select).getAllByRole('option').length
+    expect(count).toBeGreaterThan(0)
+    expect(count).toBeLessThan(13)
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    expect(within(select).getAllByRole('option')).toHaveLength(13)
+    await user.click(screen.getByRole('button', { name: 'Blocks' }))
+    await user.click(screen.getByRole('button', { name: 'No props' }))
+    expect(screen.getByRole('button', { name: 'No props' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Blocks' })).toHaveAttribute('aria-pressed', 'false')
+  })
 })
 
 describe('settings', () => {

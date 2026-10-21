@@ -4,7 +4,7 @@ import { db } from '../db/schema'
 import { DEFAULT_YOGA_PREFS, getYogaPrefs, planYoga, saveYogaPrefs, startYogaSession, type YogaPrefs } from '../db/yogaRepo'
 import { setYogaLevel } from '../db/repo'
 import {
-  ALL_PROPS, LOCATION_LABEL, PROP_LABEL, RESTRICTION_LABEL, STYLES, styleById, type PropId, type Restriction, type YogaLocation, type YogaStyleId,
+  ALL_PROPS, INTENT_LABEL, LOCATION_LABEL, PROP_LABEL, RESTRICTION_LABEL, STYLES, styleById, type PropId, type Restriction, type YogaIntent, type YogaLocation, type YogaStyleId,
 } from '../data/yoga'
 import {
   itemTotalSeconds, MAX_YOGA_MINUTES, MIN_YOGA_MINUTES, suggestedProps, YOGA_DURATION_PRESETS, yogaCalories, type YogaPlan, type YogaSession,
@@ -62,6 +62,9 @@ export function Yoga({ profile, today }: { profile: Profile; today: string }) {
 
   const style = styleById(prefs.style)
   const update = (patch: Partial<YogaPrefs>) => { setPrefs((p) => ({ ...p, ...patch })); setPlan(null) }
+  const [intent, setIntent] = useState<YogaIntent | 'all'>('all')
+  // Keep the chosen style in the list even when it does not match the filter, so the select never shows a blank.
+  const shownStyles = STYLES.filter((x) => intent === 'all' || x.intents.includes(intent) || x.id === prefs.style)
   const toggle = <T extends string>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
   const sorted = useMemo(() => [...history].filter((s) => s.status !== 'in_progress' || true).sort((a, b) => b.startedAt.localeCompare(a.startedAt)), [history])
 
@@ -102,11 +105,19 @@ export function Yoga({ profile, today }: { profile: Profile; today: string }) {
       ) : (
         <>
           <Card title="Style">
+            <p className="label-like">What are you after?</p>
+            <div className="chips" role="group" aria-label="Filter styles by intent">
+              <button type="button" className={intent === 'all' ? 'chip on' : 'chip'} aria-pressed={intent === 'all'} onClick={() => setIntent('all')}>All</button>
+              {(Object.keys(INTENT_LABEL) as YogaIntent[]).map((i) => (
+                <button key={i} type="button" className={intent === i ? 'chip on' : 'chip'} aria-pressed={intent === i} onClick={() => setIntent(i)}>{INTENT_LABEL[i]}</button>
+              ))}
+            </div>
             <div className="field">
               <label htmlFor="y-style">Yoga style</label>
               <select id="y-style" value={prefs.style} onChange={(e) => update({ style: e.target.value as YogaStyleId })}>
-                {STYLES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {shownStyles.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              {shownStyles.length === 0 && <p className="hint">No style matches that. Choose another.</p>}
             </div>
             {style && (
               <>
@@ -131,6 +142,7 @@ export function Yoga({ profile, today }: { profile: Profile; today: string }) {
             <p className="label-like">Props you have</p>
             <p className="hint">Tick what is within reach. Poses that need something you do not have are swapped for ones that do not.</p>
             <div className="chips" role="group" aria-label="Props">
+              <button type="button" className={prefs.props.length === 0 ? 'chip on' : 'chip'} aria-pressed={prefs.props.length === 0} onClick={() => update({ props: [] })}>No props</button>
               {ALL_PROPS.map((p: PropId) => (
                 <button key={p} type="button" className={prefs.props.includes(p) ? 'chip on' : 'chip'} aria-pressed={prefs.props.includes(p)} onClick={() => update({ props: toggle(prefs.props, p) })}>{PROP_LABEL[p]}</button>
               ))}
