@@ -1,0 +1,48 @@
+import type { Exercise } from '../engine/types'
+
+// Hand-written entries that fill gaps in the public-domain dataset (home and machine moves).
+// No photos: instructions only, so there are no image-rights questions.
+const V = 'manual-1'
+const base = { catalogVersion: V, secondaryMuscles: [], difficulty: 'beginner' as const }
+
+export const MANUAL_EXERCISES: Exercise[] = [
+  { ...base, id: 'manual-bodyweight-squat', name: 'Bodyweight Squat', primaryMuscles: ['quads'], secondaryMuscles: ['glutes'],
+    movementPattern: 'squat', equipmentIds: ['bodyweight'], exerciseType: 'bodyweight', compound: true,
+    instructions: ['Stand with feet about shoulder-width apart.', 'Push your hips back and bend your knees, keeping your chest up.', 'Lower until your thighs are about parallel to the floor, or as far as is comfortable.', 'Press through your whole foot to stand back up.'] },
+  { ...base, id: 'manual-reverse-lunge', name: 'Reverse Lunge', primaryMuscles: ['quads', 'glutes'],
+    movementPattern: 'lunge', equipmentIds: ['bodyweight'], exerciseType: 'bodyweight', compound: true,
+    instructions: ['Stand tall with feet together.', 'Step one foot back and lower until both knees are bent about 90 degrees.', 'Push through the front foot to return to standing.', 'Alternate legs each rep.'] },
+  { ...base, id: 'manual-pike-pushup', name: 'Pike Push-Up', primaryMuscles: ['shoulders'], secondaryMuscles: ['triceps'], difficulty: 'intermediate',
+    movementPattern: 'push', equipmentIds: ['bodyweight'], exerciseType: 'bodyweight', compound: true,
+    instructions: ['Start in a push-up position, then walk your feet in and lift your hips high into an upside-down V.', 'Bend your elbows to lower the top of your head toward the floor.', 'Press back up to the V shape.'] },
+  { ...base, id: 'manual-calf-raise-bodyweight', name: 'Standing Calf Raise (Bodyweight)', primaryMuscles: ['calves'],
+    movementPattern: 'isolation', equipmentIds: ['bodyweight'], exerciseType: 'bodyweight', compound: false,
+    instructions: ['Stand tall, holding a wall for balance if needed.', 'Rise onto the balls of your feet as high as you can.', 'Pause briefly, then lower slowly.'] },
+  { ...base, id: 'manual-dumbbell-glute-bridge', name: 'Dumbbell Glute Bridge', primaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'],
+    movementPattern: 'hinge', equipmentIds: ['dumbbell'], exerciseType: 'dumbbell', compound: true,
+    instructions: ['Lie on your back, knees bent, feet flat on the floor.', 'Rest a dumbbell across your hips and hold it in place.', 'Push through your heels and lift your hips until your body forms a straight line.', 'Squeeze your glutes at the top, then lower under control.'] },
+  { ...base, id: 'manual-dumbbell-hip-thrust', name: 'Dumbbell Hip Thrust', primaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'],
+    movementPattern: 'hinge', equipmentIds: ['dumbbell', 'bench'], exerciseType: 'dumbbell', compound: true, difficulty: 'intermediate',
+    instructions: ['Sit on the floor with your upper back against the side of a bench and a dumbbell across your hips.', 'Plant your feet and drive your hips up until your torso is level.', 'Squeeze your glutes at the top, then lower with control.'] },
+  { ...base, id: 'manual-hip-abduction-machine', name: 'Hip Abduction Machine', primaryMuscles: ['glutes'],
+    movementPattern: 'isolation', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
+    instructions: ['Sit on the machine with your back against the pad and knees against the outer pads.', 'Press your knees apart against the resistance.', 'Pause, then return slowly.'] },
+  { ...base, id: 'manual-hip-adduction-machine', name: 'Hip Adduction Machine', primaryMuscles: ['glutes'],
+    movementPattern: 'isolation', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
+    instructions: ['Sit with your back against the pad and your legs against the inner pads.', 'Squeeze your legs together against the resistance.', 'Pause, then return slowly.'] },
+  { ...base, id: 'manual-band-curl', name: 'Resistance Band Curl', primaryMuscles: ['biceps'],
+    movementPattern: 'isolation', equipmentIds: ['bands'], exerciseType: 'bands', compound: false,
+    instructions: ['Stand on the middle of a band, holding the ends with palms forward.', 'Keeping elbows at your sides, curl your hands toward your shoulders.', 'Lower slowly.'] },
+  { ...base, id: 'manual-machine-chest-press', name: 'Machine Chest Press', primaryMuscles: ['chest'], secondaryMuscles: ['triceps', 'shoulders'],
+    movementPattern: 'push', equipmentIds: ['machine'], exerciseType: 'machine', compound: true,
+    instructions: ['Adjust the seat so the handles line up with the middle of your chest.', 'Press the handles forward until your arms are almost straight.', 'Return slowly without letting the weights touch down.'] },
+  { ...base, id: 'manual-machine-seated-row', name: 'Seated Row Machine', primaryMuscles: ['back'], secondaryMuscles: ['biceps'],
+    movementPattern: 'pull', equipmentIds: ['machine'], exerciseType: 'machine', compound: true,
+    instructions: ['Sit with your chest against the pad and grip the handles.', 'Pull the handles toward your torso, squeezing your shoulder blades together.', 'Return slowly with control.'] },
+  { ...base, id: 'manual-machine-leg-press', name: 'Leg Press Machine', primaryMuscles: ['quads'], secondaryMuscles: ['glutes', 'hamstrings'],
+    movementPattern: 'squat', equipmentIds: ['machine'], exerciseType: 'machine', compound: true,
+    instructions: ['Sit with your back flat on the pad and feet shoulder-width on the platform.', 'Lower the platform until your knees are bent about 90 degrees.', 'Press back up without locking your knees hard.'] },
+  { ...base, id: 'manual-machine-shoulder-press', name: 'Shoulder Press Machine', primaryMuscles: ['shoulders'], secondaryMuscles: ['triceps'],
+    movementPattern: 'push', equipmentIds: ['machine'], exerciseType: 'machine', compound: true,
+    instructions: ['Adjust the seat so the handles are at shoulder height.', 'Press the handles overhead until your arms are nearly straight.', 'Lower slowly back to shoulder height.'] },
+]
