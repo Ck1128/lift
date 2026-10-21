@@ -314,8 +314,13 @@ describe('rescheduling', () => {
 })
 
 describe('validation, units and dates', () => {
-  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), ...o })
+  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), tracks: ['workout', 'yoga'], ...o })
   it('accepts a minimal profile', () => expect(validateProfileForm(form())).toEqual({}))
+  it('requires at least one track, and only asks workout questions when workout is on', () => {
+    expect(validateProfileForm(form({ tracks: [] })).tracks).toMatch(/workout, yoga, or both/i)
+    const yogaOnly = validateProfileForm(form({ tracks: ['yoga'], trainingDays: [], preferredDurationMinutes: 'abc', trainingLevel: 'beginner', heightCm: '', weightValue: '' }))
+    expect(yogaOnly).toEqual({})
+  })
   it('rejects bad numbers with understandable messages', () => {
     const e = validateProfileForm(form({ age: '7', heightCm: '50', weightValue: '20', trainingDays: [], preferredDurationMinutes: 'abc' }))
     expect(e.age).toMatch(/13 and 100/)

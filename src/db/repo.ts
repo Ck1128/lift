@@ -10,6 +10,8 @@ import { buildLastDone, buildLastPerformance } from '../engine/history'
 import { suggestReschedule } from '../engine/reschedule'
 import { convertWeight, tidy } from '../engine/units'
 import { gapsMessage, requiredProfileGaps } from '../engine/levels'
+import { tracksOf } from '../engine/tracks'
+import { ALL_TRACKS } from '../engine/types'
 import type {
   ActualExercise, DayPlan, EquipmentId, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, ScheduledWorkout,
   SetLog, SorenessEntry, TrainingLevel, WeeklyPlan, WeightUnit, WorkoutSession,
@@ -57,6 +59,8 @@ export async function saveProfile(
     goal: form.goal,
     trainingLevel: form.trainingLevel,
     yogaLevel: existing?.yogaLevel,
+    // A form with nothing chosen (only possible when called directly) keeps what was saved, or both.
+    tracks: form.tracks.length > 0 ? ALL_TRACKS.filter((t) => form.tracks.includes(t)) : (existing?.tracks ?? [...ALL_TRACKS]),
     nutritionGuidance: form.nutritionGuidance,
     trainingDays: [...form.trainingDays].sort((a, b) => a - b),
     preferredDurationMinutes: Number(form.preferredDurationMinutes),
@@ -85,11 +89,15 @@ export async function saveProfile(
   })
   if (!existing) await applyDefaultEquipment(profile.preferredLocation, profile.gymType, profile.weightUnit)
   const keep = levelChanged && options.levelChange === 'keep'
+  const workoutOn = tracksOf(profile).workout
+  const workoutTurnedOn = workoutOn && !!existing && !tracksOf(existing).workout
   const scheduleChanged = !existing
     || existing.trainingDays.join() !== profile.trainingDays.join()
     || existing.goal !== profile.goal
     || (levelChanged && !keep)
-  if (scheduleChanged) await rebuildPlan(profile, today)
+    || workoutTurnedOn
+  // A yoga-only profile gets no workout plan. Existing plans and history are left alone when Workout is switched off.
+  if (scheduleChanged && workoutOn) await rebuildPlan(profile, today)
   if (levelChanged) await applyLevelChoice(options.levelChange ?? 'update', toKey(today))
   return profile
 }
@@ -294,6 +302,8 @@ export async function recentSoreness(today: string): Promise<Partial<Record<Musc
 // ---------- generation (with cache) ----------
 /** What is missing before a personalised plan can be built, or an empty list. */
 export function profileGaps(p: Profile): string[] {
+  // Height and weight are a workout requirement for beginners. A yoga-only profile is never asked for them.
+  if (!tracksOf(p).workout) return []
   return requiredProfileGaps(p.trainingLevel, p.heightCm, p.weightKg)
 }
 
@@ -430,23 +440,67 @@ async function patchActual(sessionId: string, slotId: string, f: (a: ActualExerc
 export const setSkipped = (sid: string, slot: string, skipped: boolean) => patchActual(sid, slot, (a) => ({ ...a, skipped }))
 export const setPain = (sid: string, slot: string, painReported: boolean) => patchActual(sid, slot, (a) => ({ ...a, painReported }))
 
-/** Swap the exercise for the rest of the session. Sets already done keep the exercise they were done with. */
-export async function replaceExercise(sessionId: string, slotId: string, newExerciseId: string): Promise<void> {
+export type LogsChoice = 'keep' | 'reset'
+
+/**
+ * Swap the exercise for the rest of the session. Only this slot changes: other exercises and their logs are untouched,
+ * and future days are never changed.
+ *  - logs 'keep' (default): sets already done keep the exercise they were done with; the rest switch.
+ *  - logs 'reset': this exercise's own sets are cleared too, so the whole slot starts fresh with the new exercise.
+ * The slot's earlier state is saved, so undoReplace can put it back.
+ */
+export async function replaceExercise(sessionId: string, slotId: string, newExerciseId: string, opts: { logs?: LogsChoice } = {}): Promise<void> {
   const ex = exerciseById(newExerciseId)
   if (!ex) throw new Error('Unknown exercise')
   const s = await db.sessions.get(sessionId)
   if (!s || s.status !== 'in_progress') return
   const cur = s.actualExercises.find((a) => a.slotId === slotId)
-  if (!cur) return
+  if (!cur || cur.exerciseId === newExerciseId) return
   await db.transaction('rw', [db.sessions, db.setLogs], async () => {
+    const slotLogs = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId).toArray()
+    const previous = { exerciseId: cur.exerciseId, replacedFromId: cur.replacedFromId, sets: slotLogs }
     await db.sessions.put({
       ...s,
       actualExercises: s.actualExercises.map((a) =>
-        a.slotId === slotId ? { ...a, exerciseId: newExerciseId, replacedFromId: a.replacedFromId ?? a.exerciseId } : a),
+        a.slotId === slotId ? { ...a, exerciseId: newExerciseId, replacedFromId: a.replacedFromId ?? a.exerciseId, previous } : a),
       updatedAt: nowIso(),
     })
-    const pending = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId && !l.completed).toArray()
-    for (const l of pending) await db.setLogs.put({ ...l, exerciseId: newExerciseId, plannedWeight: undefined, actualWeight: undefined, updatedAt: nowIso() })
+    const reset = opts.logs === 'reset'
+    for (const l of slotLogs) {
+      if (l.completed && !reset) continue
+      await db.setLogs.put({
+        ...l, exerciseId: newExerciseId, plannedWeight: undefined, actualWeight: undefined,
+        ...(reset ? { completed: false, actualReps: undefined, effortRating: undefined } : null), updatedAt: nowIso(),
+      })
+    }
+  })
+}
+
+/**
+ * Puts a slot back as it was before the last replacement. Refused if sets were logged with the new exercise since,
+ * because undoing would erase them.
+ */
+export async function undoReplace(sessionId: string, slotId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const s = await db.sessions.get(sessionId)
+  if (!s || s.status !== 'in_progress') return { ok: false, reason: 'This workout is not open.' }
+  const cur = s.actualExercises.find((a) => a.slotId === slotId)
+  if (!cur?.previous) return { ok: false, reason: 'There is nothing to undo.' }
+  const prev = cur.previous
+  return db.transaction('rw', [db.sessions, db.setLogs], async () => {
+    const now = await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId).toArray()
+    const wasDone = new Map(prev.sets.map((l) => [l.id, l.completed]))
+    if (now.some((l) => l.completed && !wasDone.get(l.id))) {
+      return { ok: false as const, reason: 'You logged sets after the swap, so it cannot be undone without erasing them. Replace it again instead.' }
+    }
+    await db.setLogs.where('sessionId').equals(sessionId).filter((l) => l.slotId === slotId).delete()
+    await db.setLogs.bulkAdd(prev.sets)
+    await db.sessions.put({
+      ...s,
+      actualExercises: s.actualExercises.map((a) =>
+        a.slotId === slotId ? { ...a, exerciseId: prev.exerciseId, replacedFromId: prev.replacedFromId, previous: undefined } : a),
+      updatedAt: nowIso(),
+    })
+    return { ok: true as const }
   })
 }
 

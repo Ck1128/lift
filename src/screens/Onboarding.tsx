@@ -15,6 +15,8 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
     onBegin() // keep onboarding on screen even though a profile now exists
     await saveProfile(form, { preferredLocation: extra.preferredLocation, gymType: extra.gymType })
     setChosen({ location: extra.preferredLocation, gymType: extra.gymType, unit: form.weightUnit })
+    // Equipment only matters for workouts. A yoga-only start goes straight to the app.
+    if (!form.tracks.includes('workout')) { onDone(); return }
     setStep('equipment')
   }
 
@@ -37,7 +39,7 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
           <Button variant="small" onClick={onDismissNotice}>OK</Button>
         </div>
       )}
-      <ScreenHeader title="Welcome" subtitle="Step 1 of 2. A few questions so your workouts fit you. No account needed, and nothing leaves this phone." />
+      <ScreenHeader title="Welcome" subtitle="A few questions so the app fits you. No account needed, and nothing leaves this phone." />
       <Card>
         <ProfileFormView
           initial={profileToForm()}

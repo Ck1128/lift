@@ -1,5 +1,6 @@
 import { cmToFtIn, fromKg, ftInToCm, HEIGHT_CM_RANGE, tidy1, toKg, weightRange } from './units'
-import type { Goal, HeightUnit, Profile, Sex, TrainingLevel, WeightUnit } from './types'
+import type { Goal, HeightUnit, Profile, Sex, Track, TrainingLevel, WeightUnit } from './types'
+import { TRACKS_ERROR } from './tracks'
 import { MAX_SESSION_MINUTES, MIN_SESSION_MINUTES } from './cardio'
 
 export interface ProfileForm {
@@ -24,6 +25,8 @@ export interface ProfileForm {
   trainingDays: number[]
   preferredDurationMinutes: string
   nutritionGuidance: boolean
+  /** Workout, Yoga or both. An empty list is not allowed when saving from the form. */
+  tracks: Track[]
 }
 
 export type FormErrors = Partial<Record<keyof ProfileForm, string>>
@@ -95,6 +98,8 @@ export function profileFormFrom(p?: Profile): ProfileForm {
     trainingDays: p?.trainingDays ?? [0, 2, 4],
     preferredDurationMinutes: String(p?.preferredDurationMinutes ?? 45),
     nutritionGuidance: p?.nutritionGuidance ?? false,
+    // A saved profile without the setting keeps both. A brand-new form starts with nothing chosen, on purpose.
+    tracks: p ? (p.tracks && p.tracks.length > 0 ? [...p.tracks] : ['workout', 'yoga']) : [],
   }
 }
 
@@ -118,11 +123,15 @@ export function validateProfileForm(f: ProfileForm): FormErrors {
     const [lo, hi] = weightRange(f.weightFieldUnit)
     if (Number.isNaN(w) || w < lo || w > hi) e.weightValue = `Enter a weight between ${lo} and ${hi} ${f.weightFieldUnit}, or leave it blank.`
   }
-  if (f.trainingDays.length < 1) e.trainingDays = 'Pick at least one training day.'
-  else if (f.trainingDays.length > 6) e.trainingDays = 'Pick at most six days. Rest days matter.'
-  const d = num(f.preferredDurationMinutes)
-  if (d === undefined || !Number.isInteger(d) || d < MIN_SESSION_MINUTES || d > MAX_SESSION_MINUTES) {
-    e.preferredDurationMinutes = `Enter a whole number of minutes between ${MIN_SESSION_MINUTES} and ${MAX_SESSION_MINUTES}.`
+  if (f.tracks.length < 1) e.tracks = TRACKS_ERROR
+  // Workout questions only matter when Workout is switched on.
+  if (f.tracks.includes('workout')) {
+    if (f.trainingDays.length < 1) e.trainingDays = 'Pick at least one training day.'
+    else if (f.trainingDays.length > 6) e.trainingDays = 'Pick at most six days. Rest days matter.'
+    const d = num(f.preferredDurationMinutes)
+    if (d === undefined || !Number.isInteger(d) || d < MIN_SESSION_MINUTES || d > MAX_SESSION_MINUTES) {
+      e.preferredDurationMinutes = `Enter a whole number of minutes between ${MIN_SESSION_MINUTES} and ${MAX_SESSION_MINUTES}.`
+    }
   }
   return e
 }

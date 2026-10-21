@@ -51,7 +51,7 @@ const PATTERN_LABEL: Record<Pattern, string> = {
 
 type Rules = Pick<GenerateInput, 'excludedExerciseIds' | 'excludedPatterns' | 'experience'>
 
-function eligible(ex: Exercise, input: Rules, avail: Set<EquipmentId>): boolean {
+export function eligible(ex: Exercise, input: Rules, avail: Set<EquipmentId>): boolean {
   if (validateExercise(ex).length > 0) return false
   if (input.excludedExerciseIds.includes(ex.id)) return false
   if (input.excludedPatterns.includes(ex.movementPattern)) return false

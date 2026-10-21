@@ -1,3 +1,5 @@
+import { useProfile } from '../hooks/app'
+import { tracksOf } from '../engine/tracks'
 import { useRouter } from '../router'
 
 export type ScreenId = 'home' | 'plan' | 'workout' | 'food' | 'progress' | 'settings'
@@ -23,9 +25,13 @@ export function tabOf(path: string): ScreenId {
 export function BottomNav() {
   const { path, navigate } = useRouter()
   const current = tabOf(path)
+  const profile = useProfile()
+  const workout = tracksOf(profile).workout
+  // Plan and Workout only make sense when Workout is on. Their history stays in Progress.
+  const screens = SCREENS.filter((s) => workout || (s.id !== 'plan' && s.id !== 'workout'))
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
-      {SCREENS.map((s) => (
+      {screens.map((s) => (
         <button
           key={s.id}
           type="button"

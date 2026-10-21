@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import {
-  addSet, finishSession, pauseSession, replaceExercise, resumeSession, setExerciseUnit, setPain, setSessionUnit, setSkipped, updateSet,
+  addSet, finishSession, pauseSession, replaceExercise, resumeSession, setExerciseUnit, setPain, setSessionUnit, setSkipped, undoReplace, updateSet, type LogsChoice,
 } from '../db/repo'
 import { CATALOG, exerciseById } from '../data/catalog'
-import { findAlternatives } from '../engine/generate'
-import { EQUIPMENT_LABEL, type EquipmentSet, type PlannedExercise, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
+import { alternativesFor, equipmentOptions, patternWord, sessionEstimateMinutes } from '../engine/variants'
+import { EQUIPMENT_LABEL, type Exercise, type EquipmentSet, type PlannedExercise, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
 import { useNow } from '../hooks/app'
 import { addRest, formatClock, isFinished, isPaused, pauseRest, remainingMs, resumeRest, startRest, type RestTimer } from '../engine/restTimer'
 import type { WeightUnit } from '../engine/types'
@@ -24,6 +24,8 @@ export function Player({ session, profile, equipment, onFinished }: {
   const logs = useLiveQuery(() => db.setLogs.where('sessionId').equals(session.id).toArray(), [session.id], [] as SetLog[])
   const [rest, setRest] = useState<RestTimer | null>(null)
   const [replacing, setReplacing] = useState<string | null>(null)
+  const [change, setChange] = useState<{ slotId: string; toId: string } | null>(null)
+  const [swapNote, setSwapNote] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'finish' | 'abandon' | null>(null)
   const paused = !!session.pausedAt
   const now = useNow(rest || !paused ? 250 : 1000)
@@ -38,6 +40,25 @@ export function Player({ session, profile, equipment, onFinished }: {
   const relevant = sorted.filter((l) => activeSlots.includes(l.slotId))
   const done = relevant.filter((l) => l.completed).length
   const pending = relevant.length - done
+  const rules = useMemo(() => ({
+    catalog: CATALOG, equipment, excludedExerciseIds: profile.excludedExerciseIds, excludedPatterns: profile.excludedPatterns, experience: profile.trainingLevel,
+  }), [equipment, profile.excludedExerciseIds, profile.excludedPatterns, profile.trainingLevel])
+  const inSession = session.actualExercises.map((a) => a.exerciseId)
+  const estimate = sessionEstimateMinutes(session, profile.goal)
+
+  // Swap one slot to another exercise. If sets are already logged for it, ask what to do with them first.
+  const requestSwap = (slotId: string, toId: string) => {
+    const logged = sorted.filter((l) => l.slotId === slotId && l.completed).length
+    if (logged > 0) { setChange({ slotId, toId }); return }
+    void applySwap(slotId, toId, 'keep')
+  }
+  const applySwap = async (slotId: string, toId: string, logs: LogsChoice) => {
+    setChange(null)
+    setReplacing(null)
+    const from = exerciseById(session.actualExercises.find((a) => a.slotId === slotId)?.exerciseId ?? '')
+    await replaceExercise(session.id, slotId, toId, { logs })
+    setSwapNote(`Swapped ${from?.name ?? 'the exercise'} for ${exerciseById(toId)?.name ?? 'a new one'}. Only this exercise changed. You can undo it on its card.`)
+  }
   
   // The rest timer ends itself. It uses timestamps, so a locked screen or background tab cannot make it drift.
   useEffect(() => {
@@ -61,6 +82,8 @@ export function Player({ session, profile, equipment, onFinished }: {
       <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={relevant.length} aria-valuenow={done} aria-label="Workout progress">
         <div className="progress-fill" style={{ width: `${relevant.length ? (done / relevant.length) * 100 : 0}%` }} />
       </div>
+      <p className="hint" aria-live="polite">Estimated session length: about {estimate} min{session.plannedMinutes ? ` (you chose ${session.plannedMinutes})` : ''}. It updates when you swap an exercise.</p>
+      {swapNote && <p className="ok" role="status">{swapNote}</p>}
       {reopened && <p className="notice" role="status">You reopened this workout. Change anything, then finish again to save it.</p>}
       <div className="inline">
         <Button variant="small" onClick={() => (paused ? resumeSession(session.id) : pauseSession(session.id))}>{paused ? 'Resume' : 'Pause'}</Button>
@@ -86,6 +109,9 @@ export function Player({ session, profile, equipment, onFinished }: {
             pageUnit={session.weightUnit}
             onSetDone={() => setRest(startRest(Date.now(), slot.restSeconds))}
             onReplace={() => setReplacing(slot.slotId)}
+            rules={rules}
+            inSession={inSession}
+            onSwap={(toId) => requestSwap(slot.slotId, toId)}
           />
         )
       })}
@@ -111,9 +137,19 @@ export function Player({ session, profile, equipment, onFinished }: {
         <ReplaceDialog
           session={session}
           slotId={replacing}
-          profile={profile}
-          equipment={equipment}
+          rules={rules}
+          onPick={(toId) => requestSwap(replacing, toId)}
+          onSkip={async () => { await setSkipped(session.id, replacing, true); setReplacing(null) }}
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {change && (
+        <LoggedSetsDialog
+          fromName={exerciseById(session.actualExercises.find((a) => a.slotId === change.slotId)?.exerciseId ?? '')?.name ?? 'this exercise'}
+          toName={exerciseById(change.toId)?.name ?? 'the new exercise'}
+          logged={sorted.filter((l) => l.slotId === change.slotId && l.completed).length}
+          onChoose={(choice) => void applySwap(change.slotId, change.toId, choice)}
+          onCancel={() => setChange(null)}
         />
       )}
       {confirm === 'finish' && (
@@ -139,7 +175,7 @@ export function Player({ session, profile, equipment, onFinished }: {
   )
 }
 
-function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace }: {
+function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace, rules, inSession, onSwap }: {
   slot: PlannedExercise
   actual: WorkoutSession['actualExercises'][number]
   sessionId: string
@@ -147,8 +183,12 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
   pageUnit: WeightUnit
   onSetDone: () => void
   onReplace: () => void
+  rules: Parameters<typeof equipmentOptions>[1]
+  inSession: string[]
+  onSwap: (toId: string) => void
 }) {
   const ex = exerciseById(actual.exerciseId)
+  const [undoMsg, setUndoMsg] = useState('')
   const original = actual.replacedFromId ? exerciseById(actual.replacedFromId) : undefined
   const cardio = slot.kind === 'cardio'
   const unit: WeightUnit = logs[0]?.weightUnit ?? pageUnit
@@ -178,6 +218,14 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
         </>
       ) : (
         <>
+          {ex && <EquipmentSelect exercise={ex} name={slot.name} rules={rules} inSession={inSession} onPick={onSwap} />}
+          {actual.previous && (
+            <div className="inline">
+              <Button variant="small" onClick={async () => { const r = await undoReplace(sessionId, slot.slotId); setUndoMsg(r.ok ? '' : r.reason) }}>Undo swap</Button>
+              <span className="hint">Was {exerciseById(actual.previous.exerciseId)?.name}</span>
+            </div>
+          )}
+          {undoMsg && <p className="error" role="alert">{undoMsg}</p>}
           <div className="inline unit-row">
             <label className="mini"><span>Unit for this exercise</span>
               <select value={unit} aria-label={`${slot.name} weight unit`} onChange={(e) => void setExerciseUnit(sessionId, slot.slotId, e.target.value as WeightUnit)}>
@@ -274,32 +322,87 @@ function SetRow({ log, onDone }: { log: SetLog; onDone: () => void }) {
   )
 }
 
-function ReplaceDialog({ session, slotId, profile, equipment, onClose }: {
-  session: WorkoutSession; slotId: string; profile: Profile; equipment: EquipmentSet; onClose: () => void
+function EquipmentSelect({ exercise, name, rules, inSession, onPick }: {
+  exercise: Exercise; name: string; rules: Parameters<typeof equipmentOptions>[1]; inSession: string[]; onPick: (exerciseId: string) => void
+}) {
+  const options = equipmentOptions(exercise, rules, inSession)
+  if (options.length < 2) return null
+  const blocked = options.filter((o) => !o.exerciseId)
+  return (
+    <div className="equip-row">
+      <label className="mini"><span>Equipment for this exercise</span>
+        <select aria-label={`${name} equipment`} value={exercise.exerciseType} onChange={(e) => { const o = options.find((x) => x.type === e.target.value); if (o?.exerciseId) onPick(o.exerciseId) }}>
+          {options.map((o) => (
+            <option key={o.type} value={o.type} disabled={!o.exerciseId}>{o.label}{o.exerciseId ? '' : ' (not available)'}</option>
+          ))}
+        </select>
+      </label>
+      {blocked.length > 0 && (
+        <details>
+          <summary className="muted">Why are some options unavailable?</summary>
+          <ul className="plain hint">{blocked.map((o) => <li key={o.type}><strong>{o.label}:</strong> {o.reason}</li>)}</ul>
+        </details>
+      )}
+    </div>
+  )
+}
+
+function LoggedSetsDialog({ fromName, toName, logged, onChoose, onCancel }: {
+  fromName: string; toName: string; logged: number; onChoose: (c: LogsChoice) => void; onCancel: () => void
+}) {
+  return (
+    <Dialog title="You already logged sets" onClose={onCancel}>
+      <p>You logged {logged} set{logged === 1 ? '' : 's'} of <strong>{fromName}</strong>. What should happen when you switch to <strong>{toName}</strong>?</p>
+      <div className="stack">
+        <Button onClick={() => onChoose('keep')}>Keep my {logged} logged set{logged === 1 ? '' : 's'}, switch the rest</Button>
+        <Button variant="danger" onClick={() => onChoose('reset')}>Reset this exercise's sets and switch</Button>
+        <Button variant="ghost" onClick={onCancel}>Cancel, change nothing</Button>
+      </div>
+      <p className="hint">Only this exercise is affected. Your other exercises and their sets stay as they are. You can undo a swap if you have not logged new sets since.</p>
+    </Dialog>
+  )
+}
+
+function ReplaceDialog({ session, slotId, rules, onPick, onSkip, onClose }: {
+  session: WorkoutSession; slotId: string; rules: Parameters<typeof equipmentOptions>[1]
+  onPick: (exerciseId: string) => void; onSkip: () => void; onClose: () => void
 }) {
   const actual = session.actualExercises.find((a) => a.slotId === slotId)
   const current = actual ? exerciseById(actual.exerciseId) : undefined
   const inSession = session.actualExercises.map((a) => a.exerciseId)
-  const alts = current
-    ? findAlternatives(current, {
-        catalog: CATALOG, equipment, excludedExerciseIds: profile.excludedExerciseIds,
-        excludedPatterns: profile.excludedPatterns, experience: profile.trainingLevel,
-      }, inSession).slice(0, 12)
-    : []
+  const { best, related } = current ? alternativesFor(current, rules, inSession) : { best: [], related: [] }
+  const item = (a: Exercise) => (
+    <li key={a.id}>
+      <button type="button" className="alt" onClick={() => onPick(a.id)}>
+        <strong>{a.name}</strong>
+        <span className="muted">{a.equipmentIds.filter((q) => q !== 'bodyweight').map((q) => EQUIPMENT_LABEL[q]).join(', ') || 'No equipment'}</span>
+      </button>
+    </li>
+  )
   return (
     <Dialog title="Replace exercise" onClose={onClose}>
-      <p className="hint">Options for the same muscle, using only your confirmed equipment and skipping anything you excluded.</p>
-      {alts.length === 0 && <p className="notice">No other exercise fits your equipment and exclusions. You can skip this one instead.</p>}
-      <ul className="alts">
-        {alts.map((a) => (
-          <li key={a.id}>
-            <button type="button" className="alt" onClick={async () => { await replaceExercise(session.id, slotId, a.id); onClose() }}>
-              <strong>{a.name}</strong>
-              <span className="muted">{a.equipmentIds.filter((q) => q !== 'bodyweight').map((q) => EQUIPMENT_LABEL[q]).join(', ') || 'No equipment'}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {current && <p className="hint">Swaps only <strong>{current.name}</strong> for something that still works your {current.primaryMuscles[0]}, using your equipment and exclusions. The rest of today's workout stays as it is.</p>}
+      {best.length === 0 && related.length === 0 && (
+        <div className="notice">
+          <p>No other exercise fits. Nothing else trains the same muscle with the equipment you have, your exclusions and your level.</p>
+          <div className="inline">
+            <Button variant="small" onClick={onClose}>Keep this exercise</Button>
+            <Button variant="small" onClick={onSkip}>Skip it today</Button>
+          </div>
+        </div>
+      )}
+      {best.length > 0 && current && (
+        <>
+          <p className="label-like">Same {patternWord(current.movementPattern)} movement</p>
+          <ul className="alts">{best.slice(0, 10).map(item)}</ul>
+        </>
+      )}
+      {related.length > 0 && (
+        <>
+          <p className="label-like">Same muscle, a different movement</p>
+          <ul className="alts">{related.slice(0, 8).map(item)}</ul>
+        </>
+      )}
       <Button variant="ghost" onClick={onClose}>Cancel</Button>
     </Dialog>
   )

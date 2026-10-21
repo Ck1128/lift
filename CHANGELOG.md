@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0 - Phase B2 (branch feature/v2-complete)
+- US-062/069 Safe delete: warning, typed phrase, fresh math question; atomic and verified. US-069 migration safety (schema v4).
+- US-063/070 Import with validation, preview (no writes), merge or replace, counts, atomic apply.
+- US-067 Password-protected export (Web Crypto, PBKDF2 + AES-GCM) with category choices.
+- US-064 Replace an exercise while keeping the day's intent, with undo. US-065 Per-exercise equipment choice.
+- US-066 Choose Workout, Yoga or both (required, changeable, history kept; existing profiles default to both).
+- US-061 Yoga "How to do it": safety, steps, easier options, common mistakes, and a tap-to-load reference video slot (no unverified links).
+- US-068 Calmer visual redesign: tokens, one main action on Home, week progress, loading/error states.
+- See docs/DATA_SAFETY.md and docs/YOGA_MEDIA.md.
+
 ## 2.0.0 - Phase B (branch feature/v2-complete)
 - Three training levels (beginner, intermediate, regular gym-goer); beginners provide height and weight.
 - Height in ft/in or cm, kg/lb selector beside every weight field, page default with per-field override; stored as cm and kg.

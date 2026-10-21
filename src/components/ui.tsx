@@ -18,6 +18,37 @@ export function Button({
   return <button type="button" {...props} className={`btn btn-${variant} ${className ?? ''}`} />
 }
 
+/** A calm placeholder while something loads. It announces itself to screen readers and does not animate for people who ask for less motion. */
+export function Loading({ label = 'Loading' }: { label?: string }) {
+  return (
+    <div className="loading" role="status" aria-live="polite">
+      <span className="skeleton" aria-hidden="true" />
+      <span className="sr-only">{label}...</span>
+    </div>
+  )
+}
+
+/** A thin progress bar with a text alternative. */
+export function ProgressBar({ value, max, label }: { value: number; max: number; label: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
+  return (
+    <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}>
+      <div className="progress-fill" style={{ width: `${pct}%` }} />
+    </div>
+  )
+}
+
+/** Something went wrong, with a way to recover. */
+export function ErrorState({ title, message, onRetry }: { title: string; message: string; onRetry?: () => void }) {
+  return (
+    <div className="error-state" role="alert">
+      <p className="big">{title}</p>
+      <p className="muted">{message}</p>
+      {onRetry && <Button onClick={onRetry}>Try again</Button>}
+    </div>
+  )
+}
+
 export function EmptyState({ title, hint, children }: { title: string; hint: string; children?: ReactNode }) {
   return (
     <div className="empty" role="status">

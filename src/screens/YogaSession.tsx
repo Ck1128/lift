@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { deleteYogaSession, finishYoga, markYogaItem, reopenYoga, setYogaNotes } from '../db/yogaRepo'
-import { PROP_LABEL } from '../data/yoga'
+import { PROP_LABEL, poseById } from '../data/yoga'
+import { YogaPoseHelp, type PoseHelpInput } from '../components/YogaPoseHelp'
 import { itemTotalSeconds, yogaCalories } from '../engine/yoga'
 import { addRest, formatClock, isPaused, pauseRest, remainingMs, resumeRest, startRest, type RestTimer } from '../engine/restTimer'
 import { formatDay } from '../engine/dates'
@@ -10,6 +11,13 @@ import type { Profile } from '../engine/types'
 import { useNow } from '../hooks/app'
 import { Button, Card, ConfirmDialog, ScreenHeader } from '../components/ui'
 import { useRouter } from '../router'
+
+/** The plan item stores a copy of the text; the catalog adds the position and sanskrit name when the pose still exists. */
+const helpFor = (it: { poseId?: string; name: string; instructions: string[]; cautions: string[]; modifications: string[] }): PoseHelpInput => {
+  const id = it.poseId ?? ''
+  const pose = poseById(id)
+  return { id, name: it.name, sanskrit: pose?.sanskrit, position: pose?.position ?? 'standing', instructions: it.instructions, cautions: it.cautions, modifications: it.modifications }
+}
 
 const STATUS = { in_progress: 'In progress', completed: 'Completed', partial: 'Partly done', abandoned: 'Discarded' } as const
 
@@ -54,19 +62,10 @@ export function YogaSessionPage({ sessionId, profile }: { sessionId: string; pro
             <p className="muted">{it.phase}{it.optional ? ' · optional' : ''}</p>
             <p className="big">{it.index + 1}. {it.name}{done ? ' ✓' : ''}</p>
             <p className="muted">{it.perSide ? `${it.seconds}s each side` : formatClock(it.seconds * 1000)} · {formatClock(itemTotalSeconds(it) * 1000)} total{it.props.length ? ` · ${it.props.map((p) => PROP_LABEL[p]).join(', ')}` : ''}</p>
-            {(current || (!live && false)) && (
-              <>
-                <ol className="steps">{it.instructions.map((x, k) => <li key={k}>{x}</li>)}</ol>
-                {it.modifications.length > 0 && <p className="hint"><strong>Easier:</strong> {it.modifications.join(' ')}</p>}
-                {it.cautions.length > 0 && <p className="hint"><strong>Careful:</strong> {it.cautions.join(' ')}</p>}
-              </>
-            )}
-            {!current && (
+            {current ? <YogaPoseHelp pose={helpFor(it)} /> : (
               <details>
                 <summary className="muted">How to do it</summary>
-                <ol className="steps">{it.instructions.map((x, k) => <li key={k}>{x}</li>)}</ol>
-                {it.modifications.length > 0 && <p className="hint"><strong>Easier:</strong> {it.modifications.join(' ')}</p>}
-                {it.cautions.length > 0 && <p className="hint"><strong>Careful:</strong> {it.cautions.join(' ')}</p>}
+                <YogaPoseHelp pose={helpFor(it)} />
               </details>
             )}
             {current && (

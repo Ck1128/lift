@@ -20,6 +20,9 @@ Three training levels, kg/lb and ft/in everywhere, cardio, yoga, food logging, c
 
 Food and yoga are general wellness tools, not medical advice. Apple Health is not connected.
 
+## New in 2.1
+Safe delete, encrypted export and previewed import (docs/DATA_SAFETY.md), replace-exercise and per-exercise equipment, a Workout / Yoga / Both choice, yoga how-to guidance (docs/YOGA_MEDIA.md), and a calmer design.
+
 ## Run it on your computer
 
 You need [Node.js](https://nodejs.org) 20 or newer.

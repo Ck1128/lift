@@ -8,7 +8,7 @@ import type { YogaPlan, YogaSession } from '../engine/yoga'
 import type { FoodCacheEntry, FoodLogEntry } from '../engine/food'
 
 export const APP_VERSION = '2.0.0'
-export const DB_SCHEMA_VERSION = 3
+export const DB_SCHEMA_VERSION = 4
 
 /** Equipment is stored once per location (home / gym). */
 export interface EquipmentRecord {
@@ -94,6 +94,15 @@ export class LiftDB extends Dexie {
         })
         await tx.table('sessions').toCollection().modify((s: Partial<WorkoutSession>) => {
           if (!s.updatedAt) s.updatedAt = s.finishedAt ?? s.startedAt
+        })
+      })
+    // Version 4 (Phase B2): which activities are switched on. Every existing profile keeps both Workout and Yoga,
+    // so returning users are not sent back through setup. No table or index changes, and nothing is deleted.
+    this.version(4)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx.table('profile').toCollection().modify((p: Record<string, unknown>) => {
+          if (!Array.isArray(p.tracks) || p.tracks.length === 0) p.tracks = ['workout', 'yoga']
         })
       })
   }

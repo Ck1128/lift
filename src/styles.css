@@ -161,8 +161,94 @@ caption.sr-only { display: block; }
 @media (forced-colors: active) { .chip.on, .btn { border: 2px solid ButtonText; } }
 
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-.switch { position: relative; flex: none; width: 52px; height: 30px; border-radius: 15px; border: 1px solid var(--border, #888); background: var(--surface-2, #ccc); padding: 0; cursor: pointer; }
+.switch { position: relative; flex: none; width: 52px; height: 30px; border-radius: 15px; border: 1px solid var(--border); background: var(--surface-2); padding: 0; cursor: pointer; }
 .switch.on { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); }
 .switch-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
 .switch.on .switch-knob { transform: translateX(22px); }
 @media (prefers-reduced-motion: reduce) { .switch-knob { transition: none; } }
+
+/* ======================================================================
+   Redesign layer (US-068): calm, low-clutter, one main action per screen.
+   Design tokens first; components below read only tokens.
+   Visual only: no logic or data changes depend on this section.
+   ====================================================================== */
+:root {
+  --surface: var(--card);
+  --surface-2: #e6e6ec;
+  --border: var(--bd);
+  --accent: var(--ac);
+  --accent-ink: #fff;
+  --accent-soft: color-mix(in srgb, var(--ac) 10%, var(--card));
+  --text: var(--tx);
+  --text-2: var(--mu);
+  --danger: #d92d20;
+  --radius-s: 10px; --radius-m: 16px; --radius-l: 22px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px;
+  --shadow: 0 1px 2px rgb(0 0 0 / .05), 0 4px 14px rgb(0 0 0 / .05);
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --surface-2: #34343a; --shadow: 0 1px 2px rgb(0 0 0 / .4); --accent-soft: color-mix(in srgb, var(--ac) 16%, var(--card)); }
+}
+
+body { -webkit-font-smoothing: antialiased; letter-spacing: -.005em; }
+.content { padding-bottom: 104px; }
+.screen-header { margin-bottom: var(--space-2); }
+.screen-header h1 { font-family: var(--font-display); font-size: 30px; font-weight: 750; letter-spacing: -.02em; margin: 6px 0 0; }
+.screen-header p { margin: 2px 0 0; color: var(--text-2); }
+
+.card { border: 0; border-radius: var(--radius-m); padding: var(--space-4); margin: var(--space-3) 0; box-shadow: var(--shadow); }
+.card-title { font-size: 12px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 var(--space-2); }
+.card.today { box-shadow: inset 0 0 0 2px var(--accent), var(--shadow); }
+
+/* The one main thing on a screen. */
+.card.hero { background: linear-gradient(160deg, var(--accent-soft), var(--surface) 70%); padding: var(--space-5) var(--space-4); border-radius: var(--radius-l); }
+.card.hero .btn { min-height: 54px; font-size: 17px; border-radius: 14px; margin-top: var(--space-3); }
+.hero-title { font-family: var(--font-display); font-size: 28px; font-weight: 750; line-height: 1.15; margin: 2px 0 6px; letter-spacing: -.02em; }
+.eyebrow { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0; }
+.stat + .stat { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.stat strong { font-size: 22px; font-family: var(--font-display); }
+
+.btn { border-radius: 14px; font-weight: 650; transition: transform .08s, filter .12s; }
+.btn:active:not([disabled]) { transform: scale(.985); }
+.btn-ghost { background: var(--surface-2); }
+.btn-small { border-radius: 99px; background: var(--surface-2); }
+.chip { background: var(--surface-2); border-color: transparent; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+input, select, textarea { background: var(--surface-2); border-color: transparent; border-radius: var(--radius-s); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.btn:focus-visible, .btn-small:focus-visible, .link:focus-visible, .switch:focus-visible, .video-play:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.bottom-nav { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: saturate(1.4) blur(14px); border-top: 1px solid var(--border); }
+.nav-item { font-size: 11px; font-weight: 550; }
+.nav-item.on { color: var(--accent); }
+.nav-item.on span:first-child { transform: translateY(-1px); }
+
+/* States */
+.loading { padding: var(--space-4) 0; }
+.skeleton { display: block; height: 120px; border-radius: var(--radius-m); background: linear-gradient(90deg, var(--surface-2), color-mix(in srgb, var(--surface-2) 60%, var(--surface)), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.error-state { text-align: center; padding: var(--space-5) var(--space-4); border-radius: var(--radius-m); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); margin: var(--space-4) 0; }
+.empty { border: 0; background: var(--surface); box-shadow: var(--shadow); border-radius: var(--radius-m); }
+.notice { border-radius: var(--radius-s); }
+.ok::before { content: "✓ "; }
+
+/* Progress bars */
+.progress { height: 10px; background: var(--surface-2); }
+.progress-fill { height: 10px; background: var(--accent); }
+
+/* Toggle: tokens now exist, so the switch no longer falls back to hard-coded colours. */
+.switch { border-color: transparent; background: var(--surface-2); }
+.switch.on { background: var(--accent); border-color: var(--accent); }
+
+/* Yoga help and video */
+.pose-help { margin-top: var(--space-2); }
+.pose-help ul.steps { margin: 0 0 var(--space-2); }
+.video-box { margin-top: var(--space-3); }
+.video-play { width: 100%; min-height: 56px; border: 0; border-radius: var(--radius-m); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 650; cursor: pointer; }
+.video-play[disabled] { opacity: .6; cursor: not-allowed; }
+.video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius-m); background: #000; }
+.media-img { background: var(--surface-2); }
+
+@media (max-width: 360px) { .screen-header h1 { font-size: 26px; } .hero-title { font-size: 24px; } }
+@media (forced-colors: active) { .card { border: 1px solid CanvasText; } .btn-small { border: 1px solid ButtonText; } }

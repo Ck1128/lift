@@ -59,8 +59,10 @@ describe('onboarding', () => {
   })
 
   it('offers three training levels and defaults to Beginner', async () => {
+    const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Workout' }))
     const group = screen.getByRole('radiogroup', { name: 'Training level' })
     expect(within(group).getAllByRole('radio')).toHaveLength(3)
     expect(within(group).getByRole('radio', { name: /beginner/i })).toBeChecked()
@@ -72,6 +74,7 @@ describe('onboarding', () => {
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Workout' }))
     for (const d of ['Mon', 'Wed', 'Fri']) await user.click(screen.getByRole('button', { name: d }))
     const dur = screen.getByLabelText(/usual workout length/i)
     await user.clear(dur)
@@ -89,6 +92,7 @@ describe('onboarding', () => {
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Workout' }))
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByText(/need your height/i)).toBeInTheDocument()
     expect(screen.getByText(/need your body weight/i)).toBeInTheDocument()
@@ -99,6 +103,7 @@ describe('onboarding', () => {
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Workout' }))
     await user.type(screen.getByLabelText(/nickname/i), 'Sam')
     await user.click(within(screen.getByRole('radiogroup', { name: 'Training level' })).getByRole('radio', { name: /intermediate/i }))
     await user.click(screen.getByRole('button', { name: 'Continue' }))
@@ -114,6 +119,7 @@ describe('onboarding', () => {
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Workout' }))
     await user.click(within(screen.getByRole('radiogroup', { name: 'Training level' })).getByRole('radio', { name: /intermediate/i }))
     await user.selectOptions(screen.getByLabelText('Where do you train?'), 'home')
     await user.click(screen.getByRole('button', { name: 'Continue' }))
@@ -121,6 +127,34 @@ describe('onboarding', () => {
     expect(await screen.findByLabelText('Weight machines')).not.toBeChecked()
     await user.click(screen.getByLabelText('Dumbbells'))
     await waitFor(async () => expect((await db.equipment.get('home'))?.items.dumbbell?.available).toBe(true))
+  })
+
+  it('requires a choice of Workout, Yoga, or both, and saves nothing until one is picked', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Welcome' })
+    expect(screen.getByRole('button', { name: 'Workout' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Yoga' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('radiogroup', { name: 'Training level' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText(/choose workout, yoga, or both/i)).toBeInTheDocument()
+    expect(await db.profile.count()).toBe(0)
+  })
+
+  it('yoga only skips body basics and equipment and lands on a Yoga-first Home with no workout tabs', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Yoga' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('button', { name: /plan a yoga session/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /confirm your equipment/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/training level/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/height and weight/i)).not.toBeInTheDocument()
+    const nav = screen.getByRole('navigation')
+    await waitFor(() => expect(within(nav).queryByText('Plan')).not.toBeInTheDocument())
+    expect(within(nav).queryByText('Workout')).not.toBeInTheDocument()
+    expect((await db.profile.toArray())[0].tracks).toEqual(['yoga'])
   })
 })
 
@@ -312,14 +346,17 @@ describe('workout flow', () => {
     await waitFor(async () => expect((await db.setLogs.toArray()).filter((l) => l.completed)).toHaveLength(0))
     await user.click(screen.getAllByRole('button', { name: /mark set 1 done/i })[0])
 
-    await user.click(screen.getAllByRole('button', { name: 'Replace' })[1])
+    // the last exercise has no logged sets, so it swaps straight away
+    await user.click(screen.getAllByRole('button', { name: 'Replace' }).at(-1)!)
     const dlg = await screen.findByRole('dialog', { name: /replace exercise/i })
     const alts = within(dlg).getAllByRole('button').filter((b) => b.className.includes('alt'))
     expect(alts.length).toBeGreaterThan(0)
     await user.click(alts[0])
     expect(await screen.findByText(/^Replaced /)).toBeInTheDocument()
     const session = (await db.sessions.toArray())[0]
-    expect(session.actualExercises[1].replacedFromId).toBe(session.plannedExercises[1].exerciseId)
+    const swapped = session.actualExercises.find((a) => a.replacedFromId)!
+    expect(swapped.replacedFromId).toBe(session.plannedExercises.find((p) => p.slotId === swapped.slotId)!.exerciseId)
+    expect(session.actualExercises.filter((a) => a.replacedFromId)).toHaveLength(1)
 
     await user.click(screen.getAllByRole('button', { name: 'Finish workout' })[0])
     const confirm = await screen.findByRole('dialog', { name: /finish workout/i })
@@ -352,6 +389,85 @@ describe('workout flow', () => {
     await user.click(within(dlg).getByRole('button', { name: /save and finish/i }))
     await screen.findByRole('heading', { name: /workout (saved|discarded)/i })
     expect(await db.sessions.count()).toBe(1)
+  })
+
+  describe('per-exercise equipment and safe replace (US-064, US-065)', () => {
+    /** The first exercise card that offers at least one other usable equipment choice. */
+    const swappable = () => {
+      for (const sel of screen.getAllByLabelText(/ equipment$/i) as HTMLSelectElement[]) {
+        const other = [...sel.options].find((o) => !o.disabled && o.value !== sel.value)
+        if (other) return { sel, other, card: sel.closest('section') as HTMLElement }
+      }
+      throw new Error('no exercise offers another equipment choice')
+    }
+
+    it('changes only the chosen exercise, shows why some equipment is unavailable, and persists', async () => {
+      await seed()
+      const user = userEvent.setup()
+      const first = render(<App />)
+      await startWorkout(user)
+      const before = (await db.sessions.toArray())[0].actualExercises.map((a) => a.exerciseId)
+      const { sel, other, card } = swappable()
+      await user.selectOptions(sel, other.value)
+      await waitFor(async () => expect((await db.sessions.toArray())[0].actualExercises.filter((a) => a.replacedFromId)).toHaveLength(1))
+      const after = (await db.sessions.toArray())[0].actualExercises.map((a) => a.exerciseId)
+      expect(after.filter((id, i) => id !== before[i])).toHaveLength(1)
+      expect(await screen.findByText(/^Swapped /)).toBeInTheDocument()
+      expect(within(card).queryByText(/why are some options unavailable/i) ?? screen.getAllByText(/why are some options unavailable/i)[0]).toBeTruthy()
+      first.unmount()
+      window.history.replaceState(null, '', '#/home')
+      render(<App />)
+      await userEvent.setup().click(await screen.findByRole('button', { name: /resume workout/i }))
+      await screen.findAllByLabelText('Set 1 weight')
+      expect((await db.sessions.toArray())[0].actualExercises.map((a) => a.exerciseId)).toEqual(after)
+    })
+
+    it('keeps bodyweight as a choice and never disables it because other equipment is selected', async () => {
+      await seed()
+      const user = userEvent.setup()
+      render(<App />)
+      await startWorkout(user)
+      const selects = screen.getAllByLabelText(/ equipment$/i) as HTMLSelectElement[]
+      const withBodyweight = selects.find((s) => [...s.options].some((o) => o.value === 'bodyweight'))
+      expect(withBodyweight).toBeTruthy()
+      const o = [...withBodyweight!.options].find((x) => x.value === 'bodyweight')!
+      expect(o.disabled).toBe(false)
+    })
+
+    it('asks before touching logged sets: cancel changes nothing, reset clears only that exercise, undo restores', async () => {
+      await seed()
+      const user = userEvent.setup()
+      render(<App />)
+      await startWorkout(user)
+      const { sel, other, card } = swappable()
+      await user.click(within(card).getAllByRole('button', { name: /mark set 1 done/i })[0])
+      await waitFor(async () => expect((await db.setLogs.toArray()).filter((l) => l.completed)).toHaveLength(1))
+      const original = (await db.sessions.toArray())[0].actualExercises.map((a) => a.exerciseId)
+
+      await user.selectOptions(sel, other.value)
+      let dlg = await screen.findByRole('dialog', { name: /you already logged sets/i })
+      await user.click(within(dlg).getByRole('button', { name: /cancel, change nothing/i }))
+      expect((await db.sessions.toArray())[0].actualExercises.map((a) => a.exerciseId)).toEqual(original)
+
+      await user.selectOptions(sel, other.value)
+      dlg = await screen.findByRole('dialog', { name: /you already logged sets/i })
+      await user.click(within(dlg).getByRole('button', { name: /reset this exercise's sets and switch/i }))
+      await waitFor(async () => expect((await db.setLogs.toArray()).filter((l) => l.completed)).toHaveLength(0))
+      expect((await db.sessions.toArray())[0].actualExercises.filter((a) => a.replacedFromId)).toHaveLength(1)
+
+      await user.click(await screen.findByRole('button', { name: 'Undo swap' }))
+      await waitFor(async () => expect((await db.sessions.toArray())[0].actualExercises.map((a) => a.exerciseId)).toEqual(original))
+      expect((await db.setLogs.toArray()).filter((l) => l.completed)).toHaveLength(1) // the reset set is back
+    })
+
+    it('shows an estimated session length that follows the session', async () => {
+      await seed()
+      const user = userEvent.setup()
+      render(<App />)
+      await startWorkout(user, 30)
+      const line = await screen.findByText(/estimated session length: about \d+ min \(you chose 30\)/i)
+      expect(line).toBeInTheDocument()
+    })
   })
 
   it('shows the rest timer with pause, resume, +15s and skip', async () => {

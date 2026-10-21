@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { WEEKDAY_LABELS } from '../engine/dates'
 import {
-  GOAL_LABEL, LEVEL_LABEL, type Goal, type GymType, type LocationType, type Sex, type TrainingLevel, type WeightUnit,
+  ALL_TRACKS, GOAL_LABEL, LEVEL_LABEL, TRACK_LABEL, type Goal, type GymType, type LocationType, type Sex, type Track, type TrainingLevel, type WeightUnit,
 } from '../engine/types'
 import {
   validateProfileForm, withWeightFieldUnit, type FormErrors, type ProfileForm,
@@ -40,7 +40,8 @@ export function ProfileFormView({
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
   useUnsavedGuard(dirty)
-  const beginner = f.trainingLevel === 'beginner'
+  const workoutOn = f.tracks.includes('workout')
+  const beginner = workoutOn && f.trainingLevel === 'beginner'
   const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) => { setF((p) => ({ ...p, [k]: v })); setSaved(false); setDirty(true) }
   const update = (fn: (p: ProfileForm) => ProfileForm) => { setF(fn); setSaved(false); setDirty(true) }
 
@@ -65,12 +66,15 @@ export function ProfileFormView({
     }
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
-    if (onLevelChange && initial.trainingLevel !== f.trainingLevel) {
+    if (workoutOn && onLevelChange && initial.trainingLevel !== f.trainingLevel) {
       onLevelChange(initial.trainingLevel, f.trainingLevel, (mode) => void doSubmit(mode))
       return
     }
     await doSubmit()
   }
+
+  const toggleTrack = (t: Track) =>
+    update((p) => ({ ...p, tracks: p.tracks.includes(t) ? p.tracks.filter((x) => x !== t) : ALL_TRACKS.filter((x) => x === t || p.tracks.includes(x)) }))
 
   const toggleDay = (d: number) =>
     set('trainingDays', f.trainingDays.includes(d) ? f.trainingDays.filter((x) => x !== d) : [...f.trainingDays, d])
@@ -85,10 +89,23 @@ export function ProfileFormView({
 
   return (
     <form onSubmit={submit} noValidate>
+      <fieldset className="field">
+        <legend>What do you want to use Lift for?</legend>
+        <div role="group" aria-label="Activities" className="chips">
+          {ALL_TRACKS.map((t) => (
+            <button key={t} type="button" className={f.tracks.includes(t) ? 'chip on' : 'chip'} aria-pressed={f.tracks.includes(t)} onClick={() => toggleTrack(t)}>{TRACK_LABEL[t]}</button>
+          ))}
+        </div>
+        <p className="hint">Pick Workout, Yoga, or both. You can change this later. Turning one off only hides it: your history is kept.</p>
+        {errors.tracks && <p className="error" role="alert">{errors.tracks}</p>}
+      </fieldset>
+
       <Field label="Nickname (optional)" hint="Only used to greet you. You do not need your real name." error={errors.displayName}>
         {(id, d) => <input id={id} aria-describedby={d} value={f.displayName} maxLength={40} onChange={(e) => set('displayName', e.target.value)} />}
       </Field>
 
+      {workoutOn && (
+        <>
       <Field label="Main goal" hint="This sets rep ranges and rest times. It does not promise any particular result.">
         {(id) => (
           <select id={id} value={f.goal} onChange={(e) => set('goal', e.target.value as Goal)}>
@@ -110,6 +127,9 @@ export function ProfileFormView({
         <p className="hint">Up to {LEVEL_PARAMS[f.trainingLevel].maxExercises} exercises per workout at this level. You can change it any time.</p>
       </fieldset>
 
+        </>
+      )}
+
       <div className={beginner ? 'required-block' : ''}>
         <p className="label-like">{beginner ? 'Your height and weight (needed for beginners)' : 'Height and weight (optional)'}</p>
         <HeightField form={f} update={update} error={errors.heightCm} />
@@ -129,6 +149,8 @@ export function ProfileFormView({
         <p className="hint">The default for the weights you lift and your body weight. Each weight box can use its own unit too.</p>
       </div>
 
+      {workoutOn && (
+        <>
       <fieldset className="field">
         <legend>Training days</legend>
         <div role="group" aria-label="Training days" className="chips">
@@ -164,6 +186,9 @@ export function ProfileFormView({
               )}
             </Field>
           )}
+        </>
+      )}
+
         </>
       )}
 

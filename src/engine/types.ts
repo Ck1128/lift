@@ -55,6 +55,10 @@ export const LEVEL_LABEL: Record<TrainingLevel, string> = {
   beginner: 'Beginner', intermediate: 'Intermediate', regular: 'Regular gym-goer',
 }
 export type Sex = 'female' | 'male'
+/** The activities a person uses the app for. At least one is always on. */
+export type Track = 'workout' | 'yoga'
+export const ALL_TRACKS: Track[] = ['workout', 'yoga']
+export const TRACK_LABEL: Record<Track, string> = { workout: 'Workout', yoga: 'Yoga' }
 export type LocationType = 'home' | 'gym'
 export type GymType = 'planet_fitness' | 'generic'
 
@@ -107,6 +111,8 @@ export interface Profile {
   weightUnit: WeightUnit
   goal: Goal
   trainingLevel: TrainingLevel
+  /** Which activities are switched on. Missing (older profiles) means both. Turning one off never deletes its history. */
+  tracks?: Track[]
   /** Yoga has its own level. It is never assumed from the strength level. */
   yogaLevel?: TrainingLevel
   /** Optional. Only used by the energy estimate equation. */
@@ -208,6 +214,8 @@ export interface ActualExercise {
   replacedFromId?: string
   skipped: boolean
   painReported: boolean
+  /** What this slot looked like before the last replacement, so it can be undone. Cleared by a new replacement. */
+  previous?: { exerciseId: string; replacedFromId?: string; sets: SetLog[] }
 }
 
 export interface WorkoutSession {

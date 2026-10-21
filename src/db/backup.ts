@@ -83,6 +83,7 @@ const CHECKS: Record<TableName, Check> = {
     : r.weightKg !== undefined && (!isNum(r.weightKg) || r.weightKg < 10 || r.weightKg > 700) ? 'bad body weight'
     : !oneOf(r.trainingLevel, ['beginner', 'intermediate', 'regular']) ? 'bad training level'
     : !Array.isArray(r.trainingDays) || r.trainingDays.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? 'bad training days'
+    : r.tracks !== undefined && (!Array.isArray(r.tracks) || r.tracks.length === 0 || r.tracks.some((t) => !oneOf(t, ['workout', 'yoga']))) ? 'bad activity setting'
     : !isNum(r.preferredDurationMinutes) ? 'bad duration' : null,
   equipment: (r) =>
     !oneOf(r.location, ['home', 'gym']) ? 'bad location'

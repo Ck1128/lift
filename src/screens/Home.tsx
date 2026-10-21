@@ -7,7 +7,8 @@ import {
 } from '../db/repo'
 import { formatDay, startOfWeek } from '../engine/dates'
 import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type DayPlan, type Muscle, type Profile } from '../engine/types'
-import { Button, Card, ScreenHeader } from '../components/ui'
+import { tracksOf } from '../engine/tracks'
+import { Button, Card, Loading, ProgressBar, ScreenHeader } from '../components/ui'
 import { BodyBasicsCard, DurationPicker, LevelDialog } from '../components/HomeParts'
 import { useQuery } from '../hooks/app'
 import { useRouter } from '../router'
@@ -21,26 +22,34 @@ const EXTRA: Record<string, DayPlan> = {
 
 export function Home({ profile, today }: { profile: Profile; today: string }) {
   const { navigate } = useRouter()
+  const tracks = tracksOf(profile)
   const [minutes, setMinutes] = useState<number | null>(profile.preferredDurationMinutes)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [pickExtra, setPickExtra] = useState(false)
   const [levelOpen, setLevelOpen] = useState(false)
 
-  useEffect(() => { void ensureScheduled(today, 14, profile) }, [today, profile])
+  useEffect(() => { if (tracks.workout) void ensureScheduled(today, 14, profile) }, [today, profile, tracks.workout])
   const schedQ = useQuery(() => scheduledOn(today), [today])
   const activeQ = useQuery(() => getActiveSession(), [])
-  const sched = schedQ.value
-  const active = activeQ.value
-  const loading = schedQ.loading || activeQ.loading
+  const sched = tracks.workout ? schedQ.value : null
+  const active = tracks.workout ? activeQ.value : null
+  const loading = tracks.workout && (schedQ.loading || activeQ.loading)
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
+  const yogaSessions = useLiveQuery(() => db.yogaSessions.toArray(), [], [])
+  const weekRows = useLiveQuery(() => db.scheduled.toArray(), [], [])
   const soreness = useLiveQuery(() => recentSoreness(today), [today], {} as Partial<Record<Muscle, 1 | 2 | 3>>)
   const gaps = profileGaps(profile)
 
   const isTraining = sched && sched.status !== 'skipped'
+  const week = startOfWeek(today)
   const finished = sessions.filter((s) => s.status === 'completed' || s.status === 'partial')
-  const thisWeek = finished.filter((s) => startOfWeek(s.date) === startOfWeek(today)).length
+  const thisWeek = finished.filter((s) => startOfWeek(s.date) === week).length
   const last = [...finished].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
+  const plannedThisWeek = weekRows.filter((r) => startOfWeek(r.date) === week && r.status !== 'skipped').length
+  const yogaDone = yogaSessions.filter((y) => (y.status === 'completed' || y.status === 'partial') && startOfWeek(y.date) === week)
+  const yogaMinutes = Math.round(yogaDone.reduce((a, y) => a + y.durationSeconds, 0) / 60)
+  const yogaActive = yogaSessions.find((y) => y.status === 'in_progress')
   const greeting = profile.displayName ? `Hi, ${profile.displayName}` : 'Today'
 
   const generate = async (id: string) => {
@@ -63,53 +72,64 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
     await generate(row.id)
   }
 
+  const yogaCard = (primary: boolean) => (
+    <Card title="Yoga" className={primary ? 'hero' : ''}>
+      {yogaActive ? (
+        <>
+          <p className="muted">{yogaActive.styleName} is in progress.</p>
+          <Button onClick={() => navigate(`/yoga/session/${yogaActive.id}`)}>Resume yoga session</Button>
+        </>
+      ) : (
+        <>
+          <p className="muted">{primary ? 'A guided session in 13 styles, for any level. No equipment needed.' : 'A guided session, any level, no equipment needed.'}</p>
+          <Button variant={primary ? 'primary' : 'ghost'} onClick={() => navigate('/yoga')}>Plan a yoga session</Button>
+        </>
+      )}
+    </Card>
+  )
+
   return (
     <>
       <ScreenHeader title={greeting} subtitle={formatDay(today)} />
 
-      <Card title="Training level">
-        <div className="row">
-          <strong>{LEVEL_LABEL[profile.trainingLevel]}</strong>
-          <Button variant="small" onClick={() => setLevelOpen(true)}>Change</Button>
-        </div>
-      </Card>
-
       {gaps.length > 0 && <BodyBasicsCard profile={profile} />}
 
-      {active && (
-        <Card title="Workout in progress">
-          <p>{active.title} started {new Date(active.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</p>
+      {loading && <Loading label="Loading today" />}
+
+      {/* ---- the one main thing for today ---- */}
+      {!tracks.workout && yogaCard(true)}
+
+      {tracks.workout && !loading && active && (
+        <Card title="Workout in progress" className="hero">
+          <p className="big">{active.title}</p>
+          <p className="muted">Started {new Date(active.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</p>
           <Button onClick={() => navigate('/workout')}>Resume workout</Button>
         </Card>
       )}
 
-      {loading && <p className="muted">Loading...</p>}
-
-      {!loading && !active && isTraining && sched && (
-        <>
-          <Card title="Today's focus">
-            <p className="big">{sched.focus}</p>
-            <p className="muted">{sched.targetMuscles.map((m) => MUSCLE_LABEL[m]).join(' · ')}</p>
-            {sched.status === 'completed' && <p className="ok">Done today. Nice work.</p>}
-            {sched.status === 'partial' && <p className="muted">You did part of this workout today.</p>}
-          </Card>
+      {tracks.workout && !loading && !active && isTraining && sched && (
+        <Card className="hero">
+          <p className="eyebrow">Today's focus</p>
+          <p className="hero-title">{sched.focus}</p>
+          <p className="muted">{sched.targetMuscles.map((m) => MUSCLE_LABEL[m]).join(' · ')}</p>
+          {sched.status === 'completed' && <p className="ok">Done today. Nice work.</p>}
+          {sched.status === 'partial' && <p className="muted">You did part of this workout today.</p>}
           {(sched.status === 'planned' || sched.status === 'partial') && (
-            <Card title="How much time do you have?">
+            <>
+              <p className="label-like">How much time do you have?</p>
               <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
               <Button disabled={busy || minutes === null || gaps.length > 0} onClick={() => generate(sched.id)}>
                 {sched.workout ? `View / update workout (${minutes ?? '?'} min)` : `Generate workout (${minutes ?? '?'} min)`}
               </Button>
               {message && <p className="error" role="alert">{message}</p>}
-            </Card>
+            </>
           )}
-          {sched.status === 'completed' && (
-            <Card><Button variant="ghost" onClick={() => navigate('/workout')}>View today's workout</Button></Card>
-          )}
-        </>
+          {sched.status === 'completed' && <Button variant="ghost" onClick={() => navigate('/workout')}>View today's workout</Button>}
+        </Card>
       )}
 
-      {!loading && !active && !isTraining && (
-        <Card title="Rest day">
+      {tracks.workout && !loading && !active && !isTraining && (
+        <Card title="Rest day" className="hero">
           <p>{sched?.status === 'skipped' ? 'You skipped today\'s workout. That is fine.' : 'Today is a rest day. Recovery is part of training.'}</p>
           {!pickExtra ? (
             <Button variant="ghost" onClick={() => setPickExtra(true)}>I want to train anyway</Button>
@@ -129,42 +149,58 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
         </Card>
       )}
 
-      <Card title="Yoga">
-        <p className="muted">A guided session in 13 styles, for any level. No equipment needed.</p>
-        <Button variant="ghost" onClick={() => navigate('/yoga')}>Plan a yoga session</Button>
-      </Card>
+      {tracks.workout && tracks.yoga && yogaCard(false)}
 
-      <Card title="Feeling sore? (optional)">
-        <details>
-          <summary>Tell the planner which muscles are sore</summary>
-          <p className="hint">Soreness is only used to trim sets for those muscles. It is not a diagnosis. If something hurts or feels wrong, rest and consider asking a qualified professional.</p>
-          {ALL_MUSCLES.map((m: Muscle) => (
-            <div className="row" key={m}>
-              <label htmlFor={`sore-${m}`}>{MUSCLE_LABEL[m]}</label>
-              <select
-                id={`sore-${m}`}
-                value={soreness[m] ?? 0}
-                onChange={(e) => { const v = Number(e.target.value); void (v === 0 ? clearSoreness(m, today) : addSoreness(m, v as 1 | 2 | 3, today)) }}
-              >
-                <option value={0}>Not sore</option>
-                <option value={1}>Mild</option>
-                <option value={2}>Moderate</option>
-                <option value={3}>Very sore</option>
-              </select>
-            </div>
-          ))}
-        </details>
-      </Card>
-
-      <Card title="Recent progress">
-        {finished.length === 0 ? (
-          <p className="muted">No workouts saved yet. Finish one and your progress shows up here.</p>
-        ) : (
-          <>
-            <p><strong>{thisWeek}</strong> workout{thisWeek === 1 ? '' : 's'} this week</p>
-            {last && <p className="muted">Last: {last.title} on {formatDay(last.date)}</p>}
-          </>
+      {/* ---- progress ---- */}
+      <Card title="This week">
+        {tracks.workout && (
+          <div className="stat">
+            <div className="row"><span><strong>{thisWeek}</strong>{plannedThisWeek > 0 ? ` of ${Math.max(plannedThisWeek, thisWeek)}` : ''} workout{thisWeek === 1 ? '' : 's'}</span></div>
+            {plannedThisWeek > 0 && <ProgressBar value={thisWeek} max={Math.max(plannedThisWeek, thisWeek)} label="Workouts this week" />}
+            {last ? <p className="hint">Last: {last.title} on {formatDay(last.date)}</p> : <p className="hint">No workouts saved yet. Finish one and your progress shows up here.</p>}
+          </div>
         )}
+        {tracks.yoga && (
+          <div className="stat">
+            <div className="row"><span><strong>{yogaDone.length}</strong> yoga session{yogaDone.length === 1 ? '' : 's'}{yogaMinutes > 0 ? ` · ${yogaMinutes} min` : ''}</span></div>
+            {yogaDone.length === 0 && <p className="hint">Your yoga sessions show up here.</p>}
+          </div>
+        )}
+      </Card>
+
+      {/* ---- adjust (kept small and out of the way) ---- */}
+      <Card title="Adjust">
+        {tracks.workout && (
+          <div className="row">
+            <span>Training level: <strong>{LEVEL_LABEL[profile.trainingLevel]}</strong></span>
+            <Button variant="small" onClick={() => setLevelOpen(true)}>Change</Button>
+          </div>
+        )}
+        {tracks.workout && (
+          <details>
+            <summary>Feeling sore? (optional)</summary>
+            <p className="hint">Soreness is only used to trim sets for those muscles. It is not a diagnosis. If something hurts or feels wrong, rest and consider asking a qualified professional.</p>
+            {ALL_MUSCLES.map((m: Muscle) => (
+              <div className="row" key={m}>
+                <label htmlFor={`sore-${m}`}>{MUSCLE_LABEL[m]}</label>
+                <select
+                  id={`sore-${m}`}
+                  value={soreness[m] ?? 0}
+                  onChange={(e) => { const v = Number(e.target.value); void (v === 0 ? clearSoreness(m, today) : addSoreness(m, v as 1 | 2 | 3, today)) }}
+                >
+                  <option value={0}>Not sore</option>
+                  <option value={1}>Mild</option>
+                  <option value={2}>Moderate</option>
+                  <option value={3}>Very sore</option>
+                </select>
+              </div>
+            ))}
+          </details>
+        )}
+        <div className="row">
+          <span className="muted">Food log (optional)</span>
+          <Button variant="small" onClick={() => navigate('/food')}>Open</Button>
+        </div>
       </Card>
 
       {levelOpen && (
