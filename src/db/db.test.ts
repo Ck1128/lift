@@ -228,7 +228,7 @@ describe('workout sessions and set logs', () => {
     const sc = (await scheduledOn(TODAY))!
     const first = await generateFor(sc.id, 45, { today: TODAY })
     if (first.kind !== 'workout') throw new Error('x')
-    const lead = first.workout.exercises.find((e) => e.suggestedWeight === undefined && exerciseById(e.exerciseId)?.exerciseType !== 'bodyweight')!
+    const lead = first.workout.exercises.find((e) => e.kind !== 'cardio' && !['bodyweight', 'bands'].includes(exerciseById(e.exerciseId)?.exerciseType ?? 'bodyweight'))!
     const s = await startSession(sc.id, 'lb')
     const logs = await logsOf(s.id)
     for (const l of logs) await updateSet(l.id, { actualReps: lead.repMax, actualWeight: 40, completed: true })

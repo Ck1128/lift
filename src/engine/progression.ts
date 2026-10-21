@@ -72,3 +72,35 @@ export function suggestLoad(
   }
   return { weight: same, note: `Last session fell short of ${repMin} reps on some sets (${didText}), so the weight stays. Drop one step if it felt too heavy.` }
 }
+
+const TYPE_FRACTION: Record<string, [number, number]> = {
+  // [compound, isolation] as a fraction of body weight, per dumbbell / per stack setting, for an intermediate man.
+  machine: [0.4, 0.15], cable: [0.25, 0.1], dumbbell: [0.15, 0.06], kettlebell: [0.15, 0.1], smith: [0.3, 0.15], barbell: [0.4, 0.2],
+}
+const LEVEL_FACTOR = { beginner: 0.6, intermediate: 1, regular: 1.15 } as const
+const LOWER = new Set(['quads', 'hamstrings', 'glutes', 'calves'])
+
+export interface StartInput {
+  exerciseType: string
+  compound: boolean
+  primaryMuscles: string[]
+  level: keyof typeof LEVEL_FACTOR
+  weightKg?: number
+  sex?: 'female' | 'male'
+}
+
+/**
+ * A cautious first-session guess for an exercise with no history. It is deliberately light (the load is rounded
+ * down to what the equipment can make) and the note says so. Body weight and sex are rough proxies, so this is a
+ * place to start, never a safe-load prescription. Returns undefined when there is not enough information.
+ */
+export function startingWeight(i: StartInput, spec: LoadSpec | null, unit: WeightUnit): number | undefined {
+  const frac = TYPE_FRACTION[i.exerciseType]
+  if (!frac || !i.weightKg || !spec) return undefined
+  const sexFactor = i.sex === 'male' ? 1 : i.sex === 'female' ? 0.7 : 0.8
+  const lower = i.primaryMuscles.some((m) => LOWER.has(m)) ? 1.5 : 1
+  const kg = i.weightKg * (i.compound ? frac[0] : frac[1]) * LEVEL_FACTOR[i.level] * sexFactor * lower * 0.8
+  const w = convertWeight(kg, 'kg', unit)
+  const steps = Math.floor((w - spec.min) / spec.increment)
+  return tidy(Math.min(spec.max, Math.max(spec.min, spec.min + Math.max(0, steps) * spec.increment)))
+}

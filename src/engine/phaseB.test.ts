@@ -126,3 +126,23 @@ describe('food portions', () => {
     expect(calcPortion(rice(100), 0, 'g').ok).toBe(false)
   })
 })
+
+import { startingWeight } from './progression'
+describe('starting weight guess', () => {
+  const spec = { min: 5, max: 50, increment: 5, unit: 'lb' as const }
+  const base = { exerciseType: 'dumbbell', compound: true, primaryMuscles: ['chest'], level: 'beginner' as const, weightKg: 80 }
+  it('is light, snapped to the equipment, and needs body weight', () => {
+    const w = startingWeight({ ...base, sex: 'male' }, spec, 'lb')!
+    expect(w).toBeGreaterThanOrEqual(5)
+    expect(w % 5).toBe(0)
+    expect(startingWeight({ ...base, weightKg: undefined }, spec, 'lb')).toBeUndefined()
+    expect(startingWeight({ ...base, exerciseType: 'bodyweight' }, spec, 'lb')).toBeUndefined()
+  })
+  it('depends on level and sex', () => {
+    const m = startingWeight({ ...base, level: 'regular', sex: 'male' }, spec, 'lb')!
+    const f = startingWeight({ ...base, level: 'regular', sex: 'female' }, spec, 'lb')!
+    const b = startingWeight({ ...base, level: 'beginner', sex: 'male' }, spec, 'lb')!
+    expect(m).toBeGreaterThanOrEqual(f)
+    expect(m).toBeGreaterThanOrEqual(b)
+  })
+})

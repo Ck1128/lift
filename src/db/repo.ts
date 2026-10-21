@@ -314,7 +314,7 @@ export async function generateFor(
     date: sched.date, planDay, minutes, goal: profile.goal, experience: profile.trainingLevel, equipment,
     excludedExerciseIds: profile.excludedExerciseIds, excludedPatterns: profile.excludedPatterns,
     catalog: CATALOG, lastPerformance: buildLastPerformance(sessions, logs), lastDone: buildLastDone(sessions, logs),
-    soreness, weightUnit: profile.weightUnit, cardioChoice: sched.cardioChoice, weightKg: profile.weightKg,
+    soreness, weightUnit: profile.weightUnit, cardioChoice: sched.cardioChoice, weightKg: profile.weightKg, sex: profile.sex,
   }
   const { catalog: _catalog, ...rest } = input
   void _catalog

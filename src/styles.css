@@ -159,3 +159,10 @@ hr { border: 0; border-top: 1px solid var(--bd); margin: 16px 0; }
 caption.sr-only { display: block; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
 @media (forced-colors: active) { .chip.on, .btn { border: 2px solid ButtonText; } }
+
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.switch { position: relative; flex: none; width: 52px; height: 30px; border-radius: 15px; border: 1px solid var(--border, #888); background: var(--surface-2, #ccc); padding: 0; cursor: pointer; }
+.switch.on { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); }
+.switch-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch.on .switch-knob { transform: translateX(22px); }
+@media (prefers-reduced-motion: reduce) { .switch-knob { transition: none; } }

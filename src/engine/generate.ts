@@ -5,7 +5,7 @@ import type {
 import { EQUIPMENT_LABEL, MUSCLE_LABEL } from './types'
 import { availableIds, loadSpec } from './equipment'
 import { assumptionsText, estimateSeconds, restSecondsFor } from './time'
-import { suggestLoad, type LoadSpec } from './progression'
+import { startingWeight, suggestLoad, type LoadSpec } from './progression'
 import { validateExercise } from './validate'
 import { LEVEL_PARAMS, setsFor } from './levels'
 import { cardioCalories, MAX_SESSION_MINUTES, MIN_SESSION_MINUTES, pickCardio } from './cardio'
@@ -32,6 +32,8 @@ export interface GenerateInput {
   cardioChoice?: string
   /** Canonical body weight, used only for the rough cardio calorie range. */
   weightKg?: number
+  /** Optional. With body weight and level it sets a cautious first-session weight guess. */
+  sex?: 'female' | 'male'
 }
 
 const REPS: Record<Goal, { compound: [number, number]; iso: [number, number] }> = {
@@ -181,13 +183,20 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
   const reps = REPS[input.goal]
   const soreFor = (ex: Exercise) => Math.max(0, ...ex.primaryMuscles.map((m) => input.soreness[m] ?? 0))
   const rest = (ex: Exercise) => restSecondsFor(input.goal, ex.compound, level.restBonus)
+  // With no history, offer a light starting guess from level, body weight and sex. It is only a place to start.
+  const withStart = (sug: { weight?: number; note: string }, ex: Exercise, spec: LoadSpec | null) => {
+    if (sug.weight !== undefined || input.lastPerformance[ex.id]) return sug
+    const w = startingWeight({ exerciseType: ex.exerciseType, compound: ex.compound, primaryMuscles: ex.primaryMuscles, level: input.experience, weightKg: input.weightKg, sex: input.sex }, spec, input.weightUnit)
+    if (w === undefined) return sug
+    return { weight: w, note: `First time, so this is a light starting guess (${w} ${input.weightUnit}) from your level, body weight and sex. It is not a safe-load rule. Go lighter if the last reps are not smooth, or heavier if it feels too easy.` }
+  }
   const build = (ex: Exercise, slot: number, sets: number): PlannedExercise => {
     const [repMin, repMax] = ex.compound ? reps.compound : reps.iso
     const spec = loadSpecFor(ex, input.equipment, input.weightUnit)
     const noLoad = ex.exerciseType === 'bodyweight' || ex.exerciseType === 'bands'
     const sug = noLoad
       ? { weight: undefined, note: 'No weight needed. Use a variation that lets you reach the target reps with good form.' }
-      : suggestLoad(input.lastPerformance[ex.id], spec, input.weightUnit, repMin, repMax, level.effortCeiling)
+      : withStart(suggestLoad(input.lastPerformance[ex.id], spec, input.weightUnit, repMin, repMax, level.effortCeiling), ex, spec)
     return {
       slotId: `s${slot + 1}`,
       exerciseId: ex.id,

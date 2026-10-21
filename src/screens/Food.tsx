@@ -102,10 +102,11 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
       })}
 
       <Card title="Food search settings">
-        <label className="check">
-          <input type="checkbox" checked={!!online} onChange={(e) => void setFoodOnline(e.target.checked)} />
-          <span>Also search packaged foods online (Open Food Facts)</span>
-        </label>
+        <div className="switch-row">
+          <span id="off-label">Search packaged foods online (Open Food Facts)</span>
+          <button type="button" role="switch" aria-checked={!!online} aria-labelledby="off-label" className={online ? 'switch on' : 'switch'}
+            onClick={() => void setFoodOnline(!online)}><span className="switch-knob" aria-hidden="true" /><span className="sr-only">{online ? 'On' : 'Off'}</span></button>
+        </div>
         <p className="hint">Off by default. When on, the words you type in the food search are sent to world.openfoodfacts.org, and nothing else. Results are saved on this phone so repeat searches work offline.</p>
         <Button variant="small" onClick={() => void clearFoodCache()}>Clear saved online results</Button>
       </Card>
