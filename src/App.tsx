@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BottomNav } from './components/BottomNav'
+import { DbGate } from './components/DbGate'
 import { OfflineBanner, UpdateBanner } from './components/Banners'
 import { ConfirmDialog } from './components/ui'
 import { useOnline, useProfile, useToday } from './hooks/app'
@@ -43,6 +44,7 @@ function Shell() {
   const online = useOnline()
   const { navigate, replace } = useRouter()
   const [onboarding, setOnboarding] = useState(false)
+  const [deletedNotice, setDeletedNotice] = useState(false)
   const [update, setUpdate] = useState<(() => void) | null>(null)
   const [offlineReady, setOfflineReady] = useState(false)
 
@@ -57,7 +59,7 @@ function Shell() {
       <div className="app">
         <OfflineBanner online={online} />
         <main className="content">
-          <Onboarding onBegin={() => setOnboarding(true)} onDone={() => { setOnboarding(false); replace('/home') }} />
+          <Onboarding deletedNotice={deletedNotice} onDismissNotice={() => setDeletedNotice(false)} onBegin={() => setOnboarding(true)} onDone={() => { setOnboarding(false); replace('/home') }} />
         </main>
       </div>
     )
@@ -74,7 +76,7 @@ function Shell() {
         </div>
       )}
       <main className="content">
-        <Routes profile={profile} today={today} onReset={() => navigate('/home')} />
+        <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />
       </main>
       <BottomNav />
     </div>
@@ -95,7 +97,9 @@ export default function App() {
         />
       )}
     >
-      <Shell />
+      <DbGate>
+        <Shell />
+      </DbGate>
     </RouterProvider>
   )
 }

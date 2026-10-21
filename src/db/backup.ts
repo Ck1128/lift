@@ -2,14 +2,33 @@ import { APP_VERSION, db, DB_SCHEMA_VERSION, nowIso, upgradeProfileV2 } from './
 import { ALL_EQUIPMENT } from '../engine/types'
 
 export const BACKUP_FORMAT = 'lift-backup'
-/** Version 2 adds yoga sessions and an optional food log, and stores height and weight in cm and kg. Version 1 files still import. */
-export const BACKUP_VERSION = 2
+/**
+ * Export format version, separate from the database schema version.
+ * 3: the file says which categories it holds (`includes`). 2: yoga and an optional food log, height in cm and weight in kg.
+ * Version 1 and 2 files still import.
+ */
+export const BACKUP_VERSION = 3
 
-const CORE_TABLES = ['profile', 'equipment', 'plans', 'scheduled', 'sessions', 'setLogs', 'settings', 'soreness', 'bodyWeights', 'yogaSessions'] as const
-/** Food is personal, so it is only in a backup when the person chose to include it. */
-const OPTIONAL_TABLES = ['foodLog'] as const
-const TABLES = [...CORE_TABLES, ...OPTIONAL_TABLES] as const
-type TableName = (typeof TABLES)[number]
+const ALL_TABLES = ['profile', 'equipment', 'settings', 'plans', 'scheduled', 'sessions', 'setLogs', 'soreness', 'bodyWeights', 'yogaSessions', 'foodLog'] as const
+type TableName = (typeof ALL_TABLES)[number]
+
+/** What a person chooses to put in an export. Each category maps to whole tables. */
+export const CATEGORIES = ['profile', 'workouts', 'bodyweight', 'yoga', 'food'] as const
+export type Category = (typeof CATEGORIES)[number]
+export const CATEGORY_TABLES: Record<Category, readonly TableName[]> = {
+  profile: ['profile', 'equipment', 'settings'],
+  workouts: ['plans', 'scheduled', 'sessions', 'setLogs', 'soreness'],
+  bodyweight: ['bodyWeights'],
+  yoga: ['yogaSessions'],
+  food: ['foodLog'],
+}
+export const CATEGORY_LABEL: Record<Category, string> = {
+  profile: 'Profile, equipment and settings', workouts: 'Workout plans, sessions and sets', bodyweight: 'Body weight entries', yoga: 'Yoga sessions', food: 'Food log',
+}
+/** Food is personal, so it is off unless the person turns it on. */
+export const DEFAULT_CATEGORIES: Category[] = ['profile', 'workouts', 'bodyweight', 'yoga']
+
+const tablesOf = (cats: readonly Category[]): TableName[] => cats.flatMap((c) => [...CATEGORY_TABLES[c]])
 
 export interface BackupFile {
   format: typeof BACKUP_FORMAT
@@ -17,16 +36,22 @@ export interface BackupFile {
   exportedAt: string
   appVersion: string
   schemaVersion: number
-  /** True when the food log is part of this file. */
+  /** The categories in this file. Anything not listed is left alone on import. */
+  includes: Category[]
+  /** True when the food log is part of this file (kept for older readers). */
   includesFood?: boolean
   data: Record<TableName, unknown[]>
 }
 
-export async function exportBackup(opts: { includeFood?: boolean } = {}): Promise<BackupFile> {
+export async function exportBackup(opts: { includeFood?: boolean; categories?: Category[] } = {}): Promise<BackupFile> {
+  const categories = opts.categories ?? (opts.includeFood ? [...DEFAULT_CATEGORIES, 'food' as const] : DEFAULT_CATEGORIES)
   const data = {} as Record<TableName, unknown[]>
-  for (const t of CORE_TABLES) data[t] = await db.table(t).toArray()
-  data.foodLog = opts.includeFood ? await db.table('foodLog').toArray() : []
-  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, includesFood: !!opts.includeFood, exportedAt: nowIso(), appVersion: APP_VERSION, schemaVersion: DB_SCHEMA_VERSION, data }
+  const wanted = new Set(tablesOf(categories))
+  for (const t of ALL_TABLES) data[t] = wanted.has(t) ? await db.table(t).toArray() : []
+  return {
+    format: BACKUP_FORMAT, version: BACKUP_VERSION, includes: [...categories], includesFood: categories.includes('food'),
+    exportedAt: nowIso(), appVersion: APP_VERSION, schemaVersion: DB_SCHEMA_VERSION, data,
+  }
 }
 
 export function backupFilename(d = new Date()): string {
@@ -92,7 +117,7 @@ const CHECKS: Record<TableName, Check> = {
     !isStr(r.id) ? 'missing id'
     : !isStr(r.date) || !DATE.test(r.date) ? 'bad date'
     : !oneOf(r.mealCategory, ['breakfast', 'lunch', 'dinner', 'evening_snacks', 'other']) ? 'bad meal category'
-    : r.calories !== undefined && (!isNum(r.calories) || r.calories < 0 || r.calories > 20000) ? 'bad calories' : null,
+    : r.kcal !== undefined && (!isNum(r.kcal) || r.kcal < 0 || r.kcal > 20000) ? 'bad calories' : null,
   bodyWeights: (r) => (!isStr(r.id) ? 'missing id' : !isNum(r.value) || r.value <= 0 ? 'bad value' : !oneOf(r.unit, UNITS) ? 'bad unit' : !isStr(r.date) || !DATE.test(r.date) ? 'bad date' : null),
 }
 
@@ -102,26 +127,47 @@ const KEY: Record<TableName, string> = {
 
 export type ParseResult = { ok: true; backup: BackupFile } | { ok: false; error: string }
 
+/** The largest file this app will read. A real backup is far smaller. */
+export const MAX_IMPORT_BYTES = 50 * 1024 * 1024
+
+function includesOf(raw: Record<string, unknown>, version: number): Category[] | null {
+  if (version >= 3) {
+    if (!Array.isArray(raw.includes) || raw.includes.some((c) => !oneOf(c, CATEGORIES))) return null
+    return CATEGORIES.filter((c) => (raw.includes as string[]).includes(c))
+  }
+  // Older files: everything except food, plus food when the file said so.
+  return raw.includesFood === true ? [...DEFAULT_CATEGORIES, 'food'] : [...DEFAULT_CATEGORIES]
+}
+
 export function parseBackup(text: string): ParseResult {
+  if (text.length > MAX_IMPORT_BYTES) return { ok: false, error: 'That file is too large to be a Lift backup.' }
   let raw: unknown
   try {
     raw = JSON.parse(text)
   } catch {
     return { ok: false, error: 'This file is not valid JSON. Pick a backup file made by this app.' }
   }
+  if (isObj(raw) && raw.format === 'lift-encrypted') return { ok: false, error: 'This file is password-protected. Enter its password to open it.' }
   if (!isObj(raw) || raw.format !== BACKUP_FORMAT) return { ok: false, error: 'This is not a Lift backup file.' }
   if (!isNum(raw.version) || raw.version > BACKUP_VERSION || raw.version < 1) {
     return { ok: false, error: `Backup format version ${String(raw.version)} is not supported by this app version.` }
   }
   if (!isObj(raw.data)) return { ok: false, error: 'The backup has no data section.' }
+  const includes = includesOf(raw, raw.version)
+  if (!includes) return { ok: false, error: 'The backup lists categories this app does not know.' }
+  if (includes.length === 0) return { ok: false, error: 'The backup says it contains nothing.' }
+  const wanted = new Set(tablesOf(includes))
   const data = {} as Record<TableName, unknown[]>
-  for (const t of TABLES) {
+  for (const t of ALL_TABLES) {
+    // A category the file does not claim is ignored, even if rows are present.
+    if (!wanted.has(t)) { data[t] = []; continue }
     let rows = (raw.data as Record<string, unknown>)[t] ?? []
     // Older backups store height and weight as typed. Convert them the same way the database upgrade does.
     if (t === 'profile' && Array.isArray(rows) && raw.version < 2) {
       rows = rows.map((p) => (isObj(p) ? upgradeProfileV2(p) : p))
     }
     if (!Array.isArray(rows)) return { ok: false, error: `The "${t}" section is damaged.` }
+    if (rows.length > 500_000) return { ok: false, error: `The "${t}" section is too large.` }
     const seen = new Set<string>()
     for (const [i, row] of rows.entries()) {
       if (!isObj(row)) return { ok: false, error: `${t} record ${i + 1} is not an object.` }
@@ -143,56 +189,97 @@ export function parseBackup(text: string): ParseResult {
     backup: {
       format: BACKUP_FORMAT, version: raw.version, exportedAt: String(raw.exportedAt ?? ''),
       appVersion: String(raw.appVersion ?? ''), schemaVersion: Number(raw.schemaVersion ?? 0),
-      includesFood: raw.includesFood === true, data,
+      includes, includesFood: includes.includes('food'), data,
     },
   }
 }
 
 export interface BackupPreview {
   exportedAt: string
+  formatVersion: number
+  appVersion: string
+  includes: Category[]
   profileName?: string
   workouts: number
   yogaSessions: number
   foodEntries: number
+  bodyWeights: number
   includesFood: boolean
   sets: number
   firstDate?: string
   lastDate?: string
+  /** The most recent workouts in the file, for a read-only look. Shown as plain text. */
+  recent: { date: string; title: string }[]
 }
 
+/** A read-only summary of a parsed file. It never touches the database. */
 export function previewBackup(b: BackupFile): BackupPreview {
-  const sessions = b.data.sessions as { date: string }[]
+  const sessions = b.data.sessions as { date: string; title?: string }[]
   const dates = sessions.map((s) => s.date).sort()
   const profile = b.data.profile[0] as { displayName?: string } | undefined
+  const recent = [...sessions].sort((x, y) => y.date.localeCompare(x.date)).slice(0, 8).map((s) => ({ date: s.date, title: String(s.title ?? 'Workout').slice(0, 80) }))
   return {
-    exportedAt: b.exportedAt, profileName: profile?.displayName, workouts: sessions.length,
-    sets: b.data.setLogs.length, yogaSessions: b.data.yogaSessions.length, foodEntries: b.data.foodLog.length, includesFood: !!b.includesFood, firstDate: dates[0], lastDate: dates[dates.length - 1],
+    exportedAt: b.exportedAt, formatVersion: b.version, appVersion: b.appVersion, includes: b.includes,
+    profileName: profile?.displayName === undefined ? undefined : String(profile.displayName).slice(0, 60),
+    workouts: sessions.length, sets: b.data.setLogs.length, yogaSessions: b.data.yogaSessions.length, foodEntries: b.data.foodLog.length,
+    bodyWeights: b.data.bodyWeights.length, includesFood: b.includes.includes('food'), firstDate: dates[0], lastDate: dates[dates.length - 1], recent,
   }
 }
 
+export interface ImportReport {
+  mode: 'replace' | 'merge'
+  /** Records written to this device. */
+  added: number
+  /** Records that were already here (same id), left exactly as they were. Merge only. */
+  skipped: number
+  /** Always 0 on success: an import is all or nothing, so a failure changes nothing and throws instead. */
+  failed: number
+  perTable: Partial<Record<TableName, { added: number; skipped: number }>>
+}
+
 /**
- * replace: wipe this phone's data and load the backup.
- * merge:   keep everything here and add only records that are not already present
- *          (same id = already present). The existing profile and equipment are kept.
- * Runs in ONE transaction: if anything throws, nothing is changed.
+ * replace: erase the categories in the file on this device, then load them. Categories not in the file are untouched.
+ * merge:   keep everything here and add only records that are not already present (same id = already present).
+ *          Nothing already on the device is overwritten. A saved profile is kept. Sets whose workout was already
+ *          here are skipped too, so a workout is never mixed from two copies.
+ * The whole import runs in ONE transaction on data that was validated first: if anything throws, nothing is changed.
  */
-export async function importBackup(b: BackupFile, mode: 'replace' | 'merge'): Promise<void> {
+export async function importBackup(b: BackupFile, mode: 'replace' | 'merge'): Promise<ImportReport> {
+  const report: ImportReport = { mode, added: 0, skipped: 0, failed: 0, perTable: {} }
+  const tables = tablesOf(b.includes)
   await db.transaction('rw', db.tables, async () => {
-    for (const t of TABLES) {
+    const skippedSessions = new Set<string>()
+    for (const t of ALL_TABLES) {
+      if (!tables.includes(t)) continue
       const table = db.table(t)
       const rows = b.data[t]
-      // A file without food leaves the food log on this phone exactly as it is.
-      if (t === 'foodLog' && !b.includesFood) continue
       if (mode === 'replace') {
         await table.clear()
         await table.bulkAdd(rows)
-      } else {
-        const keyName = KEY[t]
-        const existing = new Set((await table.toArray()).map((r) => String((r as Record<string, unknown>)[keyName])))
-        const fresh = rows.filter((r) => !existing.has(String((r as Record<string, unknown>)[keyName])))
-        if (t === 'profile' && existing.size > 0) continue
-        await table.bulkAdd(fresh)
+        report.perTable[t] = { added: rows.length, skipped: 0 }
+        report.added += rows.length
+        continue
       }
+      const keyName = KEY[t]
+      const existing = new Set((await table.toArray()).map((r) => String((r as Record<string, unknown>)[keyName])))
+      let fresh = rows.filter((r) => !existing.has(String((r as Record<string, unknown>)[keyName])))
+      if (t === 'sessions') for (const r of rows) if (existing.has(String((r as { id: string }).id))) skippedSessions.add((r as { id: string }).id)
+      if (t === 'setLogs') fresh = fresh.filter((r) => !skippedSessions.has((r as { sessionId: string }).sessionId))
+      if (t === 'profile' && existing.size > 0) fresh = []
+      await table.bulkAdd(fresh)
+      report.perTable[t] = { added: fresh.length, skipped: rows.length - fresh.length }
+      report.added += fresh.length
+      report.skipped += rows.length - fresh.length
     }
   })
+  return report
 }
+
+/** What is on this device right now, shown next to a preview so the two are never confused. */
+export async function deviceSummary(): Promise<{ workouts: number; yogaSessions: number; foodEntries: number; bodyWeights: number }> {
+  return {
+    workouts: await db.sessions.count(), yogaSessions: await db.yogaSessions.count(), foodEntries: await db.foodLog.count(), bodyWeights: await db.bodyWeights.count(),
+  }
+}
+
+export const encryptedBackupFilename = (d = new Date()): string => `lift-backup-encrypted-${d.toISOString().slice(0, 10)}.json`

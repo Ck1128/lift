@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 import { db, useDatabase } from './db/schema'
 import { exportBackup } from './db/backup'
+import { encryptText } from './db/crypto'
 import { profileToForm, resetAllData, saveProfile, scheduledOn } from './db/repo'
 
 const NOW = new Date(2026, 9, 21, 12, 0, 0) // Wednesday, a training day in the default plan
@@ -668,45 +669,286 @@ describe('settings', () => {
     expect(await screen.findByText(/apple health is not connected/i)).toBeInTheDocument()
   })
 
-  it('exports a backup and restores from a file (merge)', async () => {
+  async function readBlob(blob: Blob): Promise<string> {
+    return new Promise((res, rej) => {
+      const r = new FileReader()
+      r.onload = () => res(String(r.result))
+      r.onerror = () => rej(r.error)
+      r.readAsText(blob)
+    })
+  }
+
+  it('offers an encrypted export by default, needs a matching password, and clears the password afterwards', async () => {
     await seed()
-    URL.createObjectURL = vi.fn(() => 'blob:x')
+    await db.profile.toCollection().modify({ displayName: 'Sam Private' })
+    let blob: Blob | null = null
+    URL.createObjectURL = vi.fn((b: Blob) => { blob = b; return 'blob:x' })
     URL.revokeObjectURL = vi.fn()
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const user = userEvent.setup()
     render(<App />)
     await user.click(await tab('Settings'))
-    expect(await screen.findByText(/treat it as private health information/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /export backup/i }))
-    expect(await screen.findByText(/backup downloaded/i)).toBeInTheDocument()
-    expect(click).toHaveBeenCalled()
+    expect(await screen.findByRole('radio', { name: /encrypted export \(recommended\)/i })).toBeChecked()
+    const go = screen.getByRole('button', { name: 'Export encrypted backup' })
+    expect(go).toBeDisabled()
+    await user.type(screen.getByLabelText(/^password \(at least 8/i), 'correct horse')
+    await user.type(screen.getByLabelText(/type the password again/i), 'different one')
+    expect(go).toBeDisabled()
+    expect(screen.getByText(/do not match/i)).toBeInTheDocument()
+    await user.clear(screen.getByLabelText(/type the password again/i))
+    await user.type(screen.getByLabelText(/type the password again/i), 'correct horse')
+    expect(go).toBeEnabled()
+    await user.click(go)
+    expect(await screen.findByText(/and encrypted\. Keep the password/i)).toBeInTheDocument()
+    const text = await readBlob(blob as unknown as Blob)
+    expect(JSON.parse(text).format).toBe('lift-encrypted')
+    expect(text).not.toContain('Sam Private')
+    expect(text).not.toContain('correct horse')
+    expect(screen.getByLabelText(/^password \(at least 8/i)).toHaveValue('')
+  }, 30000)
 
-    const input = screen.getByLabelText(/restore from a backup file/i)
+  it('lets you choose categories, requires at least one, and exports only those', async () => {
+    await seed()
+    await db.foodLog.add({ id: 'f', date: '2026-10-20', mealCategory: 'lunch', name: 'Rice', provider: 'x', providerId: 'x', source: 'x', state: 'ready', portionValue: 1, portionUnit: 'g', kcal: 100, basis: { basis: 'g', kcalPer100: 1, unitSize: {} }, createdAt: 'x', updatedAt: 'x' } as never)
+    let blob: Blob | null = null
+    URL.createObjectURL = vi.fn((b: Blob) => { blob = b; return 'blob:x' })
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await tab('Settings'))
+    expect(await screen.findByRole('checkbox', { name: /food log/i })).not.toBeChecked()
+    for (const n of [/profile, equipment/i, /workout plans/i, /body weight entries/i, /yoga sessions/i]) await user.click(screen.getByRole('checkbox', { name: n }))
+    expect(screen.getByText(/choose at least one thing/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: /plain file/i }))
+    expect(screen.getByRole('button', { name: /export plain backup/i })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /food log/i }))
+    expect(screen.getByText(/this file will include: food log\./i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /export plain backup/i }))
+    await user.click(within(await screen.findByRole('dialog', { name: /without a password/i })).getByRole('button', { name: /export without a password/i }))
+    await waitFor(() => expect(blob).not.toBeNull())
+    const file = JSON.parse(await readBlob(blob as unknown as Blob))
+    expect(file.includes).toEqual(['food'])
+    expect(file.data.foodLog).toHaveLength(1)
+    expect(file.data.profile).toHaveLength(0)
+  })
+
+  it('shows a plain-export warning and exports only after confirming', async () => {
+    await seed()
+    let blob: Blob | null = null
+    URL.createObjectURL = vi.fn((b: Blob) => { blob = b; return 'blob:x' })
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await tab('Settings'))
+    await user.click(await screen.findByRole('radio', { name: /plain file/i }))
+    expect(screen.getByText(/readable by anyone who gets the file/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /export plain backup/i }))
+    const dlg = await screen.findByRole('dialog', { name: /without a password/i })
+    expect(blob).toBeNull()
+    await user.click(within(dlg).getByRole('button', { name: 'Cancel' }))
+    expect(blob).toBeNull()
+    await user.click(screen.getByRole('button', { name: /export plain backup/i }))
+    await user.click(within(await screen.findByRole('dialog', { name: /without a password/i })).getByRole('button', { name: /export without a password/i }))
+    await waitFor(() => expect(blob).not.toBeNull())
+    expect(JSON.parse(await readBlob(blob as unknown as Blob)).format).toBe('lift-backup')
+  })
+
+  it('previews an import without changing anything, then merges and reports counts', async () => {
+    await seed()
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await tab('Settings'))
+    const input = await screen.findByLabelText(/import data from a backup file/i)
     await user.upload(input, new File(['not json'], 'bad.json', { type: 'application/json' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/not valid json/i)
 
+    await db.yogaSessions.add({ id: 'y1', date: '2026-10-20', style: 'hatha', status: 'completed', durationSeconds: 60 } as never)
     const good = JSON.stringify(await exportBackup())
+    await db.yogaSessions.clear()
+    const before = { sessions: await db.sessions.count(), yoga: await db.yogaSessions.count() }
     await user.upload(input, new File([good], 'good.json', { type: 'application/json' }))
-    expect(await screen.findByText(/backup preview/i)).toBeInTheDocument()
-    expect(screen.getByText(/0 workouts/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /merge backup/i }))
+    const preview = await screen.findByRole('region', { name: /preview of the backup file/i })
+    expect(within(preview).getByText(/nothing has been imported yet/i)).toBeInTheDocument()
+    expect(within(preview).getByText(/1 yoga sessions/)).toBeInTheDocument()
+    expect(within(preview).getByText(/already on this device: 0 workouts, 0 yoga sessions/i)).toBeInTheDocument()
+    expect(await db.yogaSessions.count()).toBe(before.yoga) // preview wrote nothing
+
+    await user.click(within(preview).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('region', { name: /preview of the backup file/i })).not.toBeInTheDocument()
+    expect(await db.yogaSessions.count()).toBe(0)
+
+    await user.upload(input, new File([good], 'good.json', { type: 'application/json' }))
+    await user.click(await screen.findByRole('button', { name: /merge into this device/i }))
     await user.click(within(await screen.findByRole('dialog', { name: /merge this backup/i })).getByRole('button', { name: 'Merge' }))
-    expect(await screen.findByText(/backup merged/i)).toBeInTheDocument()
-    click.mockRestore()
+    const result = await screen.findByRole('status', { name: /import result/i })
+    expect(result).toHaveTextContent(/Added: \d+/)
+    expect(result).toHaveTextContent(/Failed: 0/)
+    expect(await db.yogaSessions.count()).toBe(1)
+    expect(await db.sessions.count()).toBe(before.sessions)
   })
 
-  it('deletes all data only after confirmation and returns to onboarding', async () => {
+  it('asks for the password of an encrypted file, rejects a wrong one, and never keeps it', async () => {
     await seed()
+    const file = JSON.stringify(await encryptText(JSON.stringify(await exportBackup()), 'right password', { iterations: 100_000 }))
     const user = userEvent.setup()
     render(<App />)
     await user.click(await tab('Settings'))
-    await user.click(await screen.findByRole('button', { name: /delete all data on this phone/i }))
-    await user.click(within(await screen.findByRole('dialog', { name: /delete all data/i })).getByRole('button', { name: 'Cancel' }))
-    expect(await db.profile.count()).toBe(1)
-    await user.click(screen.getByRole('button', { name: /delete all data on this phone/i }))
-    await user.click(within(await screen.findByRole('dialog', { name: /delete all data/i })).getByRole('button', { name: /delete everything/i }))
-    expect(await screen.findByRole('heading', { name: 'Welcome' })).toBeInTheDocument()
-    expect(await db.profile.count()).toBe(0)
+    const input = await screen.findByLabelText(/import data from a backup file/i)
+    await user.upload(input, new File([file], 'enc.json', { type: 'application/json' }))
+    expect(await screen.findByText(/this backup is password-protected/i)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /preview of the backup file/i })).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText(/password for enc\.json/i), 'wrong password')
+    await user.click(screen.getByRole('button', { name: 'Open file' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/wrong password, or the file was changed/i)
+    expect(screen.queryByRole('region', { name: /preview of the backup file/i })).not.toBeInTheDocument()
+    await user.clear(screen.getByLabelText(/password for enc\.json/i))
+    await user.type(screen.getByLabelText(/password for enc\.json/i), 'right password')
+    await user.click(screen.getByRole('button', { name: 'Open file' }))
+    expect(await screen.findByRole('region', { name: /preview of the backup file/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/password for enc\.json/i)).not.toBeInTheDocument()
+    for (const store of [window.localStorage, window.sessionStorage]) expect(JSON.stringify({ ...store })).not.toContain('right password')
+  }, 30000)
+
+  it('replace is behind its own warning, a checkbox and a typed phrase', async () => {
+    await seed()
+    const good = JSON.stringify(await exportBackup())
+    await db.yogaSessions.add({ id: 'local-only', date: '2026-10-01', style: 'yin', status: 'completed', durationSeconds: 1 } as never)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await tab('Settings'))
+    await user.upload(await screen.findByLabelText(/import data from a backup file/i), new File([good], 'good.json', { type: 'application/json' }))
+    await screen.findByRole('region', { name: /preview of the backup file/i })
+    await user.click(screen.getByText(/replace instead/i))
+    await user.click(screen.getByRole('button', { name: /replace this device's data/i }))
+    const dlg = await screen.findByRole('dialog', { name: /replace the data on this device/i })
+    const go = within(dlg).getByRole('button', { name: /erase and restore/i })
+    expect(go).toBeDisabled()
+    await user.click(within(dlg).getByRole('checkbox'))
+    expect(go).toBeDisabled()
+    await user.type(within(dlg).getByLabelText(/type replace my data/i), 'REPLACE MY DATA')
+    expect(go).toBeEnabled()
+    await user.click(go)
+    await waitFor(async () => expect(await db.yogaSessions.count()).toBe(0))
+  })
+
+  describe('delete all data', () => {
+    const openStep1 = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole('button', { name: /delete all data on this device\.\.\./i }))
+      return screen.findByRole('dialog', { name: /step 1 of 3/i })
+    }
+    const toStep3 = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(within(await openStep1(user)).getByRole('button', { name: /i understand, continue/i }))
+      const step2 = await screen.findByRole('dialog', { name: /step 2 of 3/i })
+      await user.type(within(step2).getByLabelText(/confirmation phrase/i), 'DELETE MY DATA')
+      await user.click(within(step2).getByRole('button', { name: 'Continue' }))
+      return screen.findByRole('dialog', { name: /step 3 of 3/i })
+    }
+    const answerOf = (dlg: HTMLElement) => {
+      const q = within(dlg).getByLabelText(/what is/i)
+      const text = (dlg.querySelector(`label[for="${q.id}"]`) as HTMLElement).textContent ?? ''
+      const m = /(\d+) ([+\-×]) (\d+)/.exec(text)!
+      const [a, op, b] = [Number(m[1]), m[2], Number(m[3])]
+      return String(op === '+' ? a + b : op === '-' ? a - b : a * b)
+    }
+
+    it('lists what will be deleted and can be cancelled at every step', async () => {
+      await seed()
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(await tab('Settings'))
+      const s1 = await openStep1(user)
+      expect(within(s1).getByText(/permanent on this device/i)).toBeInTheDocument()
+      expect(within(s1).getByText(/yoga sessions/i)).toBeInTheDocument()
+      expect(within(s1).getByText(/food log/i)).toBeInTheDocument()
+      await user.click(within(s1).getByRole('button', { name: 'Cancel' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      await user.click(within(await openStep1(user)).getByRole('button', { name: /i understand, continue/i }))
+      const s2 = await screen.findByRole('dialog', { name: /step 2 of 3/i })
+      await user.click(within(s2).getByRole('button', { name: 'Cancel' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      const s3 = await toStep3(user)
+      await user.click(within(s3).getByRole('button', { name: /keep my data/i }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(await db.profile.count()).toBe(1)
+    })
+
+    it('cannot be bypassed by a wrong phrase, a wrong answer, or the Enter key, and a reopened flow starts over', async () => {
+      await seed()
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(await tab('Settings'))
+      await user.click(within(await openStep1(user)).getByRole('button', { name: /i understand, continue/i }))
+      const s2 = await screen.findByRole('dialog', { name: /step 2 of 3/i })
+      const phrase = within(s2).getByLabelText(/confirmation phrase/i)
+      expect(within(s2).getByRole('button', { name: 'Continue' })).toBeDisabled()
+      await user.type(phrase, 'delete my data{Enter}') // wrong case, and Enter
+      expect(within(s2).getByRole('button', { name: 'Continue' })).toBeDisabled()
+      expect(screen.queryByRole('dialog', { name: /step 3 of 3/i })).not.toBeInTheDocument()
+      await user.clear(phrase)
+      await user.type(phrase, 'DELETE MY DATA{Enter}')
+      expect(screen.queryByRole('dialog', { name: /step 3 of 3/i })).not.toBeInTheDocument() // Enter does not advance
+      await user.click(within(s2).getByRole('button', { name: 'Continue' }))
+
+      const s3 = await screen.findByRole('dialog', { name: /step 3 of 3/i })
+      const final = within(s3).getByRole('button', { name: /delete everything permanently/i })
+      expect(final).toBeDisabled()
+      const box = within(s3).getByLabelText(/what is/i)
+      await user.type(box, `${Number(answerOf(s3)) + 1}{Enter}`)
+      expect(final).toBeDisabled()
+      expect(await db.profile.count()).toBe(1)
+      await user.clear(box)
+      await user.type(box, `${answerOf(s3)}{Enter}`)
+      expect(final).toBeEnabled()
+      expect(await db.profile.count()).toBe(1) // Enter did not delete
+
+      // cancel, then reopen: nothing from the earlier attempt carries over
+      await user.click(within(s3).getByRole('button', { name: /keep my data/i }))
+      await user.click(within(await openStep1(user)).getByRole('button', { name: /i understand, continue/i }))
+      expect(within(await screen.findByRole('dialog', { name: /step 2 of 3/i })).getByLabelText(/confirmation phrase/i)).toHaveValue('')
+      expect(await db.profile.count()).toBe(1)
+    })
+
+    it('deletes once, even on a double click, then shows the first-run setup with a completion message', async () => {
+      await seed()
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(await tab('Settings'))
+      const s3 = await toStep3(user)
+      await user.type(within(s3).getByLabelText(/what is/i), answerOf(s3))
+      await user.dblClick(within(s3).getByRole('button', { name: /delete everything permanently/i }))
+      expect(await screen.findByRole('heading', { name: 'Welcome' })).toBeInTheDocument()
+      expect(await screen.findByText(/all data on this device was deleted/i)).toBeInTheDocument()
+      for (const t of db.tables) expect(await t.count()).toBe(0)
+    })
+
+    it('reports a failure honestly, keeps the data, and can be retried', async () => {
+      await seed()
+      const proto = Object.getPrototypeOf(db.foodLog) as { clear: (this: { name: string }) => Promise<void> }
+      const real = proto.clear
+      const spy = vi.spyOn(proto, 'clear').mockImplementation(function (this: { name: string }) {
+        return this.name === 'foodLog' ? Promise.reject(new Error('disk full')) : real.call(this)
+      })
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(await tab('Settings'))
+      const s3 = await toStep3(user)
+      await user.type(within(s3).getByLabelText(/what is/i), answerOf(s3))
+      await user.click(within(s3).getByRole('button', { name: /delete everything permanently/i }))
+      expect(await within(s3).findByRole('alert')).toHaveTextContent(/did not finish/i)
+      expect(screen.queryByText(/all data on this device was deleted/i)).not.toBeInTheDocument()
+      expect(await db.profile.count()).toBe(1)
+
+      spy.mockRestore()
+      await user.click(within(s3).getByRole('button', { name: /try again/i }))
+      await user.type(within(s3).getByLabelText(/what is/i), answerOf(s3))
+      await user.click(within(s3).getByRole('button', { name: /delete everything permanently/i }))
+      expect(await screen.findByRole('heading', { name: 'Welcome' })).toBeInTheDocument()
+      expect(await db.profile.count()).toBe(0)
+    })
   })
 })
 

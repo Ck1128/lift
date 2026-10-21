@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { profileToForm, saveProfile } from '../db/repo'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView, type ProfileExtra } from '../components/ProfileFormView'
+import { ImportPanel } from '../components/BackupPanel'
 import { Button, Card, ScreenHeader } from '../components/ui'
 import type { ProfileForm } from '../engine/validateProfile'
 import type { GymType, LocationType } from '../engine/types'
 
-export function Onboarding({ onBegin, onDone }: { onBegin: () => void; onDone: () => void }) {
+export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: { onBegin: () => void; onDone: () => void; deletedNotice?: boolean; onDismissNotice?: () => void }) {
   const [step, setStep] = useState<'profile' | 'equipment'>('profile')
   const [chosen, setChosen] = useState<{ location: LocationType; gymType: GymType; unit: 'lb' | 'kg' }>({ location: 'gym', gymType: 'planet_fitness', unit: 'lb' })
 
@@ -30,6 +31,12 @@ export function Onboarding({ onBegin, onDone }: { onBegin: () => void; onDone: (
   }
   return (
     <>
+      {deletedNotice && (
+        <div className="notice" role="status">
+          <p><strong>All data on this device was deleted.</strong> You are back at first-run setup. Start fresh below, or restore a backup at the bottom of this page.</p>
+          <Button variant="small" onClick={onDismissNotice}>OK</Button>
+        </div>
+      )}
       <ScreenHeader title="Welcome" subtitle="Step 1 of 2. A few questions so your workouts fit you. No account needed, and nothing leaves this phone." />
       <Card>
         <ProfileFormView
@@ -39,6 +46,9 @@ export function Onboarding({ onBegin, onDone }: { onBegin: () => void; onDone: (
           submitLabel="Continue"
           onSubmit={submit}
         />
+      </Card>
+      <Card title="Already have a backup?">
+        <ImportPanel />
       </Card>
     </>
   )

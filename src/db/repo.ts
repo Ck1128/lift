@@ -606,6 +606,36 @@ export async function resetAllData(): Promise<void> {
   })
 }
 
+export type DeleteResult = { ok: true; deleted: number } | { ok: false; error: string; remaining: number }
+
+/**
+ * Deletes everything this app saved on this device, in one transaction, then checks that nothing is left.
+ * It only touches this app's own database: no other browser data and no cached app files are cleared.
+ * If it fails, the transaction rolls back, so the data is still all there and it is safe to try again.
+ */
+export async function deleteAllData(): Promise<DeleteResult> {
+  let deleted = 0
+  try {
+    await db.transaction('rw', db.tables, async () => {
+      for (const t of db.tables) {
+        deleted += await t.count()
+        await t.clear()
+      }
+    })
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'unknown error', remaining: await countAll() }
+  }
+  const remaining = await countAll()
+  if (remaining > 0) return { ok: false, error: 'Some records are still on this device.', remaining }
+  return { ok: true, deleted }
+}
+
+async function countAll(): Promise<number> {
+  let n = 0
+  for (const t of db.tables) n += await t.count()
+  return n
+}
+
 // ---------- per-page and per-exercise weight units ----------
 async function convertSlotUnit(sessionId: string, slotId: string | null, from: WeightUnit, to: WeightUnit): Promise<void> {
   if (from === to) return

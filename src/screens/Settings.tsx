@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { CATALOG } from '../data/catalog'
-import { profileToForm, rebuildPlan, resetAllData, saveProfile, setLocation, setNutritionGuidance, setYogaLevel, updateExclusions } from '../db/repo'
+import { profileToForm, rebuildPlan, saveProfile, setLocation, setNutritionGuidance, setYogaLevel, updateExclusions } from '../db/repo'
 import { APP_VERSION, DB_SCHEMA_VERSION } from '../db/schema'
 import { BackupPanel } from '../components/BackupPanel'
+import { DeleteAllData, DELETE_CATEGORIES } from '../components/DeleteAllData'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
-import { Button, Card, Chips, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
+import { Button, Card, Chips, Dialog, ScreenHeader } from '../components/ui'
 import { LEVEL_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
 import { APPLE_HEALTH_NOTE } from '../engine/guidance'
 
@@ -17,7 +18,6 @@ const PATTERNS: { id: Pattern; label: string }[] = [
 export function Settings({ profile, onReset }: { profile: Profile; onReset: () => void }) {
   const [editLocation, setEditLocation] = useState<LocationType>(profile.preferredLocation)
   const [search, setSearch] = useState('')
-  const [confirmReset, setConfirmReset] = useState(false)
   const [note, setNote] = useState(profile.limitationNote ?? '')
   const [levelAsk, setLevelAsk] = useState<{ proceed: (m: 'update' | 'keep') => void } | null>(null)
 
@@ -130,9 +130,10 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
       </Card>
       <Card title="Backup and restore"><BackupPanel /></Card>
 
-      <Card title="Delete my data">
-        <p className="hint">Removes your profile, plans and history from this phone only.</p>
-        <Button variant="danger" onClick={() => setConfirmReset(true)}>Delete all data on this phone</Button>
+      <Card title="Delete all data on this device" className="danger-zone">
+        <p className="hint">Permanently removes everything the app saved on this device. It asks three different questions first. Make a backup first if you might want it.</p>
+        <ul className="plain hint">{DELETE_CATEGORIES.map((c) => <li key={c}>{c}</li>)}</ul>
+        <DeleteAllData onDeleted={onReset} />
       </Card>
 
       <Card title="About and privacy">
@@ -153,16 +154,6 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
         </Dialog>
       )}
 
-      {confirmReset && (
-        <ConfirmDialog
-          title="Delete all data?"
-          message="This erases your profile, equipment, plans and every saved workout on this phone. It cannot be undone. Export a backup first if you might want it back."
-          confirmLabel="Delete everything"
-          danger
-          onCancel={() => setConfirmReset(false)}
-          onConfirm={async () => { setConfirmReset(false); await resetAllData(); onReset() }}
-        />
-      )}
     </>
   )
 }
