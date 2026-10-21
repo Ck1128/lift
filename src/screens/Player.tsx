@@ -10,7 +10,9 @@ import { EQUIPMENT_LABEL, type Exercise, type EquipmentSet, type PlannedExercise
 import { useNow } from '../hooks/app'
 import { addRest, formatClock, isFinished, isPaused, pauseRest, remainingMs, resumeRest, startRest, type RestTimer } from '../engine/restTimer'
 import type { WeightUnit } from '../engine/types'
-import { ExerciseMedia } from '../components/ExerciseMedia'
+import { FeedbackButton } from '../components/Feedback'
+import { ExerciseInfo } from '../components/ExerciseInfo'
+import { WorkoutMuscles } from '../components/WorkoutMuscles'
 import { Button, Card, Chips, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
 
 const clock = (ms: number) => formatClock(ms)
@@ -95,6 +97,13 @@ export function Player({ session, profile, equipment, onFinished }: {
         <Chips label="Workout weight units" options={['lb', 'kg'] as const} value={session.weightUnit} onChange={(u) => void setSessionUnit(session.id, u)} />
         <p className="hint">Each exercise can use its own unit too. The weight itself never changes, only how it is shown.</p>
       </div>
+
+      <Card>
+        <details>
+          <summary>Muscles in this workout</summary>
+          <WorkoutMuscles exerciseIds={session.actualExercises.filter((a) => !a.skipped && session.plannedExercises.find((p) => p.slotId === a.slotId)?.kind !== 'cardio').map((a) => a.exerciseId)} />
+        </details>
+      </Card>
 
       {session.plannedExercises.map((slot) => {
         const actual = session.actualExercises.find((a) => a.slotId === slot.slotId)
@@ -194,15 +203,16 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
   const unit: WeightUnit = logs[0]?.weightUnit ?? pageUnit
   return (
     <Card className={actual.skipped ? 'skipped' : ''}>
-      <p className="big">{cardio ? slot.name : (ex?.name ?? slot.name)}</p>
+      <div className="title-row">
+        <p className="big">{cardio ? slot.name : (ex?.name ?? slot.name)}</p>
+        <FeedbackButton component="Workout exercise" element={ex?.name ?? slot.name} />
+        {!cardio && !actual.skipped && <ExerciseInfo exerciseId={actual.exerciseId} name={ex?.name ?? slot.name} cues={slot.cues} note={slot.loadNote} why={slot.why} />}
+      </div>
       {original && <p className="hint">Replaced {original.name}</p>}
       {cardio ? (
         <p className="muted">Target {slot.durationMinutes} min{slot.intensityCue ? ` · ${slot.intensityCue}` : ''}</p>
       ) : (
         <p className="muted">Target {slot.sets} × {slot.repMin}-{slot.repMax} reps · rest {slot.restSeconds}s</p>
-      )}
-      {slot.cues && slot.cues.length > 0 && !actual.skipped && (
-        <ul className="plain cues" aria-label="Form cues">{slot.cues.map((c, i) => <li key={i}>{c}</li>)}</ul>
       )}
       {actual.skipped ? (
         <div className="inline">
@@ -246,11 +256,6 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
             </Button>
           </div>
           {actual.painReported && <p className="notice">Noted. The weight will not go up next time. If something hurts, stop, and consider asking a qualified professional.</p>}
-          <details>
-            <summary className="muted">Weight tip and how-to</summary>
-            <p className="hint">{slot.loadNote}</p>
-            <ExerciseMedia exerciseId={actual.exerciseId} />
-          </details>
         </>
       )}
     </Card>

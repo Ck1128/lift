@@ -3,9 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { generateFor, getEquipment, scheduledOn, setCardioChoice, startSession } from '../db/repo'
 import { useQuery } from '../hooks/app'
-import { ExerciseMedia } from '../components/ExerciseMedia'
+import { ExerciseInfo, InfoButton } from '../components/ExerciseInfo'
+import { MUSCLE_CATEGORIES } from '../engine/feedback'
+import { WorkoutMuscles } from '../components/WorkoutMuscles'
 import { DurationPicker } from '../components/HomeParts'
-import { Button, Card, EmptyState, ScreenHeader } from '../components/ui'
+import { Button, Card, Dialog, EmptyState, ScreenHeader } from '../components/ui'
 import { Player } from './Player'
 import { SessionSummary } from './SessionDetail'
 import { MUSCLE_LABEL, type Profile } from '../engine/types'
@@ -54,6 +56,7 @@ export function Workout({ profile, today }: { profile: Profile; today: string })
 }
 
 function Preview({ scheduledId, profile, today }: { scheduledId: string; profile: Profile; today: string }) {
+  const { navigate } = useRouter()
   const sched = useLiveQuery(() => db.scheduled.get(scheduledId), [scheduledId])
   const equipment = useLiveQuery(() => getEquipment(profile.preferredLocation, profile.weightUnit, profile.gymType), [profile.preferredLocation, profile.weightUnit, profile.gymType])
   const [busy, setBusy] = useState(false)
@@ -97,35 +100,31 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
         <DurationPicker value={w.availableMinutes} onChange={(m) => { if (m !== null && m !== w.availableMinutes) void regenerate(m, false) }} />
       </Card>
 
+      <Card title="Muscles" feedback={{ categories: MUSCLE_CATEGORIES, attach: { label: 'The names of the exercises in this workout', data: { exercises: w.exercises.map((e) => e.name) } } }}>
+        <WorkoutMuscles exerciseIds={w.exercises.filter((e) => e.kind !== 'cardio').map((e) => e.exerciseId)} onChangePlan={() => navigate('/home')} />
+      </Card>
+
       {w.exercises.map((e, i) => {
         const isCardio = e.kind === 'cardio'
         const act = isCardio ? cardioById(e.exerciseId) : undefined
         const kcal = isCardio && act ? cardioCalories(act, e.durationMinutes ?? 0, profile.weightKg) : null
         return (
           <Card key={e.slotId}>
-            <p className="big">{i + 1}. {e.name}</p>
+            <div className="title-row">
+              <p className="big">{i + 1}. {e.name}</p>
+              {!isCardio && <ExerciseInfo exerciseId={e.exerciseId} name={e.name} cues={e.cues} note={e.loadNote} why={e.why} />}
+              {isCardio && act && <CardioInfo name={e.name} steps={act.instructions} />}
+            </div>
             {isCardio ? (
               <>
                 <p className="muted">{e.durationMinutes} min{e.intensityCue ? ` · ${e.intensityCue}` : ''}</p>
                 {kcal && <p className="hint">Roughly {kcal.low} to {kcal.high} calories (an estimate, not a measurement).</p>}
-                {act && (
-                  <details>
-                    <summary>Show how to do it</summary>
-                    <ol className="steps">{act.instructions.map((t, k) => <li key={k}>{t}</li>)}</ol>
-                  </details>
-                )}
               </>
             ) : (
               <>
                 <p className="muted">{e.sets} sets × {e.repMin}-{e.repMax} reps · rest {e.restSeconds}s</p>
                 <p>{e.suggestedWeight !== undefined ? <strong>Suggested: {formatWeight(e.suggestedWeight, e.loadUnit ?? profile.weightUnit)}</strong> : <span className="muted">Pick your own starting weight</span>}</p>
                 <p className="hint">{e.loadNote}</p>
-                {e.cues && e.cues.length > 0 && <ul className="plain cues" aria-label="Form cues">{e.cues.map((c, k) => <li key={k}>{c}</li>)}</ul>}
-                <p className="hint">{e.why}</p>
-                <details>
-                  <summary>Show how to do it</summary>
-                  <ExerciseMedia exerciseId={e.exerciseId} />
-                </details>
               </>
             )}
           </Card>
@@ -159,6 +158,23 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
       {error && <p className="error" role="alert">{error}</p>}
       <Button disabled={busy} onClick={start}>Start workout</Button>
       <Button variant="ghost" disabled={busy} onClick={() => regenerate(w.availableMinutes, true)}>Build a fresh version</Button>
+    </>
+  )
+}
+
+/** Cardio has instructions but no muscle map, so it gets a simple version of the info dialog. */
+function CardioInfo({ name, steps }: { name: string; steps: string[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <InfoButton label={`About ${name}`} expanded={open} onClick={() => setOpen(true)} />
+      {open && (
+        <Dialog title={name} onClose={() => setOpen(false)}>
+          <ol className="steps">{steps.map((t, k) => <li key={k}>{t}</li>)}</ol>
+          <div className="notice" role="note"><strong>Safety:</strong> keep a pace where you can still talk. Stop if you feel chest pain, dizziness or unusual shortness of breath.</div>
+          <div className="dialog-actions"><button type="button" className="btn" onClick={() => setOpen(false)}>Close</button></div>
+        </Dialog>
+      )}
     </>
   )
 }

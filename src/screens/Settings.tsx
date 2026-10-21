@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { CATALOG } from '../data/catalog'
 import { profileToForm, rebuildPlan, saveProfile, setLocation, setNutritionGuidance, setYogaLevel, updateExclusions } from '../db/repo'
 import { APP_VERSION, DB_SCHEMA_VERSION } from '../db/schema'
@@ -6,14 +6,29 @@ import { BackupPanel } from '../components/BackupPanel'
 import { DeleteAllData, DELETE_CATEGORIES } from '../components/DeleteAllData'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
-import { Button, Card, Chips, Dialog, ScreenHeader } from '../components/ui'
+import { Button, Chips, Dialog, ScreenHeader } from '../components/ui'
 import { LEVEL_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
 import { APPLE_HEALTH_NOTE } from '../engine/guidance'
+import { FeedbackButton, FeedbackForm, setFeedbackIcons, useFeedbackIcons } from '../components/Feedback'
+import { SETTINGS_CATEGORIES } from '../engine/feedback'
 
 const PATTERNS: { id: Pattern; label: string }[] = [
   { id: 'push', label: 'Pushing' }, { id: 'pull', label: 'Pulling' }, { id: 'squat', label: 'Squats' },
   { id: 'hinge', label: 'Hip hinges' }, { id: 'lunge', label: 'Lunges' }, { id: 'core', label: 'Core' }, { id: 'isolation', label: 'Single-muscle accessories' },
 ]
+
+/**
+ * A collapsible group. It is a native <details>, so keyboards and screen readers get the open/closed state for free.
+ * It is never given an `open` attribute: every section starts closed on every load, and the open state is not saved (US-04).
+ */
+function Section({ title, children, danger }: { title: string; children: ReactNode; danger?: boolean }) {
+  return (
+    <details className={`card section${danger ? ' danger-zone' : ''}`}>
+      <summary className="section-head"><span className="card-title">{title}</span><span className="chev" aria-hidden="true" /></summary>
+      <div className="section-body"><div className="section-fb"><FeedbackButton component={title} /></div>{children}</div>
+    </details>
+  )
+}
 
 export function Settings({ profile, onReset }: { profile: Profile; onReset: () => void }) {
   const [editLocation, setEditLocation] = useState<LocationType>(profile.preferredLocation)
@@ -32,9 +47,8 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
     <>
       <ScreenHeader title="Settings" subtitle="Profile, equipment, backup" />
 
-      <Card title="Profile and goals">
-        <details open>
-          <summary>Edit profile, training days and units</summary>
+      <Section title="Profile and goals">
+        <div>
           <ProfileFormView
             initial={profileToForm(profile)}
             initialExtra={{ preferredLocation: profile.preferredLocation, gymType: profile.gymType }}
@@ -43,10 +57,10 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
             onLevelChange={(_from, _to, proceed) => setLevelAsk({ proceed })}
             onSubmit={async (form, _extra, opts) => { await saveProfile(form, { preferredLocation: profile.preferredLocation, gymType: profile.gymType }, new Date(), { levelChange: opts?.levelChange }) }}
           />
-        </details>
-      </Card>
+        </div>
+      </Section>
 
-      <Card title="Yoga and food">
+      <Section title="Yoga and food">
         <div className="field">
           <label htmlFor="yoga-level">Yoga level</label>
           <select id="yoga-level" value={profile.yogaLevel ?? ''} onChange={(e) => void setYogaLevel(e.target.value as TrainingLevel)}>
@@ -60,22 +74,22 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
           <span>Show gentle next-day food guidance after I log food</span>
         </label>
         <p className="hint">Optional and off by default. It is never a diet plan and never tells you to make up for what you ate.</p>
-      </Card>
+      </Section>
 
-      <Card title="Where you train">
+      <Section title="Where you train">
         <Chips label="Training location" options={['gym', 'home'] as const} value={profile.preferredLocation} onChange={(v) => { void setLocation(v); setEditLocation(v) }} format={(v) => (v === 'gym' ? 'Gym' : 'Home')} />
         {profile.preferredLocation === 'gym' && (
           <Chips label="Which gym" options={['planet_fitness', 'generic'] as const} value={profile.gymType} onChange={(v) => void setLocation('gym', v)} format={(v) => (v === 'planet_fitness' ? 'Planet Fitness' : 'Another gym')} />
         )}
         <p className="hint">Home and gym each keep their own equipment list.</p>
-      </Card>
+      </Section>
 
-      <Card title="Equipment">
+      <Section title="Equipment">
         <Chips label="Which list to edit" options={['gym', 'home'] as const} value={editLocation} onChange={setEditLocation} format={(v) => (v === 'gym' ? 'Gym list' : 'Home list')} />
         <EquipmentEditor location={editLocation} gymType={profile.gymType} unit={profile.weightUnit} />
-      </Card>
+      </Section>
 
-      <Card title="Exercises to avoid">
+      <Section title="Exercises to avoid">
         <p className="hint">Excluded exercises and movement types are never chosen or offered as replacements. This app cannot tell you what is safe for your body. If something hurts or you have a medical concern, please talk to a qualified professional.</p>
         <p className="label-like">Movement types to avoid</p>
         <div className="chips">
@@ -105,20 +119,25 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
           <textarea id="limit-note" rows={2} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} onBlur={() => void updateExclusions({ limitationNote: note.trim() || undefined })} />
           <p className="hint">Only for your own reference. The app does not use it to make medical decisions.</p>
         </div>
-      </Card>
+      </Section>
 
-      <Card title="Weekly schedule">
+      <Section title="Weekly schedule">
         <p className="hint">Training days are set in your profile above. If your plan looks out of date, rebuild it. Finished and skipped days are never changed.</p>
         <Button variant="ghost" onClick={() => void rebuildPlan(profile)}>Rebuild upcoming plan</Button>
-      </Card>
+      </Section>
 
-      <Card title="Apple Health and wearables">
+      <Section title="Apple Health and wearables">
         <p className="notice">{APPLE_HEALTH_NOTE.status}</p>
         <p className="hint">{APPLE_HEALTH_NOTE.why}</p>
         <p className="hint">{APPLE_HEALTH_NOTE.alternative}</p>
-      </Card>
+      </Section>
 
-      <Card title="Help">
+      <Section title="Feedback and support">
+        <FeedbackIconsToggle />
+        <FeedbackForm context={{ screen: 'Settings', component: 'Feedback and support' }} categories={SETTINGS_CATEGORIES} />
+      </Section>
+
+      <Section title="Help">
         <ul className="list-tight">
           <li><strong>Back:</strong> use the Back button at the top of any screen. Unsaved changes ask before you leave.</li>
           <li><strong>Units:</strong> pick kg or lb at the top of a page; change one field with the selector beside it.</li>
@@ -127,20 +146,20 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
           <li><strong>Food and yoga:</strong> general wellness guidance, not medical advice. Online food search is off unless you turn it on.</li>
           <li><strong>Export:</strong> Progress, then Export for CSV, JSON or a chart image.</li>
         </ul>
-      </Card>
-      <Card title="Backup and restore"><BackupPanel /></Card>
+      </Section>
+      <Section title="Backup and restore"><BackupPanel /></Section>
 
-      <Card title="Delete all data on this device" className="danger-zone">
+      <Section title="Delete all data on this device" danger>
         <p className="hint">Permanently removes everything the app saved on this device. It asks three different questions first. Make a backup first if you might want it.</p>
         <ul className="plain hint">{DELETE_CATEGORIES.map((c) => <li key={c}>{c}</li>)}</ul>
         <DeleteAllData onDeleted={onReset} />
-      </Card>
+      </Section>
 
-      <Card title="About and privacy">
+      <Section title="About and privacy">
         <p className="muted">Lift version {APP_VERSION} · database v{DB_SCHEMA_VERSION}</p>
         <p className="hint">Your data is stored only on this phone, in the browser's local database. There is no account and no server. If you clear Safari's website data or delete the app, it is gone, so export a backup now and then.</p>
         <p className="hint">Exercise names, steps and photos come from the public-domain free-exercise-db project. Time, weight and calorie figures are estimates.</p>
-      </Card>
+      </Section>
 
       {levelAsk && (
         <Dialog title="Training level changed" onClose={() => setLevelAsk(null)}>
@@ -155,5 +174,15 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
       )}
 
     </>
+  )
+}
+
+function FeedbackIconsToggle() {
+  const on = useFeedbackIcons()
+  return (
+    <label className="check">
+      <input type="checkbox" checked={on} onChange={(e) => setFeedbackIcons(e.target.checked)} />
+      <span>Show the small F feedback buttons next to screens and cards (this device only)</span>
+    </label>
   )
 }

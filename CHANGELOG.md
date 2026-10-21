@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.0 - Phase B3 (branch feature/v2-complete)
+- US-09 One shared muscle model with 14 groups and primary/secondary roles; tests on common and multi-muscle exercises.
+- US-06 Progress now has Results and Recovery. Recovery uses sets, effort, muscle size, frequency and elapsed time; front/back body map, legend, tap for details, honest empty state.
+- US-07/08 Target-muscle map before and during a workout, with overlap against recent training. Informational only.
+- US-03 Exercise instructions moved behind an "i" button (muscles, equipment, form tips, safety).
+- US-04 Settings sections all start collapsed on every load.
+- US-01/02/10 Small F feedback buttons, a Feedback and support section, preview before sharing, share sheet/email/SMS/WhatsApp/file. No built-in contact details; never claims delivery.
+- US-05 Shared visual language applied across tabs (cards, headers, states).
+- See docs/MUSCLES_AND_RECOVERY.md.
+
 ## 2.1.0 - Phase B2 (branch feature/v2-complete)
 - US-062/069 Safe delete: warning, typed phrase, fresh math question; atomic and verified. US-069 migration safety (schema v4).
 - US-063/070 Import with validation, preview (no writes), merge or replace, counts, atomic apply.

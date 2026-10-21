@@ -1,0 +1,180 @@
+import { createContext, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { CATALOG_VERSION } from '../data/catalog'
+import { APP_VERSION, DB_SCHEMA_VERSION } from '../db/schema'
+import {
+  buildReport, CATEGORY_LABEL, CHANNEL_LABEL, collectDiagnostics, configuredDestinations, ELEMENT_CATEGORIES, feedbackProblem, MAX_MESSAGE,
+  performShare, screenshotProblem, SETTINGS_CATEGORIES, type Channel, type FeedbackCategory, type FeedbackContext,
+} from '../engine/feedback'
+import { tracksOf } from '../engine/tracks'
+import { useProfile } from '../hooks/app'
+import { Dialog } from './ui'
+
+/* ---------- show/hide the small F buttons (a per-device preference, off the data model) ---------- */
+const KEY = 'lift.feedbackIcons'
+const listeners = new Set<() => void>()
+const readIcons = (): boolean => { try { return localStorage.getItem(KEY) !== 'off' } catch { return true } }
+export const setFeedbackIcons = (on: boolean) => { try { localStorage.setItem(KEY, on ? 'on' : 'off') } catch { /* private mode: the choice lasts until reload */ } listeners.forEach((l) => l()) }
+export const useFeedbackIcons = (): boolean => useSyncExternalStore((cb) => { listeners.add(cb); return () => { listeners.delete(cb) } }, readIcons, () => true)
+
+/* ---------- scope: which screen we are on, and how to open the dialog ---------- */
+export interface FeedbackOptions { categories?: FeedbackCategory[]; attach?: { label: string; data: unknown } }
+interface Scope { screen: string; open: (ctx: FeedbackContext, opts?: FeedbackOptions) => void }
+const ScopeCtx = createContext<Scope | null>(null)
+export const useFeedbackScope = () => useContext(ScopeCtx)
+
+const SCREEN_NAME: Record<string, string> = { home: 'Home', plan: 'Plan', workout: 'Workout', food: 'Food', progress: 'Progress', settings: 'Settings', yoga: 'Yoga', session: 'Session' }
+export const screenNameOf = (path: string): string => SCREEN_NAME[path.split('?')[0].split('/')[1] ?? 'home'] ?? 'App'
+
+export function FeedbackHost({ path, children }: { path: string; children: ReactNode }) {
+  const [state, setState] = useState<{ ctx: FeedbackContext; opts?: FeedbackOptions } | null>(null)
+  const screen = screenNameOf(path)
+  const scope = useMemo<Scope>(() => ({ screen, open: (ctx, opts) => setState({ ctx, opts }) }), [screen])
+  return (
+    <ScopeCtx.Provider value={scope}>
+      {children}
+      {state && (
+        <Dialog title="Send feedback" onClose={() => setState(null)}>
+          <FeedbackForm context={state.ctx} categories={state.opts?.categories ?? ELEMENT_CATEGORIES} attach={state.opts?.attach} onDone={() => setState(null)} />
+        </Dialog>
+      )}
+    </ScopeCtx.Provider>
+  )
+}
+
+/** The small, unobtrusive "F" next to an element. The letter is decoration; the accessible name says what it does. */
+export function FeedbackButton({ component, element, options }: { component: string; element?: string; options?: FeedbackOptions }) {
+  const scope = useFeedbackScope()
+  const on = useFeedbackIcons()
+  if (!scope || !on) return null
+  const what = element ?? component
+  return (
+    <button type="button" className="icon-btn fb" aria-label={`Send feedback about ${what}`} title="Send feedback" onClick={() => scope.open({ screen: scope.screen, component, element }, options)}>
+      <span aria-hidden="true">F</span>
+    </button>
+  )
+}
+
+/* ---------- the form (used in the dialog and in Settings) ---------- */
+export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach, onDone, defaultCategory }: {
+  context: FeedbackContext
+  categories?: FeedbackCategory[]
+  attach?: { label: string; data: unknown }
+  onDone?: () => void
+  defaultCategory?: FeedbackCategory
+}) {
+  const profile = useProfile()
+  const cfg = useMemo(() => configuredDestinations(), [])
+  const [category, setCategory] = useState<FeedbackCategory>(defaultCategory ?? categories[0])
+  const [message, setMessage] = useState('')
+  const [diag, setDiag] = useState(false)
+  const [attachOn, setAttachOn] = useState(false)
+  const [shot, setShot] = useState<File | null>(null)
+  const [channel, setChannel] = useState<Channel>('share')
+  const [dest, setDest] = useState(cfg.email)
+  const [step, setStep] = useState<'edit' | 'preview'>('edit')
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const needsDest = channel === 'email' || channel === 'sms' || channel === 'whatsapp'
+  const diagnostics = () => collectDiagnostics({ appVersion: APP_VERSION, databaseSchema: DB_SCHEMA_VERSION, catalogVersion: CATALOG_VERSION, tracks: profile ? tracksOf(profile).list : undefined })
+  const report = () => buildReport({ category, message, context, includeDiagnostics: diag, attached: attach && attachOn ? attach : undefined }, diagnostics())
+
+  const pickChannel = (c: Channel) => {
+    setChannel(c)
+    if (c === 'email') setDest(cfg.email)
+    else if (c === 'sms' || c === 'whatsapp') setDest(cfg.phone)
+    else setDest('')
+  }
+  const preview = () => {
+    const p = feedbackProblem(message)
+    if (p) { setError(p); return }
+    setError('')
+    setResult(null)
+    setStep('preview')
+  }
+  const share = async () => {
+    setBusy(true)
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    const r = await performShare({ channel, destination: dest, report: report(), screenshot: shot, ios })
+    setResult(r)
+    setBusy(false)
+  }
+
+  if (step === 'preview') {
+    const rep = report()
+    return (
+      <div>
+        <p className="label-like">Review before sharing</p>
+        <p className="hint">This is exactly what will be put in the message and the file. Nothing has been sent.</p>
+        <pre className="preview" aria-label="Message preview">{rep.text}</pre>
+        <details>
+          <summary className="muted">Attachment file ({rep.filename})</summary>
+          <pre className="preview" aria-label="Attachment preview">{rep.json}</pre>
+        </details>
+        {shot && <p className="hint">Screenshot: {shot.name}. {channel === 'share' ? 'It goes with the share sheet.' : 'Attach it yourself in the app that opens.'}</p>}
+        <ul className="plain hint">
+          <li>Diagnostics: {diag ? 'included' : 'not included'}</li>
+          <li>{attach ? `${attach.label}: ${attachOn ? 'included' : 'not included'}` : 'No workout, food or body data is included.'}</li>
+        </ul>
+        <p className="hint">Sending via: {CHANNEL_LABEL[channel]}{needsDest ? ` to ${dest || '(no destination)'}` : ''}.</p>
+        {result && <p className={result.ok ? 'notice' : 'error'} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn btn-ghost" onClick={() => setStep('edit')}>Back</button>
+          <button type="button" className="btn" disabled={busy} onClick={() => void share()}>{channel === 'file' ? 'Save file' : 'Confirm and share'}</button>
+        </div>
+        {result?.ok && onDone && <button type="button" className="btn btn-ghost" onClick={onDone}>Close</button>}
+      </div>
+    )
+  }
+
+  const id = (s: string) => `fb-${context.component ?? 'g'}-${s}`.replace(/\s+/g, '-')
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); preview() }} noValidate>
+      {(context.component || context.element) && (
+        <p className="hint">About: <strong>{[context.screen, context.component, context.element].filter(Boolean).join(' › ')}</strong></p>
+      )}
+      <div className="field">
+        <label htmlFor={id('cat')}>What kind of feedback?</label>
+        <select id={id('cat')} value={category} onChange={(e) => setCategory(e.target.value as FeedbackCategory)}>
+          {categories.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor={id('msg')}>Your feedback</label>
+        <textarea id={id('msg')} rows={4} maxLength={MAX_MESSAGE} value={message} onChange={(e) => setMessage(e.target.value)} aria-invalid={!!error} aria-describedby={error ? id('err') : undefined} />
+        {error && <p id={id('err')} className="error" role="alert">{error}</p>}
+      </div>
+      <label className="check"><input type="checkbox" checked={diag} onChange={(e) => setDiag(e.target.checked)} /><span>Include a diagnostic report (app version, device type, screen size, online or offline). No workout or health data.</span></label>
+      {attach && (
+        <label className="check"><input type="checkbox" checked={attachOn} onChange={(e) => setAttachOn(e.target.checked)} /><span>Also attach: {attach.label}</span></label>
+      )}
+      <div className="field">
+        <label htmlFor={id('shot')}>Screenshot (optional)</label>
+        <input id={id('shot')} type="file" accept="image/*" onChange={(e) => {
+          const f = e.target.files?.[0] ?? null
+          if (!f) { setShot(null); return }
+          const p = screenshotProblem(f)
+          if (p) { setError(p); setShot(null); e.target.value = ''; return }
+          setError(''); setShot(f)
+        }} />
+        {shot && <p className="hint">{shot.name} ({Math.round(shot.size / 1024)} KB) <button type="button" className="link-btn" onClick={() => setShot(null)}>Remove</button></p>}
+      </div>
+      <div className="field">
+        <label htmlFor={id('chan')}>How do you want to share it?</label>
+        <select id={id('chan')} value={channel} onChange={(e) => pickChannel(e.target.value as Channel)}>
+          {(Object.keys(CHANNEL_LABEL) as Channel[]).map((c) => <option key={c} value={c}>{CHANNEL_LABEL[c]}</option>)}
+        </select>
+      </div>
+      {needsDest && (
+        <div className="field">
+          <label htmlFor={id('dest')}>{channel === 'email' ? 'Send to (email address)' : 'Send to (phone number with country code)'}</label>
+          <input id={id('dest')} value={dest} inputMode={channel === 'email' ? 'email' : 'tel'} autoComplete="off" onChange={(e) => setDest(e.target.value)} />
+          <p className="hint">You choose where it goes. This app has no built-in address.</p>
+        </div>
+      )}
+      <p className="hint">Mail, text and WhatsApp links cannot attach files automatically. The share sheet can, where your device supports it.</p>
+      <button type="submit" className="btn">Preview</button>
+    </form>
+  )
+}

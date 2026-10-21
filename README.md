@@ -23,6 +23,9 @@ Food and yoga are general wellness tools, not medical advice. Apple Health is no
 ## New in 2.1
 Safe delete, encrypted export and previewed import (docs/DATA_SAFETY.md), replace-exercise and per-exercise equipment, a Workout / Yoga / Both choice, yoga how-to guidance (docs/YOGA_MEDIA.md), and a calmer design.
 
+## New in 2.2
+A muscle recovery map and workout target-muscle map (docs/MUSCLES_AND_RECOVERY.md), info buttons instead of long instructions, collapsed Settings sections, and in-app feedback you review before sharing. To pre-fill a feedback destination for your own build, set `VITE_FEEDBACK_EMAIL` or `VITE_FEEDBACK_PHONE` at build time; nothing is hardcoded.
+
 ## Run it on your computer
 
 You need [Node.js](https://nodejs.org) 20 or newer.

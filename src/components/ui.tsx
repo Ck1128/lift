@@ -1,10 +1,16 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { isRoot, useRouter } from '../router'
+import { FeedbackButton, type FeedbackOptions } from './Feedback'
 
-export function Card({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
+export function Card({ title, children, className, feedback }: { title?: string; children: ReactNode; className?: string; feedback?: false | FeedbackOptions }) {
   return (
     <section className={`card ${className ?? ''}`}>
-      {title && <h2 className="card-title">{title}</h2>}
+      {title && (
+        <div className="card-head">
+          <h2 className="card-title">{title}</h2>
+          {feedback !== false && <FeedbackButton component={title} options={feedback || undefined} />}
+        </div>
+      )}
       {children}
     </section>
   )

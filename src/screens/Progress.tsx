@@ -13,6 +13,7 @@ import type { YogaSession } from '../engine/yoga'
 import type { FoodLogEntry } from '../engine/food'
 import { BarChart, ChartBlock, HBars, LineChart } from '../components/Charts'
 import { Button, Card, EmptyState, ScreenHeader } from '../components/ui'
+import { RecoveryView } from '../components/RecoveryView'
 import { deliverFile } from '../export/deliver'
 import { useRouter } from '../router'
 
@@ -20,7 +21,23 @@ const exName = (id: string) => exerciseById(id)?.name ?? 'Unknown exercise'
 const ALL_CATEGORIES: Category[] = ['workouts', 'yoga', 'food', 'bodyweight']
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`
 
+/** Results (charts and history) and Recovery (muscle map) share one tab. */
 export function Progress({ profile, today }: { profile: Profile; today: string }) {
+  const [tab, setTab] = useState<'results' | 'recovery'>('results')
+  const { navigate } = useRouter()
+  return (
+    <>
+      <ScreenHeader title="Health & Fitness Progress" subtitle={tab === 'results' ? 'History, charts and exports' : 'Which muscles are ready to train'} />
+      <div className="seg" role="group" aria-label="Progress view">
+        <button type="button" aria-pressed={tab === 'results'} onClick={() => setTab('results')}>Results</button>
+        <button type="button" aria-pressed={tab === 'recovery'} onClick={() => setTab('recovery')}>Recovery</button>
+      </div>
+      {tab === 'results' ? <ProgressResults profile={profile} today={today} /> : <RecoveryView onGoToWorkouts={() => navigate('/home')} />}
+    </>
+  )
+}
+
+function ProgressResults({ profile, today }: { profile: Profile; today: string }) {
   const { navigate } = useRouter()
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [] as WorkoutSession[])
   const logs = useLiveQuery(() => db.setLogs.toArray(), [], [] as SetLog[])
@@ -48,8 +65,7 @@ export function Progress({ profile, today }: { profile: Profile; today: string }
   if (!hasAnything) {
     return (
       <>
-        <ScreenHeader title="Health & Fitness Progress" subtitle="Your training history" />
-        <EmptyState title="Nothing to show yet" hint="Finish a workout or a yoga session, log some food, or add your body weight, and your history and charts appear here. Everything is calculated from what you log." />
+          <EmptyState title="Nothing to show yet" hint="Finish a workout or a yoga session, log some food, or add your body weight, and your history and charts appear here. Everything is calculated from what you log." />
       </>
     )
   }
@@ -94,7 +110,6 @@ export function Progress({ profile, today }: { profile: Profile; today: string }
 
   return (
     <>
-      <ScreenHeader title="Health & Fitness Progress" subtitle="Calculated from what you logged" />
 
       <Card title="Show">
         <div role="group" aria-label="Date range" className="chips">

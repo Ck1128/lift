@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BottomNav } from './components/BottomNav'
+import { FeedbackHost } from './components/Feedback'
 import { DbGate } from './components/DbGate'
 import { OfflineBanner, UpdateBanner } from './components/Banners'
 import { ConfirmDialog } from './components/ui'
@@ -42,7 +43,7 @@ function Shell() {
   const profile = useProfile()
   const today = useToday()
   const online = useOnline()
-  const { navigate, replace } = useRouter()
+  const { navigate, replace, path } = useRouter()
   const [onboarding, setOnboarding] = useState(false)
   const [deletedNotice, setDeletedNotice] = useState(false)
   const [update, setUpdate] = useState<(() => void) | null>(null)
@@ -75,9 +76,11 @@ function Shell() {
           <button type="button" onClick={() => setOfflineReady(false)}>OK</button>
         </div>
       )}
-      <main className="content">
-        <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />
-      </main>
+      <FeedbackHost path={path}>
+        <main className="content">
+          <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />
+        </main>
+      </FeedbackHost>
       <BottomNav />
     </div>
   )
