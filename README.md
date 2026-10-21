@@ -1,57 +1,128 @@
 # Lift
 
-A free, private workout planner for you and your friends. It is a web app that you add to your phone's Home Screen. There is no server, no account and no subscription.
+A free, private workout planner for you and your friends, inspired by the general workflow of apps like Fitbod. It is a web app you add to your phone's Home Screen. **No server, no account, no subscription, no paid services.** Everything is stored on each person's own phone.
 
-**Status: Phase 1.** Only the app shell exists. Every schedule and workout you see is labeled "Sample data". Workout generation, saving data, and offline use are not built yet.
+## What it does
+
+- **Weekly plan:** turns your training days into a muscle-group plan (full body, upper/lower, push/pull/legs). Back-to-back days get splits that do not repeat the same muscles.
+- **Daily workout:** pick how many minutes you have; it builds a workout from your equipment, goal, experience, soreness and history.
+- **Home and gym:** separate equipment lists. Planet Fitness starting list (no barbells; Smith machine, dumbbells, machines, cables) and a generic gym list. You confirm what is really there and can untick anything broken or taken.
+- **Workout player:** log weight, reps and optional effort for every set, rest timer, pause/resume, skip, replace an exercise, "felt pain" flag, finish early. Every set is saved the moment you tap the check.
+- **Progression:** suggests next weights from what you actually did (rules below).
+- **Progress:** workouts per week, sets per muscle, exercise trends, personal records, body weight, and a searchable history you can reopen read-only.
+- **Exercise help:** steps for every exercise, two-frame start/end photos that flip like a short clip, and a link to a form video.
+- **Backup and restore:** export/import a JSON file (merge or replace) with validation and an all-or-nothing import.
+- **Offline:** after the first load, the app and your data work without a connection.
 
 ## Run it on your computer
 
 You need [Node.js](https://nodejs.org) 20 or newer.
 
 ```bash
-npm install      # download the tools the app needs (first time only)
-npm run dev      # start the app, then open the address it prints
+npm install     # first time only
+npm run dev     # then open the address it prints. It ends in /lift/
 ```
 
-## Check that it works
+The address must end in `/lift/` (for example `http://localhost:5173/lift/`). Without it you get a blank page, because the app is built for GitHub Pages' sub-folder. Do not open `index.html` by double-clicking it.
+
+To try it on your phone while developing, run `npm run dev -- --host` and open the "Network" address in Safari on the same Wi-Fi. That checks layout only. Installing and offline mode need the real HTTPS site.
+
+## Checks
 
 ```bash
-npm run lint       # checks code style
-npm run typecheck  # checks for type mistakes
-npm test           # runs the automated tests
-npm run build      # builds the final files into dist/
+npm run lint        # code style
+npm run typecheck   # type mistakes
+npm test            # 90 automated tests
+npm run build       # production build into dist/ (also builds the service worker)
+npm run preview     # serve dist/ locally to try the built app
 ```
 
 ## Put it online (GitHub Pages)
 
-1. Put this project in the GitHub repo named `lift` on the `main` branch.
-2. On GitHub open **Settings -> Pages**.
-3. Under **Build and deployment -> Source**, choose **GitHub Actions**.
-4. Push to `main`. Open the **Actions** tab and wait for "Test and deploy to GitHub Pages" to finish.
-5. The site address appears on that run. It normally looks like `https://YOUR-USERNAME.github.io/lift/`. This README does not list a URL because nothing has been deployed yet.
+1. Merge the work into `main` (the workflow deploys from `main`).
+2. In the repo: **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**.
+3. Push to `main`. In the **Actions** tab, wait for "Test and deploy to GitHub Pages" to go green. It runs lint, typecheck, tests and build first.
+4. The address appears on the run (normally `https://YOUR-USERNAME.github.io/lift/`).
 
-If the repo is not named `lift`, change `base` in `vite.config.ts` to match the repo name.
+If your repo is not named `lift`, change `base` in `vite.config.ts`.
 
-## Install on iPhone
+## Install on a phone
 
-1. Open the site address in **Safari**.
-2. Tap **Share**, then **Add to Home Screen**.
-3. Open it from the new icon.
+**iPhone (Safari):** open the site address, tap **Share**, then **Add to Home Screen**, then **Add**. Open it from the new icon.
+**Android (Chrome):** menu, then **Install app** (or **Add to Home screen**).
 
-Android (Chrome): menu -> **Install app** or **Add to Home screen**.
+Each person's data is separate and lives only on their own phone.
 
-Installing and offline use have not been tested on a real phone yet.
+## Manual test checklist (needs a real iPhone)
 
-## Privacy
+Automated tests cannot prove these. Please tick them off on a real phone:
 
-Never commit workout data or backup files to this repo. Future versions will store data only on each phone.
+- [ ] Add to Home Screen works; it opens full-screen with the Lift icon.
+- [ ] Create a profile, confirm equipment, generate a workout.
+- [ ] Log a few sets, close the app completely, reopen: logs are still there and the workout can be resumed.
+- [ ] Turn on Airplane Mode: all screens open, you can start and finish a workout, sets are saved.
+- [ ] Turn Wi-Fi back on: the "offline" banner disappears.
+- [ ] Export a backup (the Share sheet should offer "Save to Files"), then import it.
+- [ ] After a new version is deployed, the "new version is ready" banner appears; tap Reload; your history is still there.
+- [ ] Buttons are easy to tap with one hand during a workout.
+- [ ] Repeat the install and offline checks on a friend's phone.
+
+## How the rules work
+
+Everything is ordinary TypeScript running on the phone. The same inputs always give the same workout. No AI service and no randomness.
+
+**Weekly plan** (`src/engine/split.ts`): 1 day = full body; 2 days = full body A/B (upper/lower if the days are back to back); 3 days = full body A/B/C, or push/pull/legs if the days are consecutive or you are experienced and train for muscle or strength; 4 = upper/lower x2; 5 = push/pull/legs + upper/lower; 6 = push/pull/legs x2. It lists any muscle groups the week misses and any same-muscle days back to back.
+
+**Daily workout** (`src/engine/generate.ts`):
+1. Drop exercises that need equipment you have not ticked, that you excluded (or whose movement type you excluded), or that are too advanced for beginners.
+2. For each target muscle pick the best exercise (big lifts first; exercises not done recently first), then add more in passes, preferring different movement patterns.
+3. Rep ranges and rest times come from your goal (for example muscle: 6-10 reps for big lifts, 10-15 for accessories, 90 s / 60 s rest). Beginners get fewer sets. Moderate or heavy soreness on a muscle removes one set.
+4. Add exercises while the **time estimate** fits your minutes: about 45 s per set (40 s for strength), the goal's rest between sets, 90 s between exercises, and a 5-minute warm-up for sessions of 45 minutes or more. If even one exercise does not fit, it says so instead of claiming it does.
+5. Heavier lifts go first, accessories last.
+
+**Weight suggestions** (`src/engine/progression.ts`, double progression): no history means no number (you choose a light weight). Pain reported means the same weight. Every set at the top of the rep range and no set rated 9-10 effort means plus one equipment step. Otherwise the same weight, aiming for one more rep. Never increases after a poor session. Weights snap to what your dumbbell range and step allow; machines use 5 lb or 2.5 kg steps.
+
+**Calories** (`src/engine/calories.ts`): calories = MET x body weight (kg) x hours, using resistance-training MET values of 3.5 (light/moderate) and 6.0 (vigorous) from the Compendium of Physical Activities. Shown as a rounded range and labelled a rough estimate. Weight lifted is not used because it is not a reliable predictor. Needs your body weight and at least 5 active minutes.
+
+**Rescheduling** (`src/engine/reschedule.ts`): when you skip a day, it looks up to 7 days ahead for a free day whose neighbours do not train the same muscles. It is a suggestion only; if nothing fits it tells you it is fine to just carry on.
+
+## Where your data lives
+
+- Browser IndexedDB on your phone, via Dexie (`src/db/`). Tables: profile, equipment, plans, scheduled, sessions, setLogs, settings, soreness, bodyWeights. Schema version 2 (version 1 to 2 adds soreness and body-weight tables and backfills older sessions; it never deletes rows).
+- Planned workouts are saved with the generator version and a fingerprint of the inputs, and are reused only while those inputs are unchanged. Finished sessions keep a frozen copy of what was planned, so changing your plan never rewrites history.
+- Safari can clear website data if the app goes unused for a long time. **Export a backup now and then.**
+- Never commit backups or personal data to GitHub (`*backup*.json` is git-ignored).
+
+Differences from the suggested schema in the spec: the exercise catalog is bundled in the app code rather than copied into the database; unavailable gym equipment is the `available` flag on each equipment item; "alternative exercise ids" are computed on demand.
+
+## Updates
+
+New versions are downloaded in the background and wait until you tap **Reload** on the banner, so an update never interrupts a workout. Your data lives in the database, not in the cached app files, so updates do not touch it.
+
+## Exercise data
+
+`src/data/catalog.json` is built by `scripts/build-catalog.py` from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense, public domain) plus a few hand-written entries (`src/data/manualExercises.ts`). Photos load from that project the first time you view them and are then cached for offline use. Planet Fitness equipment varies by location; the starting list is a guess you confirm.
+
+## Project layout
+
+```
+src/engine/   pure logic (no React, no database): split, generate, progression, time, calories, reschedule, history, validation
+src/db/       Dexie schema + migrations, repository functions, backup/restore
+src/data/     exercise catalog
+src/screens/  Home, WeeklyPlan, Workout (+Player), Progress, Settings, Onboarding
+src/components/  shared UI
+```
 
 ## Troubleshooting
 
-- **Blank page online:** check that `base` in `vite.config.ts` matches the repo name.
-- **Actions failed:** open the failed run and read the red step; paste it back to Claude.
-- **`npm: command not found`:** install Node.js.
+- **Blank page locally:** use the address ending in `/lift/`; do not double-click `index.html`.
+- **Blank page online:** check that `base` in `vite.config.ts` matches the repo name and that Pages source is "GitHub Actions".
+- **Old version still showing:** close the app fully and reopen, or tap Reload on the update banner.
+- **Lost data after clearing Safari data:** restore from your last backup (Settings -> Backup and restore).
+- **Photos missing offline:** photos cache the first time you view them online; the written steps always work offline.
 
-## Roadmap
+## Limitations
 
-See `fit_workout_zero_cost_build_spec.md` for the full plan. Next: Phase 2 (local database, profile, equipment, backup).
+- No automatic sync between phones; use export/import.
+- iPhone web apps cannot send reliable push notifications, and vibration on timer end may be ignored.
+- Time, weight and calorie figures are estimates. This app is not medical advice and cannot tell you what is safe for your body.
