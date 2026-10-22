@@ -46,7 +46,11 @@ export function localStamp(s: string): string | null {
   const m = ISO_LOCAL.exec(t)
   if (m) return `${m[1]}T${m[2]}:${m[3]}`
   if (ISO_DAY.test(t)) return `${t}T12:00`
-  return null
+  // Dates as the iPhone writes them: "Oct 21, 2026 at 7:30 AM", "10/21/2026, 7:30 AM". iOS puts a narrow no-break space before AM and PM.
+  const loose = t.replace(/[\u202f\u00a0]/g, ' ').replace(/\s+at\s+/i, ' ').replace(/,\s*(?=\d{1,2}:\d{2})/, ' ')
+  if (!/\d{4}|\d{1,2}\/\d{1,2}\/\d{2}/.test(loose)) return null
+  const d = new Date(loose)
+  return Number.isNaN(d.getTime()) ? null : stampOf(d)
 }
 
 /** "172.4", "172,4", "1,234.5" and "172.4 lb" all give a number. */

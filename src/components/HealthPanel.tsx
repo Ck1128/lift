@@ -224,15 +224,17 @@ export function HealthPanel({ profile, today }: { profile: Profile; today: strin
           <li>The first time you run it, allow the Health permissions it asks for.</li>
         </ol>
 
-        <h4 className="h-sub">“{prefs.readName}” reads from Health</h4>
+        <h4 className="h-sub">“{prefs.readName}” reads from Health (5 actions)</h4>
         <ol className="steps">
-          <li>Add <strong>Find Health Samples</strong>: Type is Body Mass, Start Date is in the last 90 days.</li>
-          <li>Add <strong>Repeat with Each</strong>. Inside, add <strong>Text</strong> built like the line below, using <strong>Format Date</strong> with the custom format <code>yyyy-MM-dd'T'HH:mm</code> for the date, then <strong>Add to Variable</strong> called Lines.</li>
-          <li>Add a second <strong>Find Health Samples</strong> for Workouts and do the same with the K line below (type, duration in minutes, active energy).</li>
-          <li>Add <strong>Combine Text</strong> with Lines, using New Lines, then <strong>Copy to Clipboard</strong>.</li>
+          <li><strong>Find Health Samples</strong>: Type is Body Mass, Start Date is in the last 90 days.</li>
+          <li><strong>Repeat with Each</strong> over the samples. Inside it add one <strong>Text</strong> action. Type <code>B|</code>, then tap the Repeat Item and choose <strong>Start Date</strong>, type <code>|</code>, Repeat Item, <strong>Value</strong>, type <code>|</code>, Repeat Item, <strong>Unit</strong>.</li>
+          <li>After the loop add <strong>Combine Text</strong> on <strong>Repeat Results</strong>, joined with New Lines.</li>
+          <li>Add <strong>Copy to Clipboard</strong>.</li>
+          <li>Run it once and allow Health access. No date formatting is needed: Lift reads dates the way your iPhone writes them.</li>
         </ol>
-        <p className="hint">Line shapes (the | is a vertical bar):</p>
-        <pre className="code">{'B|2026-10-21T07:30|172.4|lb\nK|2026-10-21T18:05|Running|32|310'}</pre>
+        <p className="hint">Want workouts too? Add a second Find Health Samples (Workouts) and Repeat with Each before the Combine Text, with the text <code>K|</code> Start Date <code>|</code> Workout Type <code>|</code> Duration <code>|</code> Active Energy.</p>
+        <p className="hint">Example of what ends up on the clipboard (the | is a vertical bar):</p>
+        <pre className="code">{'B|Oct 21, 2026 at 7:30 AM|172.4|lb\nK|Oct 21, 2026 at 6:05 PM|Running|32 min|310 kcal'}</pre>
         <Button variant="small" onClick={() => void copy('Example lines', 'B|2026-10-21T07:30|172.4|lb\nK|2026-10-21T18:05|Running|32|310')}>Copy the example lines</Button>
         <p className="hint">Not sure about the shortcuts? The export.zip file above works without any setup, and reads your full history.</p>
       </details>

@@ -34,6 +34,16 @@ describe('reading Shortcut text', () => {
     expect(b.workouts[0].type).toBe('Walking')
     expect(parseHealthText('B|2026-10-21T07:30|77,5|kg').weights[0].kg).toBe(77.5)
   })
+  it('reads dates the way an iPhone writes them', () => {
+    expect(localStamp('Oct 21, 2026 at 7:30 AM')).toBe('2026-10-21T07:30')
+    expect(localStamp('Oct 21, 2026 at 7:30\u202fPM')).toBe('2026-10-21T19:30')
+    expect(localStamp('10/21/2026, 7:30 AM')).toBe('2026-10-21T07:30')
+    expect(localStamp('October 21, 2026 6:05 PM')).toBe('2026-10-21T18:05')
+    expect(localStamp('yesterday')).toBeNull()
+    const b = parseHealthText('B|Oct 21, 2026 at 7:30 AM|172.4|lb\nK|Oct 21, 2026 at 6:05 PM|Running|32 min|310 kcal')
+    expect(b.weights[0].at).toBe('2026-10-21T07:30')
+    expect(b.workouts[0].start).toBe('2026-10-21T18:05')
+  })
   it('normalises time stamps', () => {
     expect(localStamp('2026-10-21 07:30:12 -0400')).toBe('2026-10-21T07:30')
     expect(localStamp('2026-10-21')).toBe('2026-10-21T12:00')

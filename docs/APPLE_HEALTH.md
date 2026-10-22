@@ -36,19 +36,14 @@ Steps, heart rate, sleep and other Health data types are not read. A native comp
 
 Open the Shortcuts app on the iPhone. Names must match Settings > Apple Health (or change them there). Apple renames actions between iOS versions: pick the closest one. Neither shortcut has been run on a real iPhone by the developer.
 
-### A. "Health to Lift" (reads Health)
+### A. "Health to Lift" (reads Health): five actions
 1. Tap +, name it **Health to Lift**.
-2. **Find Health Samples**. Filters: Type is Body Mass; Start Date is in the last 90 days. Sort by Start Date, Latest First. Limit 100.
-3. **Repeat with Each** (Health Samples). Inside:
-   - **Format Date** on the item's Start Date. Date Format: Custom, `yyyy-MM-dd'T'HH:mm`.
-   - **Text**: `B|` Formatted Date `|` item Value `|` item Unit
-   - **Add to Variable**, name it `Lines`.
-4. After the loop add **Find Health Samples** again with Type Workouts (or **Find Workouts**). Same date filter, limit 50.
-5. **Repeat with Each**. Inside: **Format Date** as above, then **Text**: `K|` Formatted Date `|` Workout Type `|` Duration `|` Active Energy. **Add to Variable** `Lines`.
-6. **Combine Text** (Lines, New Lines), then **Copy to Clipboard**, then **Show Notification** "Copied. Open Lift and tap Paste."
-7. Run it once with the play button and allow the Health permissions.
+2. **Find Health Samples**: Type is Body Mass; Start Date is in the last 90 days.
+3. **Repeat with Each** over the samples. Inside, one **Text** action: `B|` Repeat Item **Start Date** `|` Repeat Item **Value** `|` Repeat Item **Unit**.
+4. After the loop: **Combine Text** on **Repeat Results**, joined with New Lines.
+5. **Copy to Clipboard**. Run it once and allow Health access.
 
-Lift accepts "32 min", "1 hr 5 min" and "310 kcal" in those slots.
+No date formatting is needed. Lift reads "Oct 21, 2026 at 7:30 AM", "32 min", "310 kcal" and "172.4 lb" as the iPhone writes them. For workouts add a second Find Health Samples (Workouts) and Repeat with Each before the Combine Text, with the text `K|` Start Date `|` Workout Type `|` Duration `|` Active Energy.
 
 ### B. "Lift to Health" (writes to Health)
 1. Tap +, name it **Lift to Health**.

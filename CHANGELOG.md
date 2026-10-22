@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.7.2 - Five-action Health shortcut (branch feature/v2-complete)
+- Pasted Health text can use dates exactly as the iPhone writes them ("Oct 21, 2026 at 7:30 AM"). The reading shortcut no longer needs Format Date or a variable.
+
 ## 2.7.1 - Easier Apple Health shortcut setup (branch feature/v2-complete)
 - Pasted text can use Shortcuts' own wording: "32 min", "1 hr 5 min", "310 kcal", "172.4 lb".
 - Step-by-step shortcut setup added to docs/APPLE_HEALTH.md.
