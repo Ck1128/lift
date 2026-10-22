@@ -11,6 +11,7 @@ import {
 import { MUSCLE_LABEL, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
 import type { YogaSession } from '../engine/yoga'
 import type { FoodLogEntry } from '../engine/food'
+import type { HealthWorkoutRow } from '../engine/health'
 import { BarChart, ChartBlock, HBars, LineChart } from '../components/Charts'
 import { Card, EmptyState, ScreenHeader } from '../components/ui'
 import { RecoveryView } from '../components/RecoveryView'
@@ -44,6 +45,7 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
   const weights = useLiveQuery(() => db.bodyWeights.toArray(), [], [])
   const yoga = useLiveQuery(() => db.yogaSessions.toArray(), [], [] as YogaSession[])
   const food = useLiveQuery(() => db.foodLog.toArray(), [], [] as FoodLogEntry[])
+  const healthW = useLiveQuery(() => db.healthWorkouts.toArray(), [], [] as HealthWorkoutRow[])
   const [rangeKey, setRangeKey] = useState<RangeKey>('30')
   const [shown, setShown] = useState<Category[]>(ALL_CATEGORIES)
   const [exFilter, setExFilter] = useState('')
@@ -59,7 +61,7 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
   )
   const toggle = (c: Category, list: Category[], set: (l: Category[]) => void) => set(list.includes(c) ? list.filter((x) => x !== c) : [...list, c])
 
-  const hasAnything = finished.length > 0 || yoga.some((y) => y.status !== 'abandoned') || food.length > 0 || weights.length > 0
+  const hasAnything = finished.length > 0 || healthW.length > 0 || yoga.some((y) => y.status !== 'abandoned') || food.length > 0 || weights.length > 0
   if (!hasAnything) {
     return (
       <>
@@ -80,7 +82,7 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
   const bwPts = bodyWeightSeries(weights, range, unit)
   const on = (c: Category) => shown.includes(c)
 
-  type Row = { id: string; kind: 'workout' | 'yoga'; title: string; date: string; label: string; startedAt: string }
+  type Row = { id: string; kind: 'workout' | 'yoga' | 'health'; title: string; date: string; label: string; startedAt: string }
   const historyRows: Row[] = [
     ...(on('workouts') ? sessions.filter((s) => s.status !== 'in_progress').map((s): Row => ({
       id: s.id, kind: 'workout', title: s.title, date: s.date, startedAt: s.startedAt,
@@ -89,6 +91,10 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
     ...(on('yoga') ? yoga.filter((s) => s.status !== 'in_progress').map((s): Row => ({
       id: s.id, kind: 'yoga', title: `Yoga: ${s.styleName}`, date: s.date, startedAt: s.startedAt,
       label: `${s.status === 'completed' ? 'Completed' : s.status === 'partial' ? 'Partly done' : 'Discarded'} · ${Math.round(s.durationSeconds / 60)} min`,
+    })) : []),
+    ...(on('workouts') && !exFilter ? healthW.map((h): Row => ({
+      id: h.id, kind: 'health', title: h.type, date: h.date, startedAt: h.start,
+      label: `Apple Health · ${Math.round(h.minutes)} min${h.kcal ? ` · ${h.kcal} kcal` : ''}`,
     })) : []),
   ]
     .filter((r) => inRange(r.date, range))
@@ -205,10 +211,12 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
         <ul className="history">
           {historyRows.map((r) => (
             <li key={`${r.kind}-${r.id}`}>
-              <button type="button" className="alt" onClick={() => navigate(r.kind === 'workout' ? `/session/${r.id}` : `/yoga/session/${r.id}`)}>
+              {r.kind === 'health' ? (
+                <div className="alt static"><strong>{r.title}</strong><span className="muted">{formatDay(r.date)} · {r.label}</span></div>
+              ) : <button type="button" className="alt" onClick={() => navigate(r.kind === 'workout' ? `/session/${r.id}` : `/yoga/session/${r.id}`)}>
                 <strong>{r.title}</strong>
                 <span className="muted">{formatDay(r.date)} · {r.label}</span>
-              </button>
+              </button>}
             </li>
           ))}
         </ul>

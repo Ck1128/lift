@@ -10,6 +10,8 @@ import { formatDay } from '../engine/dates'
 import type { Profile } from '../engine/types'
 import { useNow } from '../hooks/app'
 import { Button, Card, ConfirmDialog, ScreenHeader } from '../components/ui'
+import { SendToHealthButton } from '../components/HealthPanel'
+import { yogaItem } from '../engine/health'
 import { useRouter } from '../router'
 
 /** The plan item stores a copy of the text; the catalog adds the position and sanskrit name when the pose still exists. */
@@ -48,6 +50,7 @@ export function YogaSessionPage({ sessionId, profile }: { sessionId: string; pro
         {live && <Button variant="small" onClick={() => setConfirm('discard')}>Discard</Button>}
       </div>
       {msg && <p className="notice" role="status">{msg}</p>}
+      {!live && <div className="inline"><SendToHealthButton build={(k) => yogaItem(s, k, kcal ? Math.round((kcal.low + kcal.high) / 2) : undefined)} /></div>}
       <p className="muted">{s.completedItems.length} of {s.plan.items.length} poses done · {Math.round(s.durationSeconds / 60)} min</p>
       {kcal && !live && <p className="hint">Roughly {kcal.low} to {kcal.high} calories (an estimate, not a measurement).</p>}
       {s.plan.cautions.map((c, i) => <p key={i} className="notice" role="note">{c}</p>)}

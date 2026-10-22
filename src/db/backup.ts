@@ -9,7 +9,7 @@ export const BACKUP_FORMAT = 'lift-backup'
  */
 export const BACKUP_VERSION = 3
 
-const ALL_TABLES = ['profile', 'equipment', 'settings', 'plans', 'scheduled', 'sessions', 'setLogs', 'soreness', 'bodyWeights', 'yogaSessions', 'foodLog'] as const
+const ALL_TABLES = ['profile', 'equipment', 'settings', 'plans', 'scheduled', 'sessions', 'setLogs', 'soreness', 'bodyWeights', 'yogaSessions', 'foodLog', 'healthWorkouts'] as const
 type TableName = (typeof ALL_TABLES)[number]
 
 /** What a person chooses to put in an export. Each category maps to whole tables. */
@@ -17,7 +17,7 @@ export const CATEGORIES = ['profile', 'workouts', 'bodyweight', 'yoga', 'food'] 
 export type Category = (typeof CATEGORIES)[number]
 export const CATEGORY_TABLES: Record<Category, readonly TableName[]> = {
   profile: ['profile', 'equipment', 'settings'],
-  workouts: ['plans', 'scheduled', 'sessions', 'setLogs', 'soreness'],
+  workouts: ['plans', 'scheduled', 'sessions', 'setLogs', 'soreness', 'healthWorkouts'],
   bodyweight: ['bodyWeights'],
   yoga: ['yogaSessions'],
   food: ['foodLog'],
@@ -119,11 +119,12 @@ const CHECKS: Record<TableName, Check> = {
     : !isStr(r.date) || !DATE.test(r.date) ? 'bad date'
     : !oneOf(r.mealCategory, ['breakfast', 'lunch', 'dinner', 'evening_snacks', 'other']) ? 'bad meal category'
     : r.kcal !== undefined && (!isNum(r.kcal) || r.kcal < 0 || r.kcal > 20000) ? 'bad calories' : null,
+  healthWorkouts: (r) => (!isStr(r.id) ? 'missing id' : !isStr(r.date) || !DATE.test(r.date) ? 'bad date' : !isNum(r.minutes) || r.minutes <= 0 ? 'bad minutes' : !isStr(r.type) ? 'bad type' : null),
   bodyWeights: (r) => (!isStr(r.id) ? 'missing id' : !isNum(r.value) || r.value <= 0 ? 'bad value' : !oneOf(r.unit, UNITS) ? 'bad unit' : !isStr(r.date) || !DATE.test(r.date) ? 'bad date' : null),
 }
 
 const KEY: Record<TableName, string> = {
-  profile: 'id', equipment: 'location', plans: 'id', scheduled: 'id', sessions: 'id', setLogs: 'id', settings: 'key', soreness: 'id', bodyWeights: 'id', yogaSessions: 'id', foodLog: 'id',
+  profile: 'id', equipment: 'location', plans: 'id', scheduled: 'id', sessions: 'id', setLogs: 'id', settings: 'key', soreness: 'id', bodyWeights: 'id', yogaSessions: 'id', foodLog: 'id', healthWorkouts: 'id',
 }
 
 export type ParseResult = { ok: true; backup: BackupFile } | { ok: false; error: string }

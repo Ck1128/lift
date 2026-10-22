@@ -9,7 +9,7 @@ import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
 import { Button, Chips, Dialog, ScreenHeader } from '../components/ui'
 import { LEVEL_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
-import { APPLE_HEALTH_NOTE } from '../engine/guidance'
+import { HealthPanel } from '../components/HealthPanel'
 import { FeedbackButton, FeedbackForm, setFeedbackIcons, useFeedbackIcons } from '../components/Feedback'
 import { SETTINGS_CATEGORIES } from '../engine/feedback'
 
@@ -29,7 +29,7 @@ const ROW_ICON: Record<string, { c: string; d: string }> = {
   'Equipment': { c: '#d62f35', d: 'M2.500 9.500v5M5.500 7v10M18.500 7v10M21.500 9.500v5M5.500 12h13' },
   'Exercises to avoid': { c: '#b45309', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM5.600 5.600l12.800 12.800' },
   'Weekly schedule': { c: '#2b63d9', d: 'M4 6.500h16v13H4zM4 10.500h16M8.500 3.500v5M15.500 3.500v5' },
-  'Apple Health and wearables': { c: '#d6336c', d: 'M12 20s-7.500-4.500-7.500-10A4.200 4.200 0 0 1 12 7.600 4.200 4.200 0 0 1 19.500 10c0 5.500-7.500 10-7.500 10Z' },
+  'Apple Health': { c: '#d6336c', d: 'M12 20s-7.500-4.500-7.500-10A4.200 4.200 0 0 1 12 7.600 4.200 4.200 0 0 1 19.500 10c0 5.500-7.500 10-7.500 10Z' },
   'Feedback and support': { c: '#25813a', d: 'M20 12a7.500 7.500 0 0 1-10.800 6.700L4 20l1.400-4.300A7.500 7.500 0 1 1 20 12Z' },
   'Help': { c: '#566073', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 .9-1 1.700M12 16.800v.01' },
   'Export your data': { c: '#2b63d9', d: 'M12 15V4M8 8l4-4 4 4M5 14v5.500h14V14' },
@@ -50,7 +50,7 @@ function Section({ title, children, danger }: { title: string; children: ReactNo
   )
 }
 
-export function Settings({ profile, onReset }: { profile: Profile; onReset: () => void }) {
+export function Settings({ profile, today, onReset }: { profile: Profile; today: string; onReset: () => void }) {
   const [editLocation, setEditLocation] = useState<LocationType>(profile.preferredLocation)
   const [search, setSearch] = useState('')
   const [note, setNote] = useState(profile.limitationNote ?? '')
@@ -147,10 +147,8 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
         <Button variant="ghost" onClick={() => void rebuildPlan(profile)}>Rebuild upcoming plan</Button>
       </Section>
 
-      <Section title="Apple Health and wearables">
-        <p className="notice">{APPLE_HEALTH_NOTE.status}</p>
-        <p className="hint">{APPLE_HEALTH_NOTE.why}</p>
-        <p className="hint">{APPLE_HEALTH_NOTE.alternative}</p>
+      <Section title="Apple Health">
+        <HealthPanel profile={profile} today={today} />
       </Section>
 
       <Section title="Feedback and support">

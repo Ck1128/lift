@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.0 - Apple Health, both ways (branch feature/v2-complete)
+- Settings > Apple Health: send workouts, yoga, body weight and (optional) food calories to Health through a shortcut, and bring body weight and Apple Watch workouts back.
+- Read Apple's own Health export (export.zip) on the phone, as a stream, with a preview and a "how far back" choice. Nothing is uploaded.
+- Paste what a shortcut copied, preview it, then add it. Duplicates, workouts already logged in Lift and weights Lift already sent are skipped.
+- "Add to Apple Health" on every saved workout and yoga session.
+- Imported workouts show in Progress history as "Apple Health". The database moves to version 5 with one new table, nothing existing changes.
+- Calorie estimates are never sent unless you turn that on.
+- The two shortcuts are described step by step in the app. They have not been run on a real iPhone yet, so please tell me what differs.
+
 ## 2.6.0 - Guided first run and a calmer interface (branch feature/v2-complete)
 - First run is now five short screens (what you use Lift for, your training, about you, your week, where you train) with a progress bar, Back and Next. Settings keeps the single page.
 - Radio buttons, check boxes, the file picker and drop-downs now look finished and match the tab colour.

@@ -35,7 +35,7 @@ function Routes({ profile, today, onReset }: { profile: Profile; today: string; 
   if (p === '/plan') return <WeeklyPlan profile={profile} today={today} />
   if (p === '/workout') return <Workout profile={profile} today={today} />
   if (p === '/progress') return <Progress profile={profile} today={today} />
-  if (p === '/settings') return <Settings profile={profile} onReset={onReset} />
+  if (p === '/settings') return <Settings profile={profile} today={today} onReset={onReset} />
   return <Home profile={profile} today={today} />
 }
 

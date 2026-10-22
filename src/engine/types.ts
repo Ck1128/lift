@@ -293,6 +293,8 @@ export interface BodyWeightEntry {
   date: string
   value: number
   unit: WeightUnit
+  /** Set when the entry came from Apple Health, so it is never sent back. */
+  source?: 'health'
 }
 
 /** What the engine needs to know about how an exercise went last time. */

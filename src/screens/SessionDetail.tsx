@@ -9,6 +9,8 @@ import type { Profile, SetLog, WorkoutSession } from '../engine/types'
 import { addSet, getActiveSession, markComplete, reopenSession, setExerciseDone, updateSet } from '../db/repo'
 import { useRouter } from '../router'
 import { ResetDay } from '../components/ResetDay'
+import { SendToHealthButton, workoutKcal } from '../components/HealthPanel'
+import { workoutItem } from '../engine/health'
 import { Button, Card, ScreenHeader } from '../components/ui'
 
 const STATUS: Record<WorkoutSession['status'], string> = {
@@ -69,6 +71,7 @@ function SessionBody({ session, logs, profile, editing }: { session: WorkoutSess
           {activeMinutes(session)} min active · {logs.filter((l) => l.completed).length} of {logs.length} sets done
         </p>
         {session.status !== 'abandoned' && <p className="hint">{calorieLine(session, logs, profile)}</p>}
+        {!editing && <div className="inline"><SendToHealthButton build={(k) => workoutItem(session, k, k ? workoutKcal(session, logs, profile) : undefined)} /></div>}
         {session.reopenedAt && <p className="hint">Reopened and edited {new Date(session.updatedAt ?? session.reopenedAt).toLocaleString()}</p>}
         <p className="hint">Plan v{session.planVersion} · generator {session.generatorVersion}</p>
       </Card>

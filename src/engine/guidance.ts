@@ -4,9 +4,9 @@ import type { Sex } from './types'
 
 /** What this app does and does not do with Apple Health. Shown in Settings. */
 export const APPLE_HEALTH_NOTE = {
-  status: 'Apple Health is not connected, and this app does not pretend it is. Nothing is read from or written to Apple Health.',
-  why: 'A web app that you add to the Home Screen cannot reach Apple Health. Only a native iPhone app that you install with the HealthKit permission can. Rather than show fake steps or heart rate, this app only shows what you log here.',
-  alternative: 'You can export your workouts, yoga and (if you choose) food as CSV or JSON from Progress. A native iOS companion app would be a separate project and is described in docs/apple-health-native-notes.md.',
+  status: 'Apple Health works through the Shortcuts app and Health export files, because a web app cannot reach Health directly.',
+  why: 'Lift sends workouts, yoga, weight and optional food calories to Health, and reads body weight and workouts back. Nothing goes through a server.',
+  alternative: 'See Settings > Apple Health for setup. Details are in docs/APPLE_HEALTH.md.',
 } as const
 
 export interface EnergyInput {

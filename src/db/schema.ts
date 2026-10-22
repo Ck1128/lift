@@ -1,3 +1,4 @@
+import type { HealthWorkoutRow } from '../engine/health'
 import Dexie, { type Table } from 'dexie'
 import type {
   BodyWeightEntry, EquipmentId, EquipmentSet, LocationType, Profile, ScheduledWorkout, SetLog, SorenessEntry,
@@ -9,7 +10,7 @@ import type { FoodCacheEntry, FoodLogEntry } from '../engine/food'
 
 /** Comes from package.json at build time (see vite.config.ts). Bump the version there for every release. */
 export const APP_VERSION: string = __APP_VERSION__
-export const DB_SCHEMA_VERSION = 4
+export const DB_SCHEMA_VERSION = 5
 
 /** Equipment is stored once per location (home / gym). */
 export interface EquipmentRecord {
@@ -51,6 +52,7 @@ export class LiftDB extends Dexie {
   yogaPlans!: Table<YogaPlanRecord, string>
   foodLog!: Table<FoodLogEntry, string>
   foodCache!: Table<FoodCacheEntry, string>
+  healthWorkouts!: Table<HealthWorkoutRow, string>
 
   constructor(name = 'lift-db') {
     super(name)
@@ -106,6 +108,8 @@ export class LiftDB extends Dexie {
           if (!Array.isArray(p.tracks) || p.tracks.length === 0) p.tracks = ['workout', 'yoga']
         })
       })
+    // Version 5: workouts brought in from Apple Health. A new table only; nothing existing changes.
+    this.version(5).stores({ healthWorkouts: 'id, date' })
   }
 }
 

@@ -303,7 +303,8 @@ describe('schema migration', () => {
     expect(s.pausedMs).toBe(0)
     expect(await upgraded.soreness.count()).toBe(0) // new tables exist
     expect(await upgraded.bodyWeights.count()).toBe(0)
-    expect(upgraded.verno).toBe(4)
+    expect(upgraded.verno).toBe(5)
+    expect(await upgraded.healthWorkouts.count()).toBe(0)
     expect(await upgraded.yogaSessions.count()).toBe(0)
     expect(await upgraded.foodLog.count()).toBe(0)
     upgraded.close()
