@@ -5,14 +5,14 @@ import { eligible, type GenerateInput } from './generate'
 import { estimateSeconds, restSecondsFor } from './time'
 import { exerciseById } from '../data/catalog'
 
-type Rules = Pick<GenerateInput, 'catalog' | 'equipment' | 'excludedExerciseIds' | 'excludedPatterns' | 'experience'>
+type Rules = Pick<GenerateInput, 'catalog' | 'equipment' | 'excludedExerciseIds' | 'excludedPatterns' | 'experience' | 'gym'>
 
 const PATTERN_WORD: Record<Pattern, string> = {
   push: 'pushing', pull: 'pulling', squat: 'squat', hinge: 'hip-hinge', lunge: 'single-leg', core: 'core', isolation: 'single-muscle',
 }
 
 export const TYPE_LABEL: Record<ExerciseType, string> = {
-  bodyweight: 'Bodyweight / no equipment', dumbbell: 'Dumbbells', barbell: 'Barbell', machine: 'Machine', cable: 'Cable', smith: 'Smith machine', kettlebell: 'Kettlebell', bands: 'Resistance bands',
+  bodyweight: 'Bodyweight / no equipment', dumbbell: 'Dumbbells', barbell: 'Barbell', machine: 'Machine', cable: 'Cable', smith: 'Smith machine', kettlebell: 'Kettlebell', bands: 'Resistance bands', ez_bar: 'EZ-curl bar',
 }
 
 export interface Alternatives {

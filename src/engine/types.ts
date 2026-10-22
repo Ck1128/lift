@@ -19,11 +19,11 @@ export type Pattern = 'push' | 'pull' | 'squat' | 'hinge' | 'lunge' | 'core' | '
 
 export type EquipmentId =
   | 'bodyweight' | 'dumbbell' | 'barbell' | 'machine' | 'cable' | 'smith'
-  | 'bench' | 'pullup_bar' | 'kettlebell' | 'bands' | 'mat'
+  | 'bench' | 'pullup_bar' | 'kettlebell' | 'bands' | 'mat' | 'ez_bar'
   | 'treadmill' | 'exercise_bike' | 'elliptical' | 'rower' | 'stair_climber'
 
 export const ALL_EQUIPMENT: EquipmentId[] = [
-  'bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'mat',
+  'bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'mat', 'ez_bar',
   'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber',
 ]
 
@@ -31,7 +31,7 @@ export const EQUIPMENT_LABEL: Record<EquipmentId, string> = {
   bodyweight: 'Bodyweight / no equipment', dumbbell: 'Dumbbells', barbell: 'Barbell and plates',
   machine: 'Weight machines', cable: 'Cable machines', smith: 'Smith machine',
   bench: 'Bench', pullup_bar: 'Pull-up bar', kettlebell: 'Kettlebells',
-  bands: 'Resistance bands', mat: 'Exercise mat',
+  bands: 'Resistance bands', mat: 'Exercise mat', ez_bar: 'EZ-curl bar / fixed barbells',
   treadmill: 'Treadmill', exercise_bike: 'Exercise bike', elliptical: 'Elliptical',
   rower: 'Rowing machine', stair_climber: 'Stair climber',
 }
@@ -42,7 +42,7 @@ export const CARDIO_EQUIPMENT: EquipmentId[] = ['treadmill', 'exercise_bike', 'e
 /** Equipment that has a weight range and increment the user can configure. */
 export const LOADABLE: EquipmentId[] = ['dumbbell', 'kettlebell', 'barbell']
 
-export type ExerciseType = 'machine' | 'dumbbell' | 'barbell' | 'cable' | 'bodyweight' | 'smith' | 'kettlebell' | 'bands'
+export type ExerciseType = 'machine' | 'dumbbell' | 'barbell' | 'cable' | 'bodyweight' | 'smith' | 'kettlebell' | 'bands' | 'ez_bar'
 export type Level = 'beginner' | 'intermediate'
 export type WeightUnit = 'lb' | 'kg'
 /** How height is shown and typed. It is always stored in centimetres. */

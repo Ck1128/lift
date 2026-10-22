@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.0 - Workouts designed for Planet Fitness and your profile (branch feature/v2-complete)
+- The Planet Fitness equipment list now follows https://taekwondoking.com/list-of-planet-fitness-equipment/: rowers, kettlebells, bands and EZ-curl bars are in; Olympic barbell and pull-up bar are out; dumbbells up to 75 lb.
+- Machines are limited to the ones the club has (added lateral raise, leg extension, glute kickback and back extension machines). Hack squat, T-bar row, leverage deadlift and similar are never planned there.
+- Exercises are ranked per muscle by a curated best-first list plus your level, goal and age, instead of alphabetically. Beginners get machines and cables first and no deadlift-type lifts.
+- Goal, level and age change reps, sets and rest. Every workout explains who it was designed for and includes a warm-up and cool-down.
+- Workouts planned with the older version are rebuilt automatically.
+
 ## 2.3.0 - Feedback, export and recovery polish (branch feature/v2-complete)
 - The app version now comes from package.json (one place) and must match the top CHANGELOG entry; a test enforces it. Bump it for every release.
 - Feedback: the Share option sends the message and a plain-text file together through the iPhone share sheet (Messages, WhatsApp, Mail). Email, SMS and WhatsApp options put the whole message in the text and no longer download a file. Added Copy. Still never claims delivery.

@@ -80,9 +80,9 @@ describe('equipment and exclusions', () => {
 
   it('removing equipment changes future workouts', () => {
     const eq = presetEquipment('planet_fitness', 'lb')
-    const withDb = lifts(workoutOf(base({ equipment: eq }))).map((e) => e.exerciseId)
+    const withDb = lifts(workoutOf(base({ equipment: eq, experience: 'regular' }))).map((e) => e.exerciseId)
     eq.dumbbell = { ...eq.dumbbell!, available: false }
-    const without = lifts(workoutOf(base({ equipment: eq })))
+    const without = lifts(workoutOf(base({ equipment: eq, experience: 'regular' })))
     for (const e of without) expect(CATALOG.find((c) => c.id === e.exerciseId)!.equipmentIds).not.toContain('dumbbell')
     expect(without.map((e) => e.exerciseId)).not.toEqual(withDb)
   })

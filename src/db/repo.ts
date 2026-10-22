@@ -334,7 +334,8 @@ export async function generateFor(
     date: sched.date, planDay, minutes, goal: profile.goal, experience: profile.trainingLevel, equipment,
     excludedExerciseIds: profile.excludedExerciseIds, excludedPatterns: profile.excludedPatterns,
     catalog: CATALOG, lastPerformance: buildLastPerformance(sessions, logs), lastDone: buildLastDone(sessions, logs),
-    soreness, weightUnit: profile.weightUnit, cardioChoice: sched.cardioChoice, weightKg: profile.weightKg, sex: profile.sex,
+    soreness, weightUnit: profile.weightUnit, cardioChoice: sched.cardioChoice, weightKg: profile.weightKg, sex: profile.sex, age: profile.age,
+    gym: profile.preferredLocation === 'gym' ? profile.gymType : undefined,
   }
   const { catalog: _catalog, ...rest } = input
   void _catalog

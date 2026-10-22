@@ -3,7 +3,7 @@ import { MANUAL_EXERCISES } from './manualExercises'
 import type { EquipmentId, Exercise, ExerciseType, Level, Muscle, Pattern } from '../engine/types'
 import { validateExercise } from '../engine/validate'
 
-export const CATALOG_VERSION = 'fedb-1+manual-1'
+export const CATALOG_VERSION = 'fedb-1+manual-2'
 
 interface RawRow {
   id: string
@@ -40,9 +40,23 @@ function fromRaw(r: RawRow): Exercise {
   }
 }
 
+/**
+ * Corrections to the bundled dataset, applied by exercise name.
+ *  - EZ-bar and fixed-barbell curls are done with the curl bars many gyms have, not an Olympic barbell and plates.
+ *  - The ab crunch machine is a simple selectorized machine, so it is fine for beginners.
+ */
+const EZ_BAR = new Set(['EZ-Bar Curl', 'Barbell Curl', 'Preacher Curl', 'Close-Grip EZ-Bar Press'])
+const BEGINNER_OK = new Set(['Ab Crunch Machine'])
+function patch(e: Exercise): Exercise {
+  let out = e
+  if (EZ_BAR.has(e.name)) out = { ...out, equipmentIds: out.equipmentIds.map((q) => (q === 'barbell' ? 'ez_bar' : q)) as EquipmentId[], exerciseType: 'ez_bar' }
+  if (BEGINNER_OK.has(e.name)) out = { ...out, difficulty: 'beginner' }
+  return out
+}
+
 const names = new Set<string>()
 const all: Exercise[] = []
-for (const e of [...MANUAL_EXERCISES, ...(raw as RawRow[]).map(fromRaw)]) {
+for (const e of [...MANUAL_EXERCISES, ...(raw as RawRow[]).map(fromRaw)].map(patch)) {
   const key = e.name.toLowerCase()
   if (names.has(key)) continue
   names.add(key)

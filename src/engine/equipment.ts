@@ -17,18 +17,19 @@ function item(id: EquipmentId, available: boolean, unit: WeightUnit, load?: Part
 }
 
 /** Version and review date of the curated default lists (also in docs/planet-fitness-equipment.md). */
-export const PRESET_VERSION = 'presets-2'
+export const PRESET_VERSION = 'presets-3'
 export const PRESET_REVIEWED = '2026-10-21'
 
 /**
  * Starting points only. Individual locations differ.
- * Planet Fitness: a typical club has cardio machines, selectorized strength machines, cables,
- * Smith machines and dumbbells, but no barbells or squat racks. The user can mark anything missing at their club.
+ * Planet Fitness: see src/engine/planetFitness.ts (machines, cables, Smith, dumbbells to 75 lb, EZ bars, kettlebells,
+ * bands, rowers; no Olympic barbells or squat racks). The user can mark anything missing at their club.
  */
 export const PRESET_EQUIPMENT: Record<PresetKind, EquipmentId[]> = {
   home: ['bodyweight', 'mat'],
-  planet_fitness: ['bodyweight', 'mat', 'dumbbell', 'machine', 'cable', 'smith', 'bench', 'treadmill', 'exercise_bike', 'elliptical', 'stair_climber'],
-  generic_gym: ['bodyweight', 'mat', 'dumbbell', 'barbell', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
+  // From the club equipment list in src/engine/planetFitness.ts: no Olympic barbell or pull-up bar.
+  planet_fitness: ['bodyweight', 'mat', 'dumbbell', 'machine', 'cable', 'smith', 'bench', 'kettlebell', 'bands', 'ez_bar', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
+  generic_gym: ['bodyweight', 'mat', 'dumbbell', 'barbell', 'ez_bar', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
 }
 
 export function presetEquipment(kind: PresetKind, unit: WeightUnit): EquipmentSet {
@@ -39,6 +40,9 @@ export function presetEquipment(kind: PresetKind, unit: WeightUnit): EquipmentSe
   for (const id of ids) {
     const available = on[kind].includes(id)
     let load: Partial<EquipmentItem> | undefined
+    if (kind === 'planet_fitness' && id === 'kettlebell') {
+      load = { minWeight: lb ? 10 : 4, maxWeight: lb ? 50 : 24, increment: lb ? 5 : 4, unit }
+    }
     if (kind === 'planet_fitness' && id === 'dumbbell') {
       load = { minWeight: lb ? 5 : 2.5, maxWeight: lb ? 75 : 35, increment: lb ? 5 : 2.5, unit }
     }

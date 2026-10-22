@@ -44,7 +44,8 @@ export function Player({ session, profile, equipment, onFinished }: {
   const pending = relevant.length - done
   const rules = useMemo(() => ({
     catalog: CATALOG, equipment, excludedExerciseIds: profile.excludedExerciseIds, excludedPatterns: profile.excludedPatterns, experience: profile.trainingLevel,
-  }), [equipment, profile.excludedExerciseIds, profile.excludedPatterns, profile.trainingLevel])
+    gym: profile.preferredLocation === 'gym' ? profile.gymType : undefined,
+  }), [equipment, profile.excludedExerciseIds, profile.excludedPatterns, profile.trainingLevel, profile.preferredLocation, profile.gymType])
   const inSession = session.actualExercises.map((a) => a.exerciseId)
   const estimate = sessionEstimateMinutes(session, profile.goal)
 

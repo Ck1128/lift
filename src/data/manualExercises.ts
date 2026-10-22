@@ -45,4 +45,17 @@ export const MANUAL_EXERCISES: Exercise[] = [
   { ...base, id: 'manual-machine-shoulder-press', name: 'Shoulder Press Machine', primaryMuscles: ['shoulders'], secondaryMuscles: ['triceps'],
     movementPattern: 'push', equipmentIds: ['machine'], exerciseType: 'machine', compound: true,
     instructions: ['Adjust the seat so the handles are at shoulder height.', 'Press the handles overhead until your arms are nearly straight.', 'Lower slowly back to shoulder height.'] },
+  // Planet Fitness machines that the public dataset does not have. Instructions only, no photos.
+  { ...base, id: 'manual-lateral-raise-machine', name: 'Lateral Raise Machine', primaryMuscles: ['shoulders'],
+    movementPattern: 'isolation', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
+    instructions: ['Adjust the seat so your shoulders line up with the machine\'s pivot points.', 'Rest your forearms against the pads and raise your arms out to the sides until they reach about shoulder height.', 'Pause briefly, then lower slowly without letting the weights crash down.'] },
+  { ...base, id: 'manual-leg-extension-machine', name: 'Leg Extension Machine', primaryMuscles: ['quads'],
+    movementPattern: 'isolation', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
+    instructions: ['Sit with your back flat against the pad and the roller resting on your lower shins.', 'Straighten your legs until they are almost fully extended, without snapping the knees.', 'Pause, then lower slowly back to the start.'] },
+  { ...base, id: 'manual-glute-kickback-machine', name: 'Glute Kickback Machine', primaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'],
+    movementPattern: 'isolation', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
+    instructions: ['Stand or kneel facing the machine and set one foot or the back of one thigh against the pad.', 'Press the pad back and up by squeezing your glute, without arching your lower back.', 'Pause, return slowly, finish all reps, then switch legs.'] },
+  { ...base, id: 'manual-back-extension-machine', name: 'Back Extension Machine', primaryMuscles: ['back'], secondaryMuscles: ['glutes', 'hamstrings'],
+    movementPattern: 'hinge', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
+    instructions: ['Sit with your back against the pad and set the seat so the pad sits at your mid-back.', 'Push back against the pad by extending your lower back, keeping the motion small and smooth.', 'Return slowly. Use light weight and stop if your lower back hurts.'] },
 ]

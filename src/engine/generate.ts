@@ -1,8 +1,10 @@
 import type {
-  EquipmentId, EquipmentSet, Exercise, Experience, GeneratedWorkout, GenerationResult, Goal, LastPerformance,
+  GymType, EquipmentId, EquipmentSet, Exercise, Experience, GeneratedWorkout, GenerationResult, Goal, LastPerformance,
   Muscle, Pattern, PlannedExercise, WeightUnit, DayPlan,
 } from './types'
-import { EQUIPMENT_LABEL, MUSCLE_LABEL } from './types'
+import { EQUIPMENT_LABEL, GOAL_LABEL, LEVEL_LABEL, MUSCLE_LABEL } from './types'
+import { pfMachineOk, PF_SUMMARY } from './planetFitness'
+import { suitability, type SuitabilityContext } from './suitability'
 import { availableIds, loadSpec } from './equipment'
 import { assumptionsText, estimateSeconds, restSecondsFor } from './time'
 import { startingWeight, suggestLoad, type LoadSpec } from './progression'
@@ -10,7 +12,7 @@ import { validateExercise } from './validate'
 import { LEVEL_PARAMS, setsFor } from './levels'
 import { cardioCalories, MAX_SESSION_MINUTES, MIN_SESSION_MINUTES, pickCardio } from './cardio'
 
-export const GENERATOR_VERSION = 'gen-2.0'
+export const GENERATOR_VERSION = 'gen-2.1'
 
 export interface GenerateInput {
   date: string
@@ -34,6 +36,10 @@ export interface GenerateInput {
   weightKg?: number
   /** Optional. With body weight and level it sets a cautious first-session weight guess. */
   sex?: 'female' | 'male'
+  /** Optional. Older lifters get gentler exercise choices and rep ranges. */
+  age?: number
+  /** Set when training at a gym, so a known club (Planet Fitness) only gets exercises it can actually do. */
+  gym?: GymType
 }
 
 const REPS: Record<Goal, { compound: [number, number]; iso: [number, number] }> = {
@@ -49,14 +55,28 @@ const PATTERN_LABEL: Record<Pattern, string> = {
   hinge: 'a hip-hinge movement', lunge: 'a single-leg movement', core: 'a core exercise', isolation: 'an accessory (single-muscle) exercise',
 }
 
-type Rules = Pick<GenerateInput, 'excludedExerciseIds' | 'excludedPatterns' | 'experience'>
+type Rules = Pick<GenerateInput, 'excludedExerciseIds' | 'excludedPatterns' | 'experience'> & { gym?: GymType }
 
 export function eligible(ex: Exercise, input: Rules, avail: Set<EquipmentId>): boolean {
   if (validateExercise(ex).length > 0) return false
   if (input.excludedExerciseIds.includes(ex.id)) return false
   if (input.excludedPatterns.includes(ex.movementPattern)) return false
   if (LEVEL_PARAMS[input.experience].maxDifficulty === 'beginner' && ex.difficulty !== 'beginner') return false
+  // A machine is only offered at Planet Fitness if the club really has that machine.
+  if (input.gym === 'planet_fitness' && ex.equipmentIds.includes('machine') && !pfMachineOk(ex.name)) return false
   return ex.equipmentIds.every((q) => avail.has(q))
+}
+
+/** Rep ranges for the goal, eased for newer and older lifters so the first weeks are about form, not maxes. */
+function repsFor(goal: Goal, level: Experience, age?: number): { compound: [number, number]; iso: [number, number] } {
+  const base = REPS[goal]
+  if (goal === 'strength' && (level === 'beginner' || (age !== undefined && age >= 55))) {
+    return { compound: [5, 8], iso: [8, 12] }
+  }
+  if (age !== undefined && age >= 55 && (goal === 'muscle' || goal === 'general')) {
+    return { compound: [8, 12], iso: [10, 15] }
+  }
+  return base
 }
 
 function why(ex: Exercise): string {
@@ -75,9 +95,11 @@ function loadSpecFor(ex: Exercise, equipment: EquipmentSet, unit: WeightUnit): L
   return { min: 0, max: Number.POSITIVE_INFINITY, increment: unit === 'lb' ? 5 : 2.5, unit }
 }
 
-function sortCandidates(list: Exercise[], lastDone: Record<string, string>): Exercise[] {
+function sortCandidates(list: Exercise[], lastDone: Record<string, string>, ctx: SuitabilityContext): Exercise[] {
   return [...list].sort((a, b) => {
-    if (a.compound !== b.compound) return a.compound ? -1 : 1
+    const sa = suitability(a, ctx)
+    const sb = suitability(b, ctx)
+    if (sa !== sb) return sb - sa
     const da = lastDone[a.id] ?? ''
     const db = lastDone[b.id] ?? ''
     if (da !== db) return da < db ? -1 : 1 // never done, then longest ago
@@ -149,11 +171,12 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
   if (pool.length === 0) {
     return { kind: 'error', message: 'No exercises match your equipment and exclusions. Check Settings: confirm your equipment or remove an exclusion.' }
   }
+  const fit: SuitabilityContext = { level: input.experience, goal: input.goal, age: input.age }
   const pools = new Map<Muscle, Exercise[]>()
   for (const m of planDay.muscles) {
     const primary = pool.filter((e) => e.primaryMuscles[0] === m)
     const any = pool.filter((e) => e.primaryMuscles.includes(m))
-    const list = sortCandidates(primary.length > 0 ? primary : any, lastDone)
+    const list = sortCandidates(primary.length > 0 ? primary : any, lastDone, fit)
     if (list.length === 0) notes.push(`No exercise for ${MUSCLE_LABEL[m].toLowerCase()} fits your equipment and exclusions, so it is skipped today.`)
     else pools.set(m, list)
   }
@@ -168,7 +191,9 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     for (const m of planDay.muscles) {
       const list = pools.get(m)
       if (!list) continue
-      const left = list.filter((e) => !used.has(e.id))
+      let left = list.filter((e) => !used.has(e.id))
+      // Later passes only add sensible extras: never a poor fit (for example a deadlift for a beginner) when anything else exists.
+      if (pass > 0) { const fine = left.filter((e) => suitability(e, fit) > 0); if (fine.length > 0) left = fine }
       if (left.length === 0) continue
       let pick = left[0]
       if (pass > 0) {
@@ -180,7 +205,7 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     }
   }
 
-  const reps = REPS[input.goal]
+  const reps = repsFor(input.goal, input.experience, input.age)
   const soreFor = (ex: Exercise) => Math.max(0, ...ex.primaryMuscles.map((m) => input.soreness[m] ?? 0))
   const rest = (ex: Exercise) => restSecondsFor(input.goal, ex.compound, level.restBonus)
   // With no history, offer a light starting guess from level, body weight and sex. It is only a place to start.
@@ -215,6 +240,7 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
   }
   const defaultSets = (ex: Exercise) => {
     let s = setsFor(input.goal, input.experience, ex.compound)
+    if (input.age !== undefined && input.age >= 55) s = Math.min(s, 3)
     if (soreFor(ex) >= 2) s = Math.max(2, s - 1)
     return s
   }
@@ -276,6 +302,8 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     notes.push(`You reported soreness in ${sorest.map((m) => MUSCLE_LABEL[m].toLowerCase()).join(', ')}, so those exercises have one fewer set. If you feel unwell or something hurts, rest or choose a lighter day.`)
   }
 
+  notes.unshift(...designNotes(input, avail, cardioMinutes > 0))
+
   const workout: GeneratedWorkout = {
     title: planDay.focus,
     date: input.date,
@@ -291,6 +319,21 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     catalogVersion: input.catalog[0]?.catalogVersion ?? 'unknown',
   }
   return { kind: 'workout', workout }
+}
+
+/** Plain-language "why this session looks the way it does", built from the person's profile. */
+function designNotes(input: GenerateInput, avail: Set<EquipmentId>, hasCardio: boolean): string[] {
+  const out: string[] = []
+  const bits = [LEVEL_LABEL[input.experience], `goal: ${GOAL_LABEL[input.goal].toLowerCase()}`]
+  if (input.age !== undefined) bits.push(`age ${input.age}`)
+  out.push(`Designed for you: ${bits.join(', ')}. ${LEVEL_PARAMS[input.experience].blurb}`)
+  if (input.gym === 'planet_fitness') out.push(`${PF_SUMMARY} Machines and cables come first for beginners; dumbbells and the Smith machine lead for more experienced lifters.`)
+  if (input.age !== undefined && input.age >= 55) out.push('Rep ranges are a little higher and sets a little lower, and jumping or ballistic moves are avoided. Move smoothly and rest as long as you need.')
+  else if (input.age !== undefined && input.age >= 50) out.push('Machines and cables are favoured and jumping moves are avoided.')
+  const warm = ['treadmill', 'exercise_bike', 'elliptical', 'rower'].find((e) => avail.has(e as EquipmentId))
+  const warmName = warm ? EQUIPMENT_LABEL[warm as EquipmentId].toLowerCase() : 'walking in place'
+  out.push(`Warm up: about 5 minutes of easy ${warmName}${hasCardio ? ' (or use your cardio block)' : ''}, then one light set of your first exercise. Cool down with a few minutes of easy movement and stretching${input.gym === 'planet_fitness' ? ' in the stretching area' : ''}.`)
+  return out
 }
 
 /** Alternatives for replacing an exercise: same primary muscle, similar pattern first, nothing excluded or unavailable. */
@@ -322,5 +365,6 @@ export function configHash(input: Omit<GenerateInput, 'catalog'> & { catalogVers
     input.planDay, input.minutes, input.goal, input.experience, input.cardioChoice ?? '', eq,
     [...input.excludedExerciseIds].sort(), [...input.excludedPatterns].sort(),
     input.soreness, input.weightUnit, input.catalogVersion, GENERATOR_VERSION, input.recentSessionIds,
+    input.age ?? '', input.gym ?? '',
   ])
 }
