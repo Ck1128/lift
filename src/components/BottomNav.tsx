@@ -15,19 +15,24 @@ export const SCREENS: { id: ScreenId; label: string; icon: string }[] = [
 ]
 
 
-const ICON: Record<ScreenId, string> = {
-  home: 'M3 11.5 12 4l9 7.5M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10',
-  plan: 'M4 6.5h16v13H4zM4 10.5h16M8.5 3.5v5M15.5 3.5v5',
-  workout: 'M2.5 9.5v5M5.5 7v10M18.5 7v10M21.5 9.5v5M5.5 12h13',
-  yoga: 'M12 21c-4.5-1.5-7-5-7-9.5 3 .2 5.5 1.7 7 4.2 1.5-2.5 4-4 7-4.2 0 4.5-2.5 8-7 9.5ZM12 15.7C10.7 11.5 11 8 12 4c1 4 1.3 7.500 0 11.700Z',
-  food: 'M7 3v8M4.5 3v5.500a2.500 2.500 0 0 0 5 0V3M7 11v10M16.500 21V3c-2.500 1.500-3.500 4.500-3.500 8h3.500',
-  progress: 'M4 19.500h16M5.500 15l4-4.500 3.500 3L19 6.500M15 6.500h4V10.500',
-  settings: 'M4 7h10M18 7h2M4 17h2M10 17h10M16 4.500v5M8 14.500v5',
+/**
+ * A two-tone icon set drawn for Lift: a soft outline in the text colour and one bright shape in the tab colour.
+ * `line` is the outline, `spark` is the bright part (a dot, a bolt, a leaf), so every icon has the same rhythm.
+ */
+const ICON: Record<ScreenId, { line: string; spark: string }> = {
+  home: { line: 'M4 11 12 4.500 20 11v8a1.500 1.500 0 0 1-1.500 1.500h-13A1.500 1.500 0 0 1 4 19Z', spark: 'M12 17.200a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z' },
+  plan: { line: 'M5 5.500h14A1.500 1.500 0 0 1 20.500 7v12a1.500 1.500 0 0 1-1.500 1.500H5A1.500 1.500 0 0 1 3.500 19V7A1.500 1.500 0 0 1 5 5.500ZM3.500 10h17M8 3v4M16 3v4', spark: 'M15.500 16.300a1.800 1.800 0 1 0 0-3.600 1.800 1.800 0 0 0 0 3.600Z' },
+  workout: { line: 'M12 3.500a8.500 8.500 0 1 0 0 17 8.500 8.500 0 0 0 0-17Z', spark: 'M13.200 7 8.800 13h3l-.9 4 4.300-6h-3Z' },
+  yoga: { line: 'M5 13c3 .2 5 1.200 7 3.200 2-2 4-3 7-3.200M12 9v7.200M8.200 20.500 12 16.200l3.800 4.300', spark: 'M12 7.200a2.100 2.100 0 1 0 0-4.200 2.100 2.100 0 0 0 0 4.200Z' },
+  food: { line: 'M12 3.500a8.500 8.500 0 1 0 0 17 8.500 8.500 0 0 0 0-17Z', spark: 'M8.200 15.800c0-4 2.800-6.600 7.200-7 0 4.200-2.600 7-7.200 7ZM8.200 15.800l3.800-3.800' },
+  progress: { line: 'M20.200 12A8.200 8.200 0 1 1 12 3.800', spark: 'M8.300 12.500l2.700 2.700 4.700-5.400' },
+  settings: { line: 'M4 7.500h9M18 7.500h2M4 16.500h2M11 16.500h9', spark: 'M15.500 9.800a2.300 2.300 0 1 0 0-4.600 2.300 2.300 0 0 0 0 4.600ZM8.500 18.800a2.300 2.300 0 1 0 0-4.600 2.300 2.300 0 0 0 0 4.600Z' },
 }
 function Icon({ id }: { id: ScreenId }) {
   return (
-    <svg className="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={ICON[id]} />
+    <svg className="nav-icon" viewBox="0 0 24 24" width="26" height="26" fill="none" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path className="i-line" d={ICON[id].line} stroke="currentColor" />
+      <path className="i-spark" d={ICON[id].spark} />
     </svg>
   )
 }

@@ -8,7 +8,8 @@ import {
 import { formatDay, startOfWeek } from '../engine/dates'
 import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type Muscle, type Profile } from '../engine/types'
 import { tracksOf } from '../engine/tracks'
-import { Button, Card, Loading, ProgressBar, ScreenHeader } from '../components/ui'
+import { Button, Card, Loading, ScreenHeader } from '../components/ui'
+import { MiniRing } from '../components/Ring'
 import { BodyBasicsCard, LevelDialog } from '../components/HomeParts'
 import { TodaysCall } from '../components/TodaysCall'
 import { InjuredAreas } from '../components/InjuredAreas'
@@ -109,8 +110,10 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
       <Card title="This week">
         {tracks.workout && (
           <div className="stat">
-            <div className="row"><span><strong>{thisWeek}</strong>{plannedThisWeek > 0 ? ` of ${Math.max(plannedThisWeek, thisWeek)}` : ''} workout{thisWeek === 1 ? '' : 's'}</span></div>
-            {plannedThisWeek > 0 && <ProgressBar value={thisWeek} max={Math.max(plannedThisWeek, thisWeek)} label="Workouts this week" />}
+            <div className="week-row">
+              <MiniRing value={plannedThisWeek > 0 ? thisWeek / Math.max(plannedThisWeek, thisWeek) : 0} label={`Workouts this week: ${thisWeek}${plannedThisWeek > 0 ? ` of ${Math.max(plannedThisWeek, thisWeek)}` : ''}`}>{thisWeek}</MiniRing>
+              <span><strong>{thisWeek}</strong>{plannedThisWeek > 0 ? ` of ${Math.max(plannedThisWeek, thisWeek)}` : ''} workout{thisWeek === 1 ? '' : 's'}</span>
+            </div>
             {last ? <p className="hint">Last: {last.title} on {formatDay(last.date)}</p> : <p className="hint">No workouts saved yet. Finish one and your progress shows up here.</p>}
           </div>
         )}

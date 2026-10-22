@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.15.0 - Aurora look (branch feature/v2-complete)
+A design-only change in its own commit (`src/theme-aurora.css`, `Ring.tsx`, new nav icons). Revert that commit to get the 2.14.1 look back.
+- **Workout disk.** When a workout starts, a round disk closes clockwise as the planned time runs out. An inner ring fills as sets are done. The middle shows time left, "Paused", or "Over plan".
+- **Aurora theme.** Bright sky background with soft colour glow, glass cards, vivid gradient hero, gradient buttons. Every tab has its own colour pair. Dark mode is a deep navy.
+- **New two-tone icons** in a floating glass nav capsule with a glowing orb behind the current tab.
+- **Week ring** on Home instead of a bar. Sora display font. Motion is off for people who ask for less.
+
 ## 2.14.1 - Reverted the "Premium" look (branch feature/v2-complete)
 - Undid the 2.14.0 design change (commit 980d722). The app looks as it did in 2.12.0. Nothing else changed.
 

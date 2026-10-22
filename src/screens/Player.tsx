@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { SessionRing } from '../components/Ring'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
@@ -98,9 +99,7 @@ export function Player({ session, profile, equipment, onFinished }: {
   return (
     <>
       <ScreenHeader title={session.title} subtitle={`${clock(elapsed)} elapsed${paused ? ' (paused)' : ''} · ${done} of ${relevant.length} sets done`} />
-      <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={relevant.length} aria-valuenow={done} aria-label="Workout progress">
-        <div className="progress-fill" style={{ width: `${relevant.length ? (done / relevant.length) * 100 : 0}%` }} />
-      </div>
+      <SessionRing elapsedMs={elapsed} plannedMinutes={session.plannedMinutes || estimate} setsDone={done} setsTotal={relevant.length} paused={paused} />
       <p className="hint" aria-live="polite">Estimated session length: about {estimate} min{session.plannedMinutes ? ` (you chose ${session.plannedMinutes})` : ''}. It updates when you swap an exercise.</p>
       {swapNote && <p className="ok" role="status">{swapNote}</p>}
       {reopened && <p className="notice" role="status">You reopened this workout. Change anything, then finish again to save it.</p>}
