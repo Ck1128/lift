@@ -4,6 +4,7 @@ import App from './App'
 import '@fontsource-variable/bricolage-grotesque/wght.css'
 import '@fontsource-variable/figtree/wght.css'
 import './styles.css'
+import './theme-docs.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

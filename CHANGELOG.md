@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.13.0 - "Docs-clean" look (branch feature/v2-complete)
+A design-only change, kept in its own commit and its own file (`src/theme-docs.css`) so it can be rolled back by reverting that commit.
+- White pages with thin borders instead of soft gradients and glow. One calm blue accent on every tab instead of a colour per tab.
+- Flat pill-shaped buttons with one clear primary action. Outlined secondary buttons. Chips and toggles show a tick when on.
+- A plain docked bottom bar with a soft highlight on the current tab, like a document app. Quiet grey icons in Settings.
+- One font family throughout, with calmer heading sizes. Dark mode follows the same system.
+
 ## 2.12.0 - Safer deleting, confirmations, a Save button in Settings (branch feature/v2-complete)
 - **Deleting a yoga session now takes three steps:** read the warning, type DELETE, then press a separate "Delete for good" button. Cancel at any step keeps everything. Enter never moves a step forward.
 - **Online food search switch is at the top** of both food screens, with an **(i)** in the corner that explains what is sent and where, and holds "Clear saved results". Turning it on asks OK or Cancel first.
