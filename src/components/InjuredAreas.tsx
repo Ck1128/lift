@@ -1,10 +1,15 @@
 import { updateExclusions } from '../db/repo'
-import { ALL_MUSCLES, MUSCLE_LABEL, type Profile } from '../engine/types'
+import { ALL_MUSCLES, MUSCLE_LABEL, type Muscle, type Profile } from '../engine/types'
 
 /** Tap the areas that are injured or recovering. Used on Home and in Settings, so nobody has to dig for it. */
-export function InjuredAreas({ profile }: { profile: Profile }) {
-  const hurt = profile.injuredMuscles ?? []
-  const toggle = (m: (typeof ALL_MUSCLES)[number]) => void updateExclusions({ injuredMuscles: hurt.includes(m) ? hurt.filter((x) => x !== m) : [...hurt, m] })
+export function InjuredAreas({ profile, value, onChange }: { profile: Profile; value?: Muscle[]; onChange?: (next: Muscle[]) => void }) {
+  // With `value` and `onChange` the parent holds the change until the person saves. Without them, a tap saves at once.
+  const hurt = value ?? profile.injuredMuscles ?? []
+  const toggle = (m: Muscle) => {
+    const next = hurt.includes(m) ? hurt.filter((x) => x !== m) : [...hurt, m]
+    if (onChange) onChange(next)
+    else void updateExclusions({ injuredMuscles: next })
+  }
   return (
     <>
       <p className="hint">Marked areas recover about 50% slower, get one fewer set, and are never the first choice for Today's Call. This is a rule of thumb. For any injury, follow the advice of a qualified professional.</p>

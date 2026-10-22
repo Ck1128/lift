@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ConfirmButton } from './confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { applyImport, clearSent, DEFAULT_PREFS, getHealthPrefs, getSent, markSent, previewImport, saveHealthPrefs, type HealthPrefs } from '../db/healthRepo'
@@ -153,11 +154,11 @@ export function HealthPanel({ profile, today }: { profile: Profile; today: strin
         <input type="checkbox" checked={prefs.includeFood} onChange={(e) => setPrefs({ includeFood: e.target.checked })} />
         <span>Include daily food calories</span>
       </label>
-      <Button disabled={next.length === 0} onClick={() => void send()}>{next.length === 0 ? 'Nothing to send' : `Send ${next.length}${unsent.length > next.length ? ` of ${unsent.length}` : ''} to Apple Health`}</Button>
+      <ConfirmButton disabled={next.length === 0} confirm={{ title: 'Send to Apple Health?', message: `${next.length} item${next.length === 1 ? '' : 's'} will be handed to your "${prefs.sendName}" shortcut. Health will treat them as real records.` }} onConfirm={send}>{next.length === 0 ? 'Nothing to send' : `Send ${next.length}${unsent.length > next.length ? ` of ${unsent.length}` : ''} to Apple Health`}</ConfirmButton>
       {unsent.length > next.length && <p className="hint">Long lists go in batches. Tap again after the shortcut finishes.</p>}
       <div className="inline">
         <Button variant="small" disabled={next.length === 0} onClick={() => void copyLines()}>Copy the lines instead</Button>
-        {sent && Object.keys(sent).length > 0 && <Button variant="small" onClick={() => void clearSent()}>Forget what was sent</Button>}
+        {sent && Object.keys(sent).length > 0 && <ConfirmButton variant="small" confirm={{ title: 'Forget what was sent?', message: 'Everything becomes sendable again. Sending it twice can create duplicates in Health.' }} onConfirm={() => clearSent()}>Forget what was sent</ConfirmButton>}
       </div>
       {copied && <p className="hint" role="status">{copied}</p>}
       <p className="hint">Lift cannot see whether the shortcut finished. "Sent" means the lines were handed to it. If something is missing in Health, use "Forget what was sent" and send again.</p>

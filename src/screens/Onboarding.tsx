@@ -29,7 +29,7 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
         <ScreenHeader title="Confirm your equipment" subtitle="Step 2 of 2" back={false} />
         <button type="button" className="back-btn" onClick={() => setStep('profile')}><span aria-hidden="true">‹</span> Back</button>
         <Card>
-          <EquipmentEditor location={chosen.location} gymType={chosen.gymType} unit={chosen.unit} />
+          <EquipmentEditor instant location={chosen.location} gymType={chosen.gymType} unit={chosen.unit} />
         </Card>
         <Button onClick={onDone}>Looks right, build my plan</Button>
       </>

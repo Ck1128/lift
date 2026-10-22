@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
-import { deleteFoodEntry, duplicateFoodEntry, foodOnDate, foodOnlineEnabled, setFoodOnline, clearFoodCache } from '../db/foodRepo'
+import { deleteFoodEntry, duplicateFoodEntry, foodOnDate } from '../db/foodRepo'
 import { addDays, formatDay } from '../engine/dates'
 import { MEAL_CATEGORIES, MEAL_LABEL, PORTION_LABEL, PREP_SHORT, summarizeDay, type FoodLogEntry, type MealCategory } from '../engine/food'
 import { energyEstimate, nextDayGuidance } from '../engine/guidance'
 import type { Profile } from '../engine/types'
+import { OnlineSearchSwitch } from '../components/OnlineSearchSwitch'
 import { Button, Card, ConfirmDialog, Dialog, EmptyState, ScreenHeader } from '../components/ui'
 import { queryOf, useRouter } from '../router'
 
@@ -18,7 +19,6 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
   const prev = useLiveQuery(() => foodOnDate(addDays(date, -1)), [date], [] as FoodLogEntry[])
   const sessions = useLiveQuery(() => db.sessions.where('date').equals(addDays(date, -1)).toArray(), [date], [])
   const started = useLiveQuery(async () => (await db.settings.get(INTRO_KEY))?.value === true, [], undefined)
-  const online = useLiveQuery(() => foodOnlineEnabled(), [], false)
   const [del, setDel] = useState<FoodLogEntry | null>(null)
   const [copy, setCopy] = useState<FoodLogEntry | null>(null)
   const [copyDate, setCopyDate] = useState(date)
@@ -54,6 +54,8 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
         <input type="date" aria-label="Choose a date" value={date} max={today} onChange={(e) => e.target.value && goDate(e.target.value)} className="date-input" />
         <Button variant="small" onClick={() => goDate(addDays(date, 1))} disabled={date >= today} aria-label="Next day">Next ›</Button>
       </div>
+
+      <Card className="switch-card"><OnlineSearchSwitch /></Card>
 
       <Card title="Daily summary">
         {summary.count === 0 ? (
@@ -101,15 +103,6 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
         )
       })}
 
-      <Card title="Food search settings">
-        <div className="switch-row">
-          <span id="off-label">Search packaged foods online (Open Food Facts)</span>
-          <button type="button" role="switch" aria-checked={!!online} aria-labelledby="off-label" className={online ? 'switch on' : 'switch'}
-            onClick={() => void setFoodOnline(!online)}><span className="switch-knob" aria-hidden="true" /><span className="sr-only">{online ? 'On' : 'Off'}</span></button>
-        </div>
-        <p className="hint">Off by default. When on, the words you type in the food search are sent to world.openfoodfacts.org, and nothing else. Results are saved on this phone so repeat searches work offline.</p>
-        <Button variant="small" onClick={() => void clearFoodCache()}>Clear saved online results</Button>
-      </Card>
 
       {del && (
         <ConfirmDialog title="Delete this entry?" message={`${del.name} (${Math.round(del.kcal)} kcal) will be removed from ${formatDay(del.date)}.`} confirmLabel="Delete" danger

@@ -41,6 +41,16 @@ async function fillAbout(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(screen.getByRole('group', { name: 'Sex' })).getByRole('button', { name: 'Male' }))
 }
 
+/** Presses a Save button that appears once something in Settings is changed. */
+async function saveIn(user: ReturnType<typeof userEvent.setup>, what: 'changes' | 'equipment' = 'changes') {
+  await user.click(await screen.findByRole('button', { name: `Save ${what}` }))
+}
+
+/** Presses OK on the confirmation that every action now asks for. */
+async function confirmOk(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^OK$/ }))
+}
+
 const tab = async (name: string) => within(await screen.findByRole('navigation', { name: /main navigation/i })).getByRole('button', { name })
 
 async function generateAndOpen(user: ReturnType<typeof userEvent.setup>, minutes = 45) {
@@ -53,6 +63,7 @@ async function startWorkout(user: ReturnType<typeof userEvent.setup>, minutes = 
   await user.click(screen.getByRole('button', { name: `${minutes} min` }))
   await generateAndOpen(user, minutes)
   await user.click(screen.getByRole('button', { name: /start workout/i }))
+  await confirmOk(user)
   await screen.findAllByLabelText('Set 1 weight')
 }
 
@@ -331,6 +342,7 @@ describe('workout flow', () => {
     expect(screen.getByText(/\(estimate, you chose 30\)/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /start workout/i }))
+    await confirmOk(user)
     const first = (await screen.findAllByLabelText('Set 1 weight'))[0]
     expect(screen.getByText(/0 of \d+ sets done/)).toBeInTheDocument()
 
@@ -500,6 +512,7 @@ describe('workout flow', () => {
     const first = render(<App />)
     await generateAndOpen(user)
     await user.click(screen.getByRole('button', { name: /start workout/i }))
+    await confirmOk(user)
     await user.click((await screen.findAllByRole('button', { name: /mark set 1 done/i }))[0])
     await waitFor(async () => expect((await db.setLogs.toArray()).some((l) => l.completed)).toBe(true))
     first.unmount()
@@ -535,9 +548,13 @@ describe('equipment', () => {
     expect(bw).toBeEnabled()
     expect(bw).toBeChecked()
     await user.click(bw)
+    expect(screen.getByLabelText('Bodyweight / no equipment')).not.toBeChecked()
+    expect((await db.equipment.get('gym'))?.excluded).not.toContain('bodyweight') // nothing is saved before Save
+    await saveIn(user, 'equipment')
     await waitFor(async () => expect((await db.equipment.get('gym'))?.excluded).toContain('bodyweight'))
     expect(screen.getByLabelText('Bodyweight / no equipment')).not.toBeChecked()
     await user.click(screen.getByLabelText('Bodyweight / no equipment'))
+    await saveIn(user, 'equipment')
     await waitFor(async () => expect((await db.equipment.get('gym'))?.excluded).not.toContain('bodyweight'))
   })
 
@@ -549,6 +566,7 @@ describe('equipment', () => {
     expect(await screen.findByText(/standard gym equipment applied automatically/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Treadmill')).toBeChecked()
     await user.click(screen.getByLabelText('Treadmill'))
+    await saveIn(user, 'equipment')
     await waitFor(async () => expect((await db.equipment.get('gym'))?.excluded).toContain('treadmill'))
     expect(screen.getByText(/applied now:/i)).not.toHaveTextContent(/treadmill/i)
   })
@@ -559,8 +577,10 @@ describe('equipment', () => {
     render(<App />)
     await user.click(await tab('Settings'))
     await user.click(within(await screen.findByRole('group', { name: 'Which gym' })).getByRole('button', { name: /^full gym/i }))
+    await saveIn(user)
     await waitFor(async () => expect((await db.equipment.get('gym'))?.preset).toBeUndefined())
     await user.click(within(screen.getByRole('group', { name: 'Which gym' })).getByRole('button', { name: /^standard gym/i }))
+    await saveIn(user)
     await waitFor(async () => expect((await db.equipment.get('gym'))?.preset).toBe('standard_gym'))
   })
 })
@@ -701,8 +721,12 @@ describe('food', () => {
     await user.click(await tab('Food'))
     const sw = await screen.findByRole('switch', { name: /search packaged foods online/i })
     expect(sw).toHaveAttribute('aria-checked', 'false')
+    await user.click(screen.getByRole('button', { name: /about online food search/i }))
     expect(screen.getByText(/sent to world\.openfoodfacts\.org/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
     await user.click(sw)
+    expect(sw).toHaveAttribute('aria-checked', 'false') // it asks first
+    await confirmOk(user)
     await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'))
     await user.click(sw)
     await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'))
@@ -724,6 +748,7 @@ describe('yoga', () => {
     await screen.findAllByRole('button', { name: /mark done/i })
     await user.click(screen.getAllByRole('button', { name: /mark done/i })[0])
     await user.click(screen.getAllByRole('button', { name: 'Finish session' })[0])
+    await confirmOk(user)
     await waitFor(async () => expect((await db.yogaSessions.toArray())[0].status).toBe('partial'))
     expect(await db.yogaSessions.count()).toBe(1)
   })
@@ -766,9 +791,12 @@ describe('settings', () => {
     render(<App />)
     await user.click(await tab('Settings'))
     await user.click(within(await screen.findByRole('group', { name: 'Training location' })).getByRole('button', { name: 'Home' }))
-    expect((await db.profile.toArray())[0].preferredLocation).toBe('home')
+    expect((await db.profile.toArray())[0].preferredLocation).toBe('gym') // not saved yet
     await user.click(screen.getByRole('button', { name: 'Home list' }))
     await user.click(await screen.findByLabelText('Dumbbells'))
+    await saveIn(user, 'equipment')
+    await saveIn(user)
+    await waitFor(async () => expect((await db.profile.toArray())[0].preferredLocation).toBe('home'))
     await waitFor(async () => expect((await db.equipment.get('home'))?.items.dumbbell?.available).toBe(true))
     expect((await db.equipment.get('gym'))?.preset).toBe('standard_gym') // gym list untouched
   })
@@ -781,8 +809,11 @@ describe('settings', () => {
     await user.type(await screen.findByLabelText(/find an exercise to exclude/i), 'squat')
     const boxes = await screen.findAllByRole('checkbox', { name: /squat/i })
     await user.click(boxes[0])
+    expect((await db.profile.toArray())[0].excludedExerciseIds).toHaveLength(0) // waits for Save
+    await saveIn(user)
     await waitFor(async () => expect((await db.profile.toArray())[0].excludedExerciseIds).toHaveLength(1))
     await user.click(await screen.findByRole('button', { name: 'Remove' }))
+    await saveIn(user)
     await waitFor(async () => expect((await db.profile.toArray())[0].excludedExerciseIds).toHaveLength(0))
   })
 
@@ -1184,8 +1215,11 @@ describe('settings sections, info icons, feedback and recovery', () => {
     await user.click(await tab('Settings'))
     await user.click(screen.getByText('Feedback and support'))
     await user.click(screen.getByLabelText(/show the small f feedback buttons/i))
-    expect(screen.queryAllByRole('button', { name: /send feedback about/i })).toHaveLength(0)
+    await saveIn(user)
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: /send feedback about/i })).toHaveLength(0))
     await user.click(screen.getByLabelText(/show the small f feedback buttons/i))
+    await saveIn(user)
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: /send feedback about/i }).length).toBeGreaterThan(0))
     expect(screen.queryAllByRole('button', { name: /send feedback about/i }).length).toBeGreaterThan(0)
   })
 

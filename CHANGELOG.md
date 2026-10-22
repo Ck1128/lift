@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.12.0 - Safer deleting, confirmations, a Save button in Settings (branch feature/v2-complete)
+- **Deleting a yoga session now takes three steps:** read the warning, type DELETE, then press a separate "Delete for good" button. Cancel at any step keeps everything. Enter never moves a step forward.
+- **Online food search switch is at the top** of both food screens, with an **(i)** in the corner that explains what is sent and where, and holds "Clear saved results". Turning it on asks OK or Cancel first.
+- **Every action asks OK or Cancel.** Starting, continuing or rebuilding a workout, finishing or reopening a yoga session, skipping an exercise or a day, sending to Apple Health, forgetting what was sent, rebuilding the plan, switching to your own equipment list and resetting a list. Simple taps while you train (marking a set done) are not interrupted.
+- **Settings has a Save button.** Changes to yoga level, food guidance, training place, gym type, exercises to avoid, injured areas, your private note and the feedback icons wait until you press **Save changes** (or **Discard**). Equipment has its own **Save equipment**. During first setup, equipment still saves as you tick it.
+
 ## 2.11.0 - Fixes for finishing and starting workouts, and 370 Indian foods with Telugu names (branch feature/v2-complete)
 - **Fixed: a new workout showed the old sets still done.** Starting a workout on a day that already had a saved one reopened the old workout. Now a workout you rebuild or ask for fresh starts with every set blank, and the one you finished stays safely in your history. If you did part of a workout, the screen asks plainly: **Continue my workout** or **Start a new workout**.
 - **Fixed: an extra workout after a finished one was hidden.** The day now shows the workout still to do first.

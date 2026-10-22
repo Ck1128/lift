@@ -1,31 +1,52 @@
+import { useState } from 'react'
 import { db } from '../db/schema'
 import { applyDefaultEquipment, saveEquipment, setExcludedEquipment } from '../db/repo'
 import {
   availableIds, defaultLoad, equipmentSummary, PRESET_EQUIPMENT, PRESET_REVIEWED, PRESET_VERSION, presetEquipment, presetFor, withExclusions,
 } from '../engine/equipment'
-import type { EquipmentId, EquipmentItem, GymType, LocationType, WeightUnit } from '../engine/types'
+import type { EquipmentId, EquipmentItem, EquipmentSet, GymType, LocationType, WeightUnit } from '../engine/types'
 import { ALL_EQUIPMENT, EQUIPMENT_LABEL, LOADABLE } from '../engine/types'
 import { useQuery } from '../hooks/app'
-import { Button } from './ui'
+import { ConfirmButton, SaveBar } from './confirm'
 
-export function EquipmentEditor({ location, gymType, unit }: { location: LocationType; gymType: GymType; unit: WeightUnit }) {
+/** In Settings changes wait for Save. During setup (`instant`) each tick is saved at once, because Continue needs it. */
+export function EquipmentEditor({ location, gymType, unit, instant }: { location: LocationType; gymType: GymType; unit: WeightUnit; instant?: boolean }) {
   const q = useQuery(() => db.equipment.get(location), [location])
+  // Changes wait here until Save. Nothing is applied to your workouts before that.
+  const [draftExcluded, setDraftExcluded] = useState<EquipmentId[] | null>(null)
+  const [draftItems, setDraftItems] = useState<EquipmentSet | null>(null)
   if (q.loading) return <p className="muted">Loading...</p>
   const rec = q.value
   const kind = presetFor(location, gymType)
   const preset = rec?.preset
-  const excluded = rec?.excluded ?? []
+  const excluded = draftExcluded ?? rec?.excluded ?? []
   const items = preset
     ? withExclusions(presetEquipment(preset, unit), excluded)
-    : (rec?.items ?? presetEquipment(kind, unit))
+    : (draftItems ?? rec?.items ?? presetEquipment(kind, unit))
+  const dirty = !instant && (draftExcluded !== null || draftItems !== null)
+  const discard = () => { setDraftExcluded(null); setDraftItems(null) }
+  const saveBar = (
+    <SaveBar
+      dirty={dirty} label="Save equipment" onDiscard={discard}
+      onSave={async () => {
+        if (preset && draftExcluded) await setExcludedEquipment(location, draftExcluded)
+        else if (draftItems) await saveEquipment(location, draftItems)
+        discard()
+      }}
+    />
+  )
   const summary = equipmentSummary(items, EQUIPMENT_LABEL)
 
   if (preset) {
     const base = PRESET_EQUIPMENT[preset]
-    const toggle = (id: EquipmentId, on: boolean) =>
-      setExcludedEquipment(location, on ? excluded.filter((x) => x !== id) : [...excluded, id])
+    const toggle = (id: EquipmentId, on: boolean) => {
+      const next = on ? excluded.filter((x) => x !== id) : [...excluded, id]
+      if (instant) void setExcludedEquipment(location, next)
+      else setDraftExcluded(next)
+    }
     return (
       <div>
+        {saveBar}
         <p className="notice">
           <strong>Standard gym equipment applied automatically.</strong>{' '}
           List {PRESET_VERSION}, last reviewed {PRESET_REVIEWED}. It is a typical club, not a record of every location, so
@@ -48,7 +69,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
         <details>
           <summary>Edit the list myself instead</summary>
           <p className="hint">Your club has something different? Switch to your own list. It starts from the current one and you can tick anything. It will no longer follow updates to the standard gym list.</p>
-          <Button variant="ghost" onClick={() => void saveEquipment(location, items)}>Use my own list</Button>
+          <ConfirmButton variant="ghost" confirm={{ title: 'Switch to your own list?', message: 'It starts from the current list and will no longer follow updates to the standard gym list.' }} onConfirm={() => saveEquipment(location, items)}>Use my own list</ConfirmButton>
         </details>
       </div>
     )
@@ -58,7 +79,8 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
     const cur = items[id] ?? { id, available: false }
     const next: EquipmentItem = { ...cur, id, ...patch }
     if (patch.available && LOADABLE.includes(id) && next.minWeight === undefined) Object.assign(next, defaultLoad(id, unit))
-    return saveEquipment(location, { ...items, [id]: next })
+    if (instant) void saveEquipment(location, { ...items, [id]: next })
+    else setDraftItems({ ...items, [id]: next })
   }
   const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
   const have = availableIds(items)
@@ -66,6 +88,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
 
   return (
     <div>
+      {saveBar}
       <p className="hint">
         {location === 'home' ? 'Tick only what you own.' : 'Tick what your gym has today.'} The workout generator uses only the ticked items.
         {' '}Bodyweight is an ordinary option: untick it if you do not want bodyweight exercises.
@@ -77,7 +100,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
         return (
           <div key={id} className="equip">
             <label className="check">
-              <input type="checkbox" checked={checked} onChange={(e) => void set(id, { available: e.target.checked })} />
+              <input type="checkbox" checked={checked} onChange={(e) => set(id, { available: e.target.checked })} />
               <span>{EQUIPMENT_LABEL[id]}</span>
             </label>
             {it.available && LOADABLE.includes(id) && (
@@ -90,7 +113,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
                       key={`${id}-${k}-${it[k] ?? ''}`}
                       onBlur={(e) => {
                         const v = num(e.target.value)
-                        if (v !== undefined && v > 0) void set(id, { [k]: v, unit })
+                        if (v !== undefined && v > 0) set(id, { [k]: v, unit })
                       }}
                     />
                   </label>
@@ -101,9 +124,9 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
           </div>
         )
       })}
-      <Button variant="ghost" onClick={() => void applyDefaultEquipment(location, gymType, unit)}>
+      <ConfirmButton variant="ghost" confirm={{ title: `Reset the list to ${presetName}?`, message: 'Your own ticks and weights for this list are replaced.', danger: true }} onConfirm={() => applyDefaultEquipment(location, gymType, unit)}>
         Reset list to {presetName}
-      </Button>
+      </ConfirmButton>
     </div>
   )
 }

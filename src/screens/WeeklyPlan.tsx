@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { acceptReschedule, getPlan, rebuildPlan, skipScheduled } from '../db/repo'
@@ -69,7 +70,7 @@ export function WeeklyPlan({ profile, today }: { profile: Profile; today: string
                 {row && !row.workout && row.status === 'planned' && <p className="hint">Exercises are chosen on the day, from your equipment, time and history.</p>}
                 {session && <Button variant="ghost" onClick={() => navigate(`/session/${session.id}`)}>View saved workout</Button>}
                 {row && row.status === 'planned' && date >= today && (
-                  <Button variant="ghost" onClick={() => skip(row)}>Skip this day</Button>
+                  <ConfirmButton variant="ghost" confirm={{ title: 'Skip this day?', message: 'The workout is marked skipped. Lift may suggest a better day to move it to.' }} onConfirm={() => skip(row)}>Skip this day</ConfirmButton>
                 )}
                 {row?.rescheduledFromId && <p className="hint">Moved here from a skipped day.</p>}
                 {(session || row?.workout || (row && row.status !== 'planned')) && date <= today && (

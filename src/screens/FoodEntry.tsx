@@ -10,6 +10,7 @@ import { searchFoods, type ProviderReport } from '../food/search'
 import { openFoodFactsProvider } from '../food/providers'
 import { formatDay } from '../engine/dates'
 import type { Profile } from '../engine/types'
+import { OnlineSearchSwitch } from '../components/OnlineSearchSwitch'
 import { Button, Card, ScreenHeader } from '../components/ui'
 import { useOnline } from '../hooks/app'
 import { queryOf, useRouter } from '../router'
@@ -194,13 +195,14 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
       {!picked && !manual && (
         <>
           <Card>
+            <OnlineSearchSwitch />
             <div className="field">
               <label htmlFor="a-search">Search foods</label>
               <input id="a-search" type="search" value={query} placeholder="For example: rice, idli, sorakaya, బియ్యం" onChange={(e) => setQuery(e.target.value)} />
               <p className="hint">Pick the exact version you ate. Raw and cooked foods have very different calories per gram.</p>
             </div>
             {searching && <p className="muted" role="status">Searching...</p>}
-            {reports.filter((r) => r.status !== 'ok' || r.provider !== 'local').map((r) => <p key={r.provider} className="hint" role="status">{r.name}: {r.message}</p>)}
+            {reports.filter((r) => r.status !== 'disabled' && (r.status !== 'ok' || r.provider !== 'local')).map((r) => <p key={r.provider} className="hint" role="status">{r.name}: {r.message}</p>)}
             <ul className="history">
               {shown.map((c) => (
                 <li key={`${c.item.provider}-${c.item.providerId}-${c.state.state}`}>

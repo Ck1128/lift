@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState } from 'react'
+import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { generateFor, getEquipment, scheduledOn, setCardioChoice, startSession } from '../db/repo'
@@ -186,13 +187,13 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
       {resuming ? (
         <>
           <p className="hint">You already did part of this workout today. Continue it, or start a new one with every set blank.</p>
-          <Button disabled={busy} onClick={start}>Continue my workout</Button>
-          <Button variant="ghost" disabled={busy} onClick={startNew}>Start a new workout</Button>
+          <ConfirmButton disabled={busy} confirm={{ title: 'Continue your workout?', message: 'It reopens with the sets you already did.' }} onConfirm={start}>Continue my workout</ConfirmButton>
+          <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Start a new workout?', message: 'Every set starts blank. The workout you did stays in your history.' }} onConfirm={startNew}>Start a new workout</ConfirmButton>
         </>
       ) : (
         <>
-          <Button disabled={busy} onClick={start}>Start workout</Button>
-          <Button variant="ghost" disabled={busy} onClick={() => regenerate(w.availableMinutes, true)}>Build a fresh version</Button>
+          <ConfirmButton disabled={busy} confirm={{ title: 'Start this workout?', message: 'The timer starts now.' }} onConfirm={start}>Start workout</ConfirmButton>
+          <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Build a fresh version?', message: 'The exercises shown here are replaced with a new set.' }} onConfirm={() => regenerate(w.availableMinutes, true)}>Build a fresh version</ConfirmButton>
         </>
       )}
     </>

@@ -10,7 +10,8 @@ import { DeleteAllData, DELETE_CATEGORIES } from '../components/DeleteAllData'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
 import { Button, Chips, Dialog, ScreenHeader } from '../components/ui'
-import { LEVEL_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
+import { ConfirmButton, SaveBar } from '../components/confirm'
+import { LEVEL_LABEL, type LocationType, type Muscle, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
 import { HealthPanel } from '../components/HealthPanel'
 import { FeedbackButton, FeedbackForm, setFeedbackIcons, useFeedbackIcons } from '../components/Feedback'
 import { SETTINGS_CATEGORIES } from '../engine/feedback'
@@ -52,23 +53,58 @@ function Section({ title, children, danger }: { title: string; children: ReactNo
   )
 }
 
+interface Edits {
+  yogaLevel: TrainingLevel | ''
+  nutrition: boolean
+  location: LocationType
+  gym: Profile['gymType']
+  patterns: Pattern[]
+  excluded: string[]
+  injured: Muscle[]
+  note: string
+  feedbackIcons: boolean
+}
+
 export function Settings({ profile, today, onReset }: { profile: Profile; today: string; onReset: () => void }) {
   const { navigate } = useRouter()
   const [editLocation, setEditLocation] = useState<LocationType>(profile.preferredLocation)
   const [search, setSearch] = useState('')
-  const [note, setNote] = useState(profile.limitationNote ?? '')
+  const feedbackOn = useFeedbackIcons()
+  // Nothing in these sections is applied until Save. `edits` holds only what the person changed.
+  const base: Edits = {
+    yogaLevel: profile.yogaLevel ?? '', nutrition: profile.nutritionGuidance, location: profile.preferredLocation, gym: profile.gymType,
+    patterns: profile.excludedPatterns, excluded: profile.excludedExerciseIds, injured: profile.injuredMuscles ?? [],
+    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn,
+  }
+  const [edits, setEdits] = useState<Partial<Edits>>({})
+  const cur: Edits = { ...base, ...edits }
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const dirty = (Object.keys(edits) as (keyof Edits)[]).some((k) => !same(edits[k], base[k]))
+  const edit = <K extends keyof Edits>(k: K, v: Edits[K]) => setEdits((e) => ({ ...e, [k]: v }))
+  const saveEdits = async () => {
+    if (cur.location !== base.location || cur.gym !== base.gym) await setLocation(cur.location, cur.gym)
+    if (cur.yogaLevel !== base.yogaLevel && cur.yogaLevel) await setYogaLevel(cur.yogaLevel)
+    if (cur.nutrition !== base.nutrition) await setNutritionGuidance(cur.nutrition)
+    const patch: Parameters<typeof updateExclusions>[0] = {}
+    if (!same(cur.patterns, base.patterns)) patch.excludedPatterns = cur.patterns
+    if (!same(cur.excluded, base.excluded)) patch.excludedExerciseIds = cur.excluded
+    if (!same(cur.injured, base.injured)) patch.injuredMuscles = cur.injured
+    if (cur.note !== base.note) patch.limitationNote = cur.note.trim() || undefined
+    if (Object.keys(patch).length > 0) await updateExclusions(patch)
+    if (cur.feedbackIcons !== base.feedbackIcons) setFeedbackIcons(cur.feedbackIcons)
+    setEdits({})
+  }
   const [levelAsk, setLevelAsk] = useState<{ proceed: (m: 'update' | 'keep') => void } | null>(null)
 
   const matches = search.trim().length < 2 ? [] : CATALOG.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 25)
-  const excluded = profile.excludedExerciseIds
-  const toggleEx = (id: string) =>
-    updateExclusions({ excludedExerciseIds: excluded.includes(id) ? excluded.filter((x) => x !== id) : [...excluded, id] })
-  const togglePattern = (p: Pattern) =>
-    updateExclusions({ excludedPatterns: profile.excludedPatterns.includes(p) ? profile.excludedPatterns.filter((x) => x !== p) : [...profile.excludedPatterns, p] })
+  const excluded = cur.excluded
+  const toggleEx = (id: string) => edit('excluded', excluded.includes(id) ? excluded.filter((x) => x !== id) : [...excluded, id])
+  const togglePattern = (p: Pattern) => edit('patterns', cur.patterns.includes(p) ? cur.patterns.filter((x) => x !== p) : [...cur.patterns, p])
 
   return (
     <>
       <ScreenHeader title="Settings" subtitle="Profile, equipment, backup" />
+      <SaveBar dirty={dirty} onSave={saveEdits} onDiscard={() => { setEdits({}); setEditLocation(profile.preferredLocation) }} />
 
       <div className="group">
       <Section title="Profile and goals">
@@ -88,30 +124,30 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
       <Section title="Yoga and food">
         <div className="field">
           <label htmlFor="yoga-level">Yoga level</label>
-          <select id="yoga-level" value={profile.yogaLevel ?? ''} onChange={(e) => void setYogaLevel(e.target.value as TrainingLevel)}>
+          <select id="yoga-level" value={cur.yogaLevel} onChange={(e) => edit('yogaLevel', e.target.value as TrainingLevel)}>
             <option value="" disabled>Choose when you plan your first yoga session</option>
             {(['beginner', 'intermediate', 'regular'] as const).map((l) => <option key={l} value={l}>{LEVEL_LABEL[l]}</option>)}
           </select>
           <p className="hint">Separate from your lifting level. A beginner lifter can be an experienced yogi.</p>
         </div>
         <label className="check">
-          <input type="checkbox" checked={profile.nutritionGuidance} onChange={(e) => void setNutritionGuidance(e.target.checked)} />
+          <input type="checkbox" checked={cur.nutrition} onChange={(e) => edit('nutrition', e.target.checked)} />
           <span>Show gentle next-day food guidance after I log food</span>
         </label>
         <p className="hint">Optional and off by default. It is never a diet plan and never tells you to make up for what you ate.</p>
       </Section>
 
       <Section title="Where you train">
-        <Chips label="Training location" options={['gym', 'home'] as const} value={profile.preferredLocation} onChange={(v) => { void setLocation(v); setEditLocation(v) }} format={(v) => (v === 'gym' ? 'Gym' : 'Home')} />
-        {profile.preferredLocation === 'gym' && (
-          <Chips label="Which gym" options={['standard', 'generic'] as const} value={profile.gymType} onChange={(v) => void setLocation('gym', v)} format={(v) => (v === 'standard' ? 'Standard gym' : 'Full gym (barbells and racks)')} />
+        <Chips label="Training location" options={['gym', 'home'] as const} value={cur.location} onChange={(v) => { edit('location', v); setEditLocation(v) }} format={(v) => (v === 'gym' ? 'Gym' : 'Home')} />
+        {cur.location === 'gym' && (
+          <Chips label="Which gym" options={['standard', 'generic'] as const} value={cur.gym} onChange={(v) => edit('gym', v)} format={(v) => (v === 'standard' ? 'Standard gym' : 'Full gym (barbells and racks)')} />
         )}
         <p className="hint">Home and gym each keep their own equipment list.</p>
       </Section>
 
       <Section title="Equipment">
         <Chips label="Which list to edit" options={['gym', 'home'] as const} value={editLocation} onChange={setEditLocation} format={(v) => (v === 'gym' ? 'Gym list' : 'Home list')} />
-        <EquipmentEditor location={editLocation} gymType={profile.gymType} unit={profile.weightUnit} />
+        <EquipmentEditor key={editLocation} location={editLocation} gymType={profile.gymType} unit={profile.weightUnit} />
       </Section>
 
       <Section title="Exercises to avoid">
@@ -119,7 +155,7 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
         <p className="label-like">Movement types to avoid</p>
         <div className="chips">
           {PATTERNS.map((p) => (
-            <button key={p.id} type="button" className={profile.excludedPatterns.includes(p.id) ? 'chip on' : 'chip'} aria-pressed={profile.excludedPatterns.includes(p.id)} onClick={() => void togglePattern(p.id)}>{p.label}</button>
+            <button key={p.id} type="button" className={cur.patterns.includes(p.id) ? 'chip on' : 'chip'} aria-pressed={cur.patterns.includes(p.id)} onClick={() => togglePattern(p.id)}>{p.label}</button>
           ))}
         </div>
         <div className="field">
@@ -127,30 +163,30 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
           <input id="ex-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type at least 2 letters" />
         </div>
         {matches.map((e) => (
-          <label key={e.id} className="check"><input type="checkbox" checked={excluded.includes(e.id)} onChange={() => void toggleEx(e.id)} /><span>{e.name}</span></label>
+          <label key={e.id} className="check"><input type="checkbox" checked={excluded.includes(e.id)} onChange={() => toggleEx(e.id)} /><span>{e.name}</span></label>
         ))}
         {excluded.length > 0 && (
           <>
             <p className="label-like">Currently excluded</p>
             <ul className="plain">
               {excluded.map((id) => (
-                <li key={id}>{CATALOG.find((e) => e.id === id)?.name ?? id}{' '}<button type="button" className="link-btn" onClick={() => void toggleEx(id)}>Remove</button></li>
+                <li key={id}>{CATALOG.find((e) => e.id === id)?.name ?? id}{' '}<button type="button" className="link-btn" onClick={() => toggleEx(id)}>Remove</button></li>
               ))}
             </ul>
           </>
         )}
         <p className="label-like">Injured or recovering areas</p>
-        <InjuredAreas profile={profile} />
+        <InjuredAreas profile={profile} value={cur.injured} onChange={(v) => edit('injured', v)} />
         <div className="field">
           <label htmlFor="limit-note">Private note (optional)</label>
-          <textarea id="limit-note" rows={2} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} onBlur={() => void updateExclusions({ limitationNote: note.trim() || undefined })} />
+          <textarea id="limit-note" rows={2} value={cur.note} maxLength={300} onChange={(e) => edit('note', e.target.value)} />
           <p className="hint">Only for your own reference. The app does not use it to make medical decisions.</p>
         </div>
       </Section>
 
       <Section title="Weekly schedule">
         <p className="hint">Training days are set in your profile above. If your plan looks out of date, rebuild it. Finished and skipped days are never changed.</p>
-        <Button variant="ghost" onClick={() => void rebuildPlan(profile)}>Rebuild upcoming plan</Button>
+        <ConfirmButton variant="ghost" confirm={{ title: 'Rebuild the upcoming plan?', message: 'Finished and skipped days are never changed. Upcoming days are rebuilt from your current profile.' }} onConfirm={async () => { await rebuildPlan(profile) }}>Rebuild upcoming plan</ConfirmButton>
       </Section>
 
       <Section title="Apple Health">
@@ -158,7 +194,10 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
       </Section>
 
       <Section title="Feedback and support">
-        <FeedbackIconsToggle />
+        <label className="check">
+          <input type="checkbox" checked={cur.feedbackIcons} onChange={(e) => edit('feedbackIcons', e.target.checked)} />
+          <span>Show the small F feedback buttons next to screens and cards (this device only)</span>
+        </label>
         <FeedbackForm context={{ screen: 'Settings', component: 'Feedback and support' }} categories={SETTINGS_CATEGORIES} />
       </Section>
 
@@ -208,15 +247,5 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
       )}
 
     </>
-  )
-}
-
-function FeedbackIconsToggle() {
-  const on = useFeedbackIcons()
-  return (
-    <label className="check">
-      <input type="checkbox" checked={on} onChange={(e) => setFeedbackIcons(e.target.checked)} />
-      <span>Show the small F feedback buttons next to screens and cards (this device only)</span>
-    </label>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { deleteYogaSession, finishYoga, markYogaItem, reopenYoga, setYogaNotes } from '../db/yogaRepo'
@@ -10,6 +11,7 @@ import { formatDay } from '../engine/dates'
 import type { Profile } from '../engine/types'
 import { useNow } from '../hooks/app'
 import { Button, Card, ConfirmDialog, ScreenHeader } from '../components/ui'
+import { StepDelete } from '../components/confirm'
 import { SendToHealthButton } from '../components/HealthPanel'
 import { yogaItem } from '../engine/health'
 import { useRouter } from '../router'
@@ -45,8 +47,8 @@ export function YogaSessionPage({ sessionId, profile }: { sessionId: string; pro
       <ScreenHeader title={s.styleName} subtitle={`${formatDay(s.date)} · ${STATUS[s.status]}`} />
       <div className="inline">
         {live
-          ? <Button variant="small" className="finish-top" onClick={() => void finish()}>Finish session</Button>
-          : <Button variant="small" onClick={async () => { const r = await reopenYoga(s.id); setMsg(r.ok ? '' : (r.reason ?? '')) }}>Edit or resume</Button>}
+          ? <ConfirmButton variant="small" className="finish-top" confirm={{ title: 'Finish this session?', message: 'It is saved to your history. You can still edit it afterwards.' }} onConfirm={finish}>Finish session</ConfirmButton>
+          : <ConfirmButton variant="small" confirm={{ title: 'Edit or resume this session?', message: 'It becomes open again so you can change it.' }} onConfirm={async () => { const r = await reopenYoga(s.id); setMsg(r.ok ? '' : (r.reason ?? '')) }}>Edit or resume</ConfirmButton>}
         {live && <Button variant="small" onClick={() => setConfirm('discard')}>Discard</Button>}
       </div>
       {msg && <p className="notice" role="status">{msg}</p>}
@@ -99,7 +101,7 @@ export function YogaSessionPage({ sessionId, profile }: { sessionId: string; pro
         <textarea id="y-notes" rows={2} maxLength={300} value={notes ?? s.notes ?? ''} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== null && void setYogaNotes(s.id, notes)} />
       </Card>
 
-      {live && <Button className="finish-bottom" onClick={() => void finish()}>Finish session</Button>}
+      {live && <ConfirmButton className="finish-bottom" confirm={{ title: 'Finish this session?', message: 'It is saved to your history. You can still edit it afterwards.' }} onConfirm={finish}>Finish session</ConfirmButton>}
       <Button variant="ghost" onClick={() => setConfirm('delete')}>Delete this session</Button>
 
       {confirm === 'discard' && (
@@ -107,7 +109,7 @@ export function YogaSessionPage({ sessionId, profile }: { sessionId: string; pro
           onCancel={() => setConfirm(null)} onConfirm={async () => { setConfirm(null); await finishYoga(s.id, 'discard') }} />
       )}
       {confirm === 'delete' && (
-        <ConfirmDialog title="Delete this session?" message="This removes the session from your history for good." confirmLabel="Delete" danger
+        <StepDelete what="this yoga session" consequence={<p>This removes the session from your history <strong>for good</strong>. It will not count toward your progress and cannot be brought back. If you only want it out of your progress, use Discard instead: that keeps it in your history.</p>}
           onCancel={() => setConfirm(null)} onConfirm={async () => { setConfirm(null); await deleteYogaSession(s.id); replace('/yoga') }} />
       )}
     </>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import {
@@ -241,7 +242,7 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
         <>
           {logs.map((l) => <CardioRow key={l.id} log={l} planned={slot.durationMinutes ?? 0} onDone={onSetDone} />)}
           <div className="inline">
-            <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, true)}>Skip</Button>
+            <ConfirmButton variant="small" confirm={{ title: 'Skip this exercise?', message: 'It is left out of this workout. You can undo it.' }} onConfirm={() => setSkipped(sessionId, slot.slotId, true)}>Skip</ConfirmButton>
           </div>
         </>
       ) : (
@@ -268,7 +269,7 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
           <div className="set-actions">
             <Button variant="small" onClick={() => void addSet(sessionId, slot.slotId)}>Add set</Button>
             <Button variant="small" onClick={onReplace}>Replace</Button>
-            <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, true)}>Skip</Button>
+            <ConfirmButton variant="small" confirm={{ title: 'Skip this exercise?', message: 'It is left out of this workout. You can undo it.' }} onConfirm={() => setSkipped(sessionId, slot.slotId, true)}>Skip</ConfirmButton>
             {ex && SHAREABLE.has(ex.exerciseType) && (
               <Button variant="small" className="taken" onClick={onMachineTaken}>{ex.exerciseType === 'machine' || ex.exerciseType === 'cable' || ex.exerciseType === 'smith' ? 'Machine taken' : 'Equipment taken'}</Button>
             )}

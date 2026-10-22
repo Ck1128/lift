@@ -114,6 +114,8 @@ describe('injured areas', () => {
     await user.click(await screen.findByText('Exercises to avoid'))
     const group = await screen.findByRole('group', { name: 'Injured areas' })
     await user.click(within(group).getByRole('button', { name: /^quads/i }))
+    expect((await db.profile.toArray())[0].injuredMuscles ?? []).toEqual([]) // waits for Save
+    await user.click(await screen.findByRole('button', { name: 'Save changes' }))
     await waitFor(async () => expect((await db.profile.toArray())[0].injuredMuscles).toEqual(['quads']))
     expect(within(group).getByRole('button', { name: /^quads/i })).toHaveAttribute('aria-pressed', 'true')
   })
@@ -295,5 +297,87 @@ describe('injured areas on Home', () => {
     await user.click(screen.getByRole('button', { name: /^chest, injured area/i }))
     await waitFor(async () => expect((await db.profile.toArray())[0].injuredMuscles).toEqual(['chest']))
     expect(await screen.findByText(/injured or recovering\? \(1\)/i)).toBeInTheDocument()
+  })
+})
+
+describe('confirmations and saving', () => {
+  it('Settings shows a Save bar only while something is changed, and Discard puts it back', async () => {
+    await seed(WED)
+    window.history.replaceState(null, '', '#/settings')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Yoga and food'))
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+    const section = (await screen.findByText('Yoga and food')).closest('details') as HTMLElement
+    const box = within(section).getByRole('checkbox', { name: /gentle next-day food guidance/i })
+    const before = (box as HTMLInputElement).checked
+    await user.click(box)
+    expect(await screen.findByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+    expect((await db.profile.toArray())[0].nutritionGuidance).toBe(before) // nothing saved yet
+    await user.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+    expect((within(section).getByRole('checkbox', { name: /gentle next-day food guidance/i }) as HTMLInputElement).checked).toBe(before)
+  })
+
+  it('an action asks OK or Cancel, and Cancel changes nothing', async () => {
+    await seed(WED)
+    window.history.replaceState(null, '', '#/settings')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Weekly schedule'))
+    await user.click(await screen.findByRole('button', { name: 'Rebuild upcoming plan' }))
+    const dlg = await screen.findByRole('dialog', { name: /rebuild the upcoming plan/i })
+    await user.click(within(dlg).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /rebuild the upcoming plan/i })).toBeNull())
+  })
+})
+
+describe('deleting a yoga session takes three steps', () => {
+  it('needs the warning, the typed word and a separate final button', async () => {
+    await seed(WED)
+    const now = new Date().toISOString()
+    const plan = { items: [], key: 'k', date: '2026-10-21', style: 'hatha', styleName: 'Hatha', level: 'beginner', location: 'home', props: [], restrictions: [], minutes: 20, cautions: [] }
+    await db.yogaSessions.put({
+      id: 'y1', date: '2026-10-21', style: 'hatha', styleName: 'Hatha', level: 'beginner', location: 'home', props: [], restrictions: [], plannedMinutes: 20,
+      plan, planKey: 'k', completedItems: [], skippedItems: [], status: 'completed', durationSeconds: 0, startedAt: now, finishedAt: now, createdAt: now, updatedAt: now,
+    } as never)
+    window.history.replaceState(null, '', '#/yoga/session/y1')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Delete this session' }))
+    // Step 1: the warning. Cancel here keeps everything.
+    let dlg = await screen.findByRole('dialog', { name: /step 1 of 3/i })
+    await user.click(within(dlg).getByRole('button', { name: 'Continue' }))
+    // Step 2: the word. Continue stays off until it is typed exactly.
+    dlg = await screen.findByRole('dialog', { name: /step 2 of 3/i })
+    expect(within(dlg).getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await user.type(within(dlg).getByLabelText(/type delete/i), 'delet')
+    expect(within(dlg).getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await user.type(within(dlg).getByLabelText(/type delete/i), 'e{Enter}')
+    expect(screen.queryByRole('dialog', { name: /step 3 of 3/i })).toBeNull() // Enter does not advance
+    await user.click(within(dlg).getByRole('button', { name: 'Continue' }))
+    // Step 3: a different, final button.
+    dlg = await screen.findByRole('dialog', { name: /step 3 of 3/i })
+    expect(await db.yogaSessions.count()).toBe(1)
+    await user.click(within(dlg).getByRole('button', { name: 'Delete for good' }))
+    await waitFor(async () => expect(await db.yogaSessions.count()).toBe(0))
+  })
+
+  it('cancelling at any step deletes nothing', async () => {
+    await seed(WED)
+    const now = new Date().toISOString()
+    const plan = { items: [], key: 'k', date: '2026-10-21', style: 'hatha', styleName: 'Hatha', level: 'beginner', location: 'home', props: [], restrictions: [], minutes: 20, cautions: [] }
+    await db.yogaSessions.put({
+      id: 'y2', date: '2026-10-21', style: 'hatha', styleName: 'Hatha', level: 'beginner', location: 'home', props: [], restrictions: [], plannedMinutes: 20,
+      plan, planKey: 'k', completedItems: [], skippedItems: [], status: 'completed', durationSeconds: 0, startedAt: now, finishedAt: now, createdAt: now, updatedAt: now,
+    } as never)
+    window.history.replaceState(null, '', '#/yoga/session/y2')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Delete this session' }))
+    await user.click(within(await screen.findByRole('dialog', { name: /step 1 of 3/i })).getByRole('button', { name: 'Continue' }))
+    await user.click(within(await screen.findByRole('dialog', { name: /step 2 of 3/i })).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /of 3/i })).toBeNull())
+    expect(await db.yogaSessions.count()).toBe(1)
   })
 })
