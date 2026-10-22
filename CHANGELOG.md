@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.14.1 - Reverted the "Premium" look (branch feature/v2-complete)
+- Undid the 2.14.0 design change (commit 980d722). The app looks as it did in 2.12.0. Nothing else changed.
+
 ## 2.14.0 - Premium look (branch feature/v2-complete)
 A design-only change in its own commit and its own file (`src/theme-premium.css`). Revert that commit to get the 2.12 look back.
 - **Deep ink hero card** on Home with a glow in the tab colour, large confident headings and a glowing primary button.
