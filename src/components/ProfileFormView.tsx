@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { WEEKDAY_LABELS } from '../engine/dates'
 import {
   ALL_TRACKS, GOAL_LABEL, LEVEL_LABEL, TRACK_LABEL, type Goal, type GymType, type LocationType, type Sex, type Track, type TrainingLevel, type WeightUnit,
@@ -7,7 +7,7 @@ import {
   validateProfileForm, withWeightFieldUnit, type FormErrors, type ProfileForm,
 } from '../engine/validateProfile'
 import { LEVEL_PARAMS } from '../engine/levels'
-import { useUnsavedGuard } from '../router'
+import { clearDraft, loadDraft, saveDraft } from '../hooks/drafts'
 import { Button, Chips, Field } from './ui'
 import { WeightField } from './WeightField'
 import { HeightField } from './HeightField'
@@ -23,7 +23,7 @@ export const LEVEL_HELP: Record<TrainingLevel, string> = {
 const LEVELS: TrainingLevel[] = ['beginner', 'intermediate', 'regular']
 
 export function ProfileFormView({
-  initial, initialExtra, showLocation, submitLabel, onSubmit, onLevelChange, stepped, onStepChange,
+  initial, initialExtra, showLocation, submitLabel, onSubmit, onLevelChange, stepped, onStepChange, draftKey,
 }: {
   initial: ProfileForm
   initialExtra: ProfileExtra
@@ -35,15 +35,20 @@ export function ProfileFormView({
   /** First-run mode: one topic per screen with Back and Next. Settings keeps the single page. */
   stepped?: boolean
   onStepChange?: (index: number) => void
+  /** Unsaved input is kept under this name, so going Back and returning does not lose it. */
+  draftKey?: string
 }) {
-  const [f, setF] = useState<ProfileForm>(initial)
-  const [extra, setExtra] = useState<ProfileExtra>(initialExtra)
+  const [draft] = useState(() => (draftKey ? loadDraft<{ f: ProfileForm; extra: ProfileExtra }>(draftKey) : null))
+  const [restored, setRestored] = useState(draft !== null)
+  const [f, setF] = useState<ProfileForm>(draft?.f ?? initial)
+  const [extra, setExtra] = useState<ProfileExtra>(draft?.extra ?? initialExtra)
   const [errors, setErrors] = useState<FormErrors>({})
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [dirty, setDirty] = useState(false)
+  const [dirty, setDirty] = useState(draft !== null)
   const [stepNo, setStepNo] = useState(0)
-  useUnsavedGuard(dirty)
+  useEffect(() => { if (draftKey && dirty) saveDraft(draftKey, { f, extra }) }, [draftKey, dirty, f, extra])
+  const startOver = () => { setF(initial); setExtra(initialExtra); setErrors({}); setDirty(false); setRestored(false); if (draftKey) clearDraft(draftKey) }
   const workoutOn = f.tracks.includes('workout')
   const beginner = workoutOn && f.trainingLevel === 'beginner'
   const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) => { setF((p) => ({ ...p, [k]: v })); setSaved(false); setDirty(true) }
@@ -55,6 +60,7 @@ export function ProfileFormView({
       await onSubmit(f, extra, { levelChange })
       setSaved(true)
       setDirty(false)
+      if (draftKey) clearDraft(draftKey)
     } finally {
       setBusy(false)
     }
@@ -254,6 +260,7 @@ export function ProfileFormView({
   if (!stepped) {
     return (
       <form onSubmit={submit} noValidate>
+        {restored && <p className="notice" role="status">Your unsaved changes were kept. <button type="button" className="link-btn" onClick={startOver}>Start over</button></p>}
         {secTracks}
         {workoutOn && secLevel}
         {secBody}
@@ -266,6 +273,7 @@ export function ProfileFormView({
 
   return (
     <form onSubmit={submit} noValidate className="stepped">
+      {restored && <p className="notice" role="status">Your earlier answers were kept. <button type="button" className="link-btn" onClick={startOver}>Start over</button></p>}
       <div className="step-progress" role="progressbar" aria-label="Setup progress" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={cur + 1}>
         {steps.map((st, i) => <span key={st.title} className={i <= cur ? 'dot on' : 'dot'} />)}
       </div>

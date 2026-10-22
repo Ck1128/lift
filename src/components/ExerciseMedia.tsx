@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { exerciseById, imageUrls } from '../data/catalog'
 
 /**
@@ -10,12 +10,15 @@ export function ExerciseMedia({ exerciseId }: { exerciseId: string }) {
   const ex = exerciseById(exerciseId)
   const [frame, setFrame] = useState(0)
   const [failed, setFailed] = useState(false)
-  const urls = ex ? imageUrls(ex) : null
+  // The pair of photos must keep the same identity between renders. The workout screen re-renders four times a second,
+  // and a new array each time restarted the one second timer before it could ever fire, so the clip never moved.
+  const urls = useMemo(() => (ex ? imageUrls(ex) : null), [ex])
+  const playing = urls !== null && !failed
   useEffect(() => {
-    if (!urls || failed) return
+    if (!playing) return
     const t = setInterval(() => setFrame((f) => (f === 0 ? 1 : 0)), 1000)
     return () => clearInterval(t)
-  }, [urls, failed])
+  }, [playing])
   if (!ex) return null
   const q = encodeURIComponent(`${ex.name} proper form`)
   return (

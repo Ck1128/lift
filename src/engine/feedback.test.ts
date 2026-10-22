@@ -44,6 +44,9 @@ describe('destinations and links', () => {
     expect(parseDestination('sms', '+1 (555) 123-4567')).toEqual({ value: '15551234567' })
     expect('problem' in parseDestination('whatsapp', 'abc')).toBe(true)
     expect('problem' in parseDestination('sms', '123')).toBe(true)
+    // A US number without the country code gets 1 in front.
+    expect(parseDestination('sms', '(555) 123-4567')).toEqual({ value: '15551234567' })
+    expect(parseDestination('whatsapp', '+44 20 7946 0958')).toEqual({ value: '442079460958' })
   })
   it('builds links that carry the message, encoded', () => {
     const r = buildReport(input, diag)

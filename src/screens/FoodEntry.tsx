@@ -12,7 +12,8 @@ import { formatDay } from '../engine/dates'
 import type { Profile } from '../engine/types'
 import { Button, Card, ScreenHeader } from '../components/ui'
 import { useOnline } from '../hooks/app'
-import { queryOf, useRouter, useUnsavedGuard } from '../router'
+import { queryOf, useRouter } from '../router'
+import { clearDraft, loadDraft, saveDraft } from '../hooks/drafts'
 
 const off = openFoodFactsProvider()
 
@@ -50,26 +51,28 @@ function PortionForm({ units, basis, value, unit, onChange }: {
 }
 
 export function FoodEntry({ today, editId }: { profile: Profile; today: string; editId?: string }) {
-  const { path, replace, back, setDirty } = useRouter()
+  const { path, replace, back } = useRouter()
   const q = queryOf(path)
   const online = useOnline()
   const onlineOn = useLiveQuery(() => foodOnlineEnabled(), [], false)
   const recents = useLiveQuery(() => recentFoods(10), [], [] as FoodLogEntry[])
   const existing = useLiveQuery(() => (editId ? getFoodEntry(editId) : undefined), [editId], undefined)
 
-  const [meal, setMeal] = useState<MealCategory>((q.get('meal') as MealCategory) || 'lunch')
-  const [date, setDate] = useState(q.get('date') ?? today)
-  const [query, setQuery] = useState('')
+  type Draft = { meal: MealCategory; date: string; query: string; picked: FoodChoice | null; value: string; unit: PortionUnit; note: string; manual: boolean; mName: string; mKcal: string }
+  const [draft] = useState(() => (editId ? null : loadDraft<Draft>('food.new')))
+  const [meal, setMeal] = useState<MealCategory>(draft?.meal ?? ((q.get('meal') as MealCategory) || 'lunch'))
+  const [date, setDate] = useState(draft?.date ?? q.get('date') ?? today)
+  const [query, setQuery] = useState(draft?.query ?? '')
   const [results, setResults] = useState<FoodChoice[]>([])
   const [reports, setReports] = useState<ProviderReport[]>([])
   const [searching, setSearching] = useState(false)
-  const [picked, setPicked] = useState<FoodChoice | null>(null)
-  const [value, setValue] = useState('100')
-  const [unit, setUnit] = useState<PortionUnit>('g')
-  const [note, setNote] = useState('')
-  const [manual, setManual] = useState(false)
-  const [mName, setMName] = useState('')
-  const [mKcal, setMKcal] = useState('')
+  const [picked, setPicked] = useState<FoodChoice | null>(draft?.picked ?? null)
+  const [value, setValue] = useState(draft?.value ?? '100')
+  const [unit, setUnit] = useState<PortionUnit>(draft?.unit ?? 'g')
+  const [note, setNote] = useState(draft?.note ?? '')
+  const [manual, setManual] = useState(draft?.manual ?? false)
+  const [mName, setMName] = useState(draft?.mName ?? '')
+  const [mKcal, setMKcal] = useState(draft?.mKcal ?? '')
   const [err, setErr] = useState('')
   const seq = useRef(0)
 
@@ -84,8 +87,13 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
     setNote(existing.note ?? '')
   }
 
-  const dirty = picked !== null || manual || (editId !== undefined && existing !== undefined && (String(existing.portionValue) !== value || existing.portionUnit !== unit || (existing.note ?? '') !== note || existing.mealCategory !== meal))
-  useUnsavedGuard(dirty)
+  // Anything typed here is kept as a draft, so Back never loses it. It is cleared when the entry is saved.
+  const hasInput = picked !== null || manual || query.trim() !== '' || mName.trim() !== '' || mKcal.trim() !== ''
+  useEffect(() => {
+    if (editId) return
+    if (hasInput) saveDraft('food.new', { meal, date, query, picked, value, unit, note, manual, mName, mKcal })
+    else clearDraft('food.new')
+  }, [editId, hasInput, meal, date, query, picked, value, unit, note, manual, mName, mKcal])
 
   useEffect(() => {
     const text = query.trim()
@@ -127,7 +135,7 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
     afterSave()
   }
   // The entry is saved, so leaving is not "losing changes".
-  const afterSave = () => { setDirty(false); replace(`/food?date=${date}`) }
+  const afterSave = () => { clearDraft('food.new'); replace(`/food?date=${date}`) }
 
   const saveManual = () => {
     const kcal = Number(mKcal)

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
-import { isRoot, useRouter } from '../router'
+import { createPortal } from 'react-dom'
+import { useRouter } from '../router'
 import { FeedbackButton, type FeedbackOptions } from './Feedback'
 
 export function Card({ title, children, className, feedback }: { title?: string; children: ReactNode; className?: string; feedback?: false | FeedbackOptions }) {
@@ -68,7 +69,8 @@ export function EmptyState({ title, hint, children }: { title: string; hint: str
 /** A page title. Every page that is not a main tab shows a Back control above it. */
 export function ScreenHeader({ title, subtitle, back }: { title: string; subtitle?: string; back?: boolean }) {
   const { path, back: goBack } = useRouter()
-  const showBack = back ?? !isRoot(path)
+  // Every page has Back except Home, where there is nowhere to go back to.
+  const showBack = back ?? path.split('?')[0] !== '/home'
   return (
     <header className="screen-header">
       {showBack && (
@@ -137,13 +139,15 @@ export function Dialog({ title, children, onClose }: { title: string; children: 
     ref.current?.focus()
     return () => document.removeEventListener('keydown', onKey)
   }, [])
-  return (
+  // Rendered on the page itself, not inside the screen, so it always sits above the navigation bar.
+  return createPortal(
     <div className="backdrop" onClick={onClose}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

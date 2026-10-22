@@ -7,6 +7,7 @@ import {
 } from '../engine/feedback'
 import { tracksOf } from '../engine/tracks'
 import { useProfile } from '../hooks/app'
+import { clearDraft, loadDraft, saveDraft } from '../hooks/drafts'
 import { Dialog } from './ui'
 
 /* ---------- show/hide the small F buttons (a per-device preference, off the data model) ---------- */
@@ -65,7 +66,8 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
   const profile = useProfile()
   const cfg = useMemo(() => configuredDestinations(), [])
   const [category, setCategory] = useState<FeedbackCategory>(defaultCategory ?? categories[0])
-  const [message, setMessage] = useState('')
+  const [message, setMessageRaw] = useState(() => loadDraft<string>('feedback.message') ?? '')
+  const setMessage = (m: string) => { setMessageRaw(m); if (m) saveDraft('feedback.message', m); else clearDraft('feedback.message') }
   const [diag, setDiag] = useState(false)
   const [attachOn, setAttachOn] = useState(false)
   const [shot, setShot] = useState<File | null>(null)
@@ -75,6 +77,7 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sentNote, setSentNote] = useState('')
 
   const needsDest = channel === 'email' || channel === 'sms' || channel === 'whatsapp'
   const diagnostics = () => collectDiagnostics({ appVersion: APP_VERSION, databaseSchema: DB_SCHEMA_VERSION, catalogVersion: CATALOG_VERSION, tracks: profile ? tracksOf(profile).list : undefined })
@@ -83,7 +86,8 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
   const pickChannel = (c: Channel) => {
     setChannel(c)
     if (c === 'email') setDest(cfg.email)
-    else if (c === 'sms' || c === 'whatsapp') setDest(cfg.phone)
+    // US country code to start with. It can be edited.
+    else if (c === 'sms' || c === 'whatsapp') setDest(cfg.phone || '+1 ')
     else setDest('')
   }
   const preview = () => {
@@ -99,6 +103,12 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
     const r = await performShare({ channel, destination: dest, report: report(), screenshot: shot, ios })
     setResult(r)
     setBusy(false)
+    if (r.ok) clearDraft('feedback.message')
+    // Once Messages, WhatsApp or Mail has opened with the text, this sheet has done its job.
+    if (r.ok && (channel === 'sms' || channel === 'whatsapp' || channel === 'email')) {
+      if (onDone) onDone()
+      else { setMessageRaw(''); setStep('edit'); setSentNote(r.message) } // inline form in Settings: start fresh and keep the note
+    }
   }
 
   if (step === 'preview') {
@@ -131,6 +141,7 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
   const id = (s: string) => `fb-${context.component ?? 'g'}-${s}`.replace(/\s+/g, '-')
   return (
     <form onSubmit={(e) => { e.preventDefault(); preview() }} noValidate>
+      {sentNote && <p className="notice" role="status">{sentNote}</p>}
       {(context.component || context.element) && (
         <p className="hint">About: <strong>{[context.screen, context.component, context.element].filter(Boolean).join(' › ')}</strong></p>
       )}

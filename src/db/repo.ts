@@ -1,3 +1,4 @@
+import { clearAllDrafts } from '../hooks/drafts'
 import { db, nowIso, uid } from './schema'
 import { CATALOG, CATALOG_VERSION, exerciseById } from '../data/catalog'
 import { addDays, startOfWeek, weekdayIndex } from '../engine/dates'
@@ -666,6 +667,7 @@ export async function acceptReschedule(skippedId: string, newDate: string): Prom
 
 // ---------- history ----------
 export async function resetAllData(): Promise<void> {
+  clearAllDrafts()
   await db.transaction('rw', db.tables, async () => {
     for (const t of db.tables) await t.clear()
   })
@@ -679,6 +681,7 @@ export type DeleteResult = { ok: true; deleted: number } | { ok: false; error: s
  * If it fails, the transaction rolls back, so the data is still all there and it is safe to try again.
  */
 export async function deleteAllData(): Promise<DeleteResult> {
+  clearAllDrafts()
   let deleted = 0
   try {
     await db.transaction('rw', db.tables, async () => {

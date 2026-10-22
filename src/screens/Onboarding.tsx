@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { profileToForm, saveProfile } from '../db/repo'
+import { useProfile } from '../hooks/app'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView, type ProfileExtra } from '../components/ProfileFormView'
 import { ImportPanel } from '../components/BackupPanel'
@@ -10,6 +11,7 @@ import type { GymType, LocationType } from '../engine/types'
 export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: { onBegin: () => void; onDone: () => void; deletedNotice?: boolean; onDismissNotice?: () => void }) {
   const [step, setStep] = useState<'profile' | 'equipment'>('profile')
   const [formStep, setFormStep] = useState(0)
+  const saved = useProfile()
   const [chosen, setChosen] = useState<{ location: LocationType; gymType: GymType; unit: 'lb' | 'kg' }>({ location: 'gym', gymType: 'planet_fitness', unit: 'lb' })
 
   const submit = async (form: ProfileForm, extra: ProfileExtra) => {
@@ -24,7 +26,8 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
   if (step === 'equipment') {
     return (
       <>
-        <ScreenHeader title="Confirm your equipment" subtitle="Step 2 of 2" />
+        <ScreenHeader title="Confirm your equipment" subtitle="Step 2 of 2" back={false} />
+        <button type="button" className="back-btn" onClick={() => setStep('profile')}><span aria-hidden="true">‹</span> Back</button>
         <Card>
           <EquipmentEditor location={chosen.location} gymType={chosen.gymType} unit={chosen.unit} />
         </Card>
@@ -43,11 +46,12 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
       {formStep === 0 && <ScreenHeader title="Welcome" subtitle="No account needed, and nothing leaves this phone." />}
       <Card className="step-card">
         <ProfileFormView
-          initial={profileToForm()}
+          initial={profileToForm(saved ?? undefined)}
           initialExtra={{ preferredLocation: 'gym', gymType: 'planet_fitness' }}
           showLocation
           submitLabel="Continue"
           stepped
+          draftKey="profile.onboarding"
           onStepChange={setFormStep}
           onSubmit={submit}
         />

@@ -43,7 +43,8 @@ function ExerciseInfoDialog({ exerciseId, name, cues, note, why, onClose }: Exer
       )}
       {ex && <p><strong>Equipment:</strong> {ex.equipmentIds.map((e) => EQUIPMENT_LABEL[e] ?? e).join(', ') || 'None'}</p>}
       {why && <p className="muted">{why}</p>}
-      {cues && cues.length > 0 && (
+      {/* The numbered steps below already contain these tips, so they are only shown when they say something else. */}
+      {cues && cues.length > 0 && !cues.every((c) => ex?.instructions.includes(c)) && (
         <>
           <p className="label-like">Form tips</p>
           <ul className="plain cues">{cues.map((c, i) => <li key={i}>{c}</li>)}</ul>

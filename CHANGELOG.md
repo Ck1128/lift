@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.3 - Fixes from your testing (branch feature/v2-complete)
+- Finish workout (and every other sheet) now sits above the navigation bar, so its buttons can be tapped.
+- Feedback by SMS or WhatsApp starts with +1, which you can edit. A 10-digit US number without a code gets 1 added. Once Messages, WhatsApp or Mail opens, the feedback sheet closes.
+- Back is on every page except Home. Going Back no longer asks "Leave without saving?" and no longer erases typed input: profile edits, setup answers, a food entry in progress and a feedback message are kept as drafts for a day, with a "Start over" link. Drafts are wiped by "Delete all data". The setup equipment page also has Back.
+- The two-photo exercise clip moves again. The workout screen redraws four times a second, which kept restarting its timer.
+- The exercise "i" sheet no longer shows the form tips twice (once as tips, once as numbered steps).
+
 ## 2.7.2 - Five-action Health shortcut (branch feature/v2-complete)
 - Pasted Health text can use dates exactly as the iPhone writes them ("Oct 21, 2026 at 7:30 AM"). The reading shortcut no longer needs Format Date or a variable.
 

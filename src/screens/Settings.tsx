@@ -74,6 +74,7 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
             initial={profileToForm(profile)}
             initialExtra={{ preferredLocation: profile.preferredLocation, gymType: profile.gymType }}
             showLocation={false}
+            draftKey="profile.settings"
             submitLabel="Save profile"
             onLevelChange={(_from, _to, proceed) => setLevelAsk({ proceed })}
             onSubmit={async (form, _extra, opts) => { await saveProfile(form, { preferredLocation: profile.preferredLocation, gymType: profile.gymType }, new Date(), { levelChange: opts?.levelChange }) }}

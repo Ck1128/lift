@@ -550,3 +550,10 @@ details.why summary { color: var(--ac); font-weight: 650; font-size: 15px; }
 .code { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; font-size: 13px; overflow-x: auto; white-space: pre; margin: 6px 0; }
 .alt.static { cursor: default; }
 .health textarea { min-height: 110px; font-size: 14px; }
+
+/* ---- Layering: sheets sit above the navigation bar ---- */
+.bottom-nav { z-index: 10; }
+.backdrop { z-index: 50; }
+.content { animation-fill-mode: backwards; }
+.dialog { padding-bottom: calc(18px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; box-shadow: 0 -20px 50px -20px rgb(0 0 0 / .35); }
+@media (min-width: 700px) { .dialog { border-radius: 24px; } }

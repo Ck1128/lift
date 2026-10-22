@@ -146,7 +146,8 @@ export function parseDestination(channel: Channel, raw: string): { value: string
   if (channel === 'sms' || channel === 'whatsapp') {
     const digits = v.replace(/[^\d]/g, '')
     if (digits.length < 7 || digits.length > 15 || /[^\d\s()+.-]/.test(v)) return { problem: 'Enter a phone number with country code, for example +1 555 123 4567.' }
-    return { value: digits }
+    // A US number typed without the country code (10 digits) gets 1 in front.
+    return { value: digits.length === 10 && !v.startsWith('+') ? `1${digits}` : digits }
   }
   return { value: '' }
 }
