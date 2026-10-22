@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.13.1 - Reverted the "Docs-clean" look (branch feature/v2-complete)
+- Undid the 2.13.0 design change (commit c75d82a). The app looks exactly as it did in 2.12.0. Nothing else changed.
+
 ## 2.13.0 - "Docs-clean" look (branch feature/v2-complete)
 A design-only change, kept in its own commit and its own file (`src/theme-docs.css`) so it can be rolled back by reverting that commit.
 - White pages with thin borders instead of soft gradients and glow. One calm blue accent on every tab instead of a colour per tab.
