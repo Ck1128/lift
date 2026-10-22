@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.1 - Progress page cleanup (branch feature/v2-complete)
+- Progress filters are now a compact date-range switch plus small on/off category toggles with a check mark, so it is clear what is shown.
+- The filter card no longer carries a title or feedback button.
+
 ## 2.4.0 - Workouts designed for Planet Fitness and your profile (branch feature/v2-complete)
 - The Planet Fitness equipment list now follows https://taekwondoking.com/list-of-planet-fitness-equipment/: rowers, kettlebells, bands and EZ-curl bars are in; Olympic barbell and pull-up bar are out; dumbbells up to 75 lb.
 - Machines are limited to the ones the club has (added lateral raise, leg extension, glute kickback and back extension machines). Hack squat, T-bar row, leverage deadlift and similar are never planned there.

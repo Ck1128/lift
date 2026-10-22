@@ -18,6 +18,7 @@ import { useRouter } from '../router'
 
 const exName = (id: string) => exerciseById(id)?.name ?? 'Unknown exercise'
 const ALL_CATEGORIES: Category[] = ['workouts', 'yoga', 'food', 'bodyweight']
+const RANGE_SHORT: Record<RangeKey, string> = { '7': '7 days', '30': '30 days', '90': '90 days', all: 'All time' }
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`
 
 /** Results (charts and history) and Recovery (muscle map) share one tab. */
@@ -98,19 +99,21 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
   return (
     <>
 
-      <Card title="Show">
-        <div role="group" aria-label="Date range" className="chips">
+      <section className="card filters" aria-label="Filters">
+        <div className="seg seg-wide" role="group" aria-label="Date range">
           {(Object.keys(RANGE_LABEL) as RangeKey[]).map((k) => (
-            <button key={k} type="button" className={rangeKey === k ? 'chip on' : 'chip'} aria-pressed={rangeKey === k} onClick={() => setRangeKey(k)}>{RANGE_LABEL[k]}</button>
+            <button key={k} type="button" aria-label={RANGE_LABEL[k]} aria-pressed={rangeKey === k} onClick={() => setRangeKey(k)}>{RANGE_SHORT[k]}</button>
           ))}
         </div>
-        <div role="group" aria-label="Categories" className="chips">
+        <div role="group" aria-label="Categories" className="filter-chips">
           {ALL_CATEGORIES.map((c) => (
-            <button key={c} type="button" className={on(c) ? 'chip on' : 'chip'} aria-pressed={on(c)} onClick={() => toggle(c, shown, setShown)}>{CATEGORY_LABEL[c]}</button>
+            <button key={c} type="button" className={on(c) ? 'fchip on' : 'fchip'} aria-pressed={on(c)} onClick={() => toggle(c, shown, setShown)}>
+              <span aria-hidden="true">{on(c) ? '✓' : '+'}</span> {CATEGORY_LABEL[c]}
+            </button>
           ))}
         </div>
-        <p className="hint">Days with nothing logged are left out of the charts. They are not counted as zero.</p>
-      </Card>
+        <p className="hint">Days with nothing logged are left out of the charts, not counted as zero.</p>
+      </section>
 
       {on('workouts') && (
         <>
