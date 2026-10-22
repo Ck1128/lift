@@ -28,7 +28,7 @@ Source: `fit_workout_phase_b_user_stories.md`. Branch `feature/v2-complete`. Dat
 - [ ] Reset a day: all three confirmations are separate and cancelling at any step keeps data.
 - [ ] Yoga: each style plans; props change the poses; history and chart appear.
 - [ ] Food: add raw and cooked rice and compare calories; edit, duplicate, delete.
-- [ ] Progress: ranges, filters, export CSV / JSON / PNG.
+- [ ] Progress: ranges, filters, export CSV / JSON (now in Settings).
 - [ ] Back button from every screen; refresh keeps the page.
 - [ ] Offline: airplane mode, everything except online food search still works.
 - [ ] Backup, wipe, restore.

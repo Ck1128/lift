@@ -11,7 +11,7 @@
  */
 import { exerciseById } from '../data/catalog'
 import { ALL_FINE, LARGE_MUSCLES, musclesOf, type FineMuscle } from './muscleMap'
-import type { SetLog, WorkoutSession } from './types'
+import type { Profile, SetLog, WorkoutSession } from './types'
 
 export type RecoveryStatus = 'recovered' | 'recovering' | 'recent' | 'no_data'
 export const STATUS_LABEL: Record<RecoveryStatus, string> = {
@@ -39,6 +39,8 @@ export interface MuscleSession {
 export interface MuscleRecovery {
   muscle: FineMuscle
   status: RecoveryStatus
+  /** 0 to 100: how far along recovery is. Missing when there is no data. */
+  readiness?: number
   /** Hours until recovered (0 when recovered). */
   remainingHours: number
   lastTrained?: string
@@ -54,6 +56,27 @@ export interface RecoveryReport {
   total: number
   /** Logged strength exercises that had no muscle mapping. They are left out, never guessed. */
   unmappedExercises: number
+  /** Personal adjustment applied to every recovery time (1 = standard), and the plain-language reasons. */
+  personalFactor: number
+  personalReasons: string[]
+}
+
+/**
+ * Adjusts recovery time to the person. Newer lifters and older lifters usually need longer; experienced and younger
+ * ones a little less. The effect is deliberately small and bounded, because these are rules of thumb, not measurements.
+ */
+export function recoveryFactor(p: Pick<Profile, 'age' | 'trainingLevel'> | null | undefined): { factor: number; reasons: string[] } {
+  if (!p) return { factor: 1, reasons: [] }
+  let f = 1
+  const reasons: string[] = []
+  if (p.trainingLevel === 'beginner') { f *= 1.15; reasons.push('you are newer to lifting, so muscles take longer to bounce back') }
+  else if (p.trainingLevel === 'regular') { f *= 0.9; reasons.push('you train regularly, so your body is used to the load') }
+  if (p.age !== undefined) {
+    if (p.age >= 50) { f *= 1.2; reasons.push('recovery slows a little from age 50') }
+    else if (p.age >= 40) { f *= 1.1; reasons.push('recovery slows a little from age 40') }
+    else if (p.age < 25) { f *= 0.95; reasons.push('younger lifters tend to recover a little faster') }
+  }
+  return { factor: Math.min(1.4, Math.max(0.8, Math.round(f * 100) / 100)), reasons }
 }
 
 const when = (s: WorkoutSession) => new Date(s.finishedAt ?? s.startedAt).getTime()
@@ -66,7 +89,7 @@ export function needHoursFor(muscle: FineMuscle, effectiveSets: number, avgRpe: 
   return Math.round(base * volume * effort * frequency)
 }
 
-export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: Date): RecoveryReport {
+export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: Date, personal: { factor: number; reasons: string[] } = { factor: 1, reasons: [] }): RecoveryReport {
   const nowMs = now.getTime()
   const done = sessions.filter((s) => (s.status === 'completed' || s.status === 'partial') && when(s) <= nowMs + HOUR)
   const bySession = new Map<string, SetLog[]>()
@@ -103,7 +126,7 @@ export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: 
       const avgRpe = a.rpe.length ? a.rpe.reduce((x, y) => x + y, 0) / a.rpe.length : undefined
       perMuscle[m].push({
         sessionId: s.id, date: s.date, title: s.title, exercises: [...a.names], effectiveSets: a.sets, avgRpe,
-        needHours: needHoursFor(m, a.sets, avgRpe, prior7), hoursSince: Math.max(0, (nowMs - sTime) / HOUR),
+        needHours: Math.round(needHoursFor(m, a.sets, avgRpe, prior7) * personal.factor), hoursSince: Math.max(0, (nowMs - sTime) / HOUR),
       })
     }
   }
@@ -119,12 +142,11 @@ export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: 
     const latest = list[0]
     const stale = latest.hoursSince > WINDOW_DAYS * 24
     let status: RecoveryStatus = 'recovered'
-    if (!stale && remaining > 0) {
-      const worst = list[rem.indexOf(biggest)]
-      status = remaining > 0.6 * worst.needHours ? 'recent' : 'recovering'
-    }
+    const worst = list[rem.indexOf(biggest)]
+    if (!stale && remaining > 0) status = remaining > 0.6 * worst.needHours ? 'recent' : 'recovering'
+    const readiness = stale || remaining <= 0 ? 100 : Math.max(0, Math.min(99, Math.round(100 * (1 - remaining / Math.max(1, worst.needHours)))))
     muscles[m] = {
-      muscle: m, status, remainingHours: stale ? 0 : remaining, lastTrained: latest.date, hoursSinceLast: latest.hoursSince, recent: list.slice(0, 3),
+      muscle: m, status, readiness, remainingHours: stale ? 0 : remaining, lastTrained: latest.date, hoursSinceLast: latest.hoursSince, recent: list.slice(0, 3),
     }
   }
   const finishedTimes = times.length ? Math.max(...times) : null
@@ -133,7 +155,7 @@ export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: 
   return {
     hasHistory,
     daysSinceLast: finishedTimes === null ? null : Math.max(0, Math.floor((nowMs - finishedTimes) / (24 * HOUR))),
-    muscles, fresh, total: ALL_FINE.length, unmappedExercises: unmapped.size,
+    muscles, fresh, total: ALL_FINE.length, unmappedExercises: unmapped.size, personalFactor: personal.factor, personalReasons: personal.reasons,
   }
 }
 

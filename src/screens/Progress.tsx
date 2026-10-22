@@ -5,16 +5,15 @@ import { exerciseById } from '../data/catalog'
 import { exerciseTrend, personalRecords, setsPerMuscle, workoutsPerWeek, activeMinutes } from '../engine/history'
 import { formatDay } from '../engine/dates'
 import {
-  bodyWeightSeries, buildExport, CATEGORY_LABEL, exportFilename, foodKcalByDay, inRange, rangeFor, RANGE_LABEL, toCsv, yogaMinutesByDay,
+  bodyWeightSeries, CATEGORY_LABEL, foodKcalByDay, inRange, rangeFor, RANGE_LABEL, yogaMinutesByDay,
   type Category, type RangeKey,
 } from '../engine/progress'
 import { MUSCLE_LABEL, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
 import type { YogaSession } from '../engine/yoga'
 import type { FoodLogEntry } from '../engine/food'
 import { BarChart, ChartBlock, HBars, LineChart } from '../components/Charts'
-import { Button, Card, EmptyState, ScreenHeader } from '../components/ui'
+import { Card, EmptyState, ScreenHeader } from '../components/ui'
 import { RecoveryView } from '../components/RecoveryView'
-import { deliverFile } from '../export/deliver'
 import { useRouter } from '../router'
 
 const exName = (id: string) => exerciseById(id)?.name ?? 'Unknown exercise'
@@ -27,7 +26,7 @@ export function Progress({ profile, today }: { profile: Profile; today: string }
   const { navigate } = useRouter()
   return (
     <>
-      <ScreenHeader title="Health & Fitness Progress" subtitle={tab === 'results' ? 'History, charts and exports' : 'Which muscles are ready to train'} />
+      <ScreenHeader title="Health & Fitness Progress" subtitle={tab === 'results' ? 'History and charts' : 'Which muscles are ready to train'} />
       <div className="seg" role="group" aria-label="Progress view">
         <button type="button" aria-pressed={tab === 'results'} onClick={() => setTab('results')}>Results</button>
         <button type="button" aria-pressed={tab === 'recovery'} onClick={() => setTab('recovery')}>Recovery</button>
@@ -49,8 +48,6 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
   const [exFilter, setExFilter] = useState('')
   const [month, setMonth] = useState('')
   const [trendEx, setTrendEx] = useState('')
-  const [exportCats, setExportCats] = useState<Category[]>(['workouts', 'yoga', 'bodyweight'])
-  const [exportMsg, setExportMsg] = useState('')
 
   const range = rangeFor(today, rangeKey)
   const unit = profile.weightUnit
@@ -97,16 +94,6 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
     .filter((r) => !month || r.date.startsWith(month))
     .filter((r) => !exFilter || (r.kind === 'workout' && logs.some((l) => l.sessionId === r.id && l.exerciseId === exFilter && l.completed)))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-
-  const data = () => buildExport({ range, categories: exportCats, unit, sessions, logs, yoga, food, weights, exerciseName: exName, now: new Date().toISOString() })
-  const doExport = async (kind: 'csv' | 'json') => {
-    setExportMsg('')
-    if (exportCats.length === 0) return setExportMsg('Choose at least one thing to export.')
-    const d = data()
-    const text = kind === 'csv' ? toCsv(d) : JSON.stringify(d, null, 2)
-    const r = await deliverFile(exportFilename(kind, today), text, kind === 'csv' ? 'text/csv' : 'application/json')
-    setExportMsg(r === 'cancelled' ? 'Cancelled. Nothing was changed.' : r === 'shared' ? 'Shared.' : 'Saved to your downloads.')
-  }
 
   return (
     <>
@@ -222,22 +209,6 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
             </li>
           ))}
         </ul>
-      </Card>
-
-      <Card title="Export">
-        <p className="hint">Exports {RANGE_LABEL[rangeKey].toLowerCase()} in {unit}, with the date and units written in the file. Choose what to include:</p>
-        {ALL_CATEGORIES.map((c) => (
-          <label key={c} className="check">
-            <input type="checkbox" checked={exportCats.includes(c)} onChange={() => toggle(c, exportCats, setExportCats)} />
-            <span>{CATEGORY_LABEL[c]}{c === 'food' ? ' (personal, off unless you choose it)' : ''}</span>
-          </label>
-        ))}
-        <div className="inline">
-          <Button variant="small" onClick={() => void doExport('csv')}>Export CSV</Button>
-          <Button variant="small" onClick={() => void doExport('json')}>Export JSON</Button>
-        </div>
-        <p className="hint">To save a single chart as a picture, use "Save chart as image" under it. A file you export contains personal health information, so keep it somewhere private.</p>
-        {exportMsg && <p className="ok" role="status">{exportMsg}</p>}
       </Card>
     </>
   )

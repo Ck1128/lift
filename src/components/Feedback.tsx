@@ -110,9 +110,9 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
         <pre className="preview" aria-label="Message preview">{rep.text}</pre>
         <details>
           <summary className="muted">Attachment file ({rep.filename})</summary>
-          <pre className="preview" aria-label="Attachment preview">{rep.json}</pre>
+          <pre className="preview" aria-label="Attachment preview">{rep.fileText}</pre>
         </details>
-        {shot && <p className="hint">Screenshot: {shot.name}. {channel === 'share' ? 'It goes with the share sheet.' : 'Attach it yourself in the app that opens.'}</p>}
+        {shot && <p className="hint">Screenshot: {shot.name}. {channel === 'share' ? 'It goes with the share sheet where your device allows.' : 'Only Share can include it. Choose Share, or attach it yourself afterwards.'}</p>}
         <ul className="plain hint">
           <li>Diagnostics: {diag ? 'included' : 'not included'}</li>
           <li>{attach ? `${attach.label}: ${attachOn ? 'included' : 'not included'}` : 'No workout, food or body data is included.'}</li>
@@ -121,7 +121,7 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
         {result && <p className={result.ok ? 'notice' : 'error'} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
         <div className="dialog-actions">
           <button type="button" className="btn btn-ghost" onClick={() => setStep('edit')}>Back</button>
-          <button type="button" className="btn" disabled={busy} onClick={() => void share()}>{channel === 'file' ? 'Save file' : 'Confirm and share'}</button>
+          <button type="button" className="btn" disabled={busy} onClick={() => void share()}>{channel === 'file' ? 'Save file' : channel === 'copy' ? 'Copy message' : 'Confirm and share'}</button>
         </div>
         {result?.ok && onDone && <button type="button" className="btn btn-ghost" onClick={onDone}>Close</button>}
       </div>
@@ -173,7 +173,7 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
           <p className="hint">You choose where it goes. This app has no built-in address.</p>
         </div>
       )}
-      <p className="hint">Mail, text and WhatsApp links cannot attach files automatically. The share sheet can, where your device supports it.</p>
+      <p className="hint">To attach the file or a screenshot, choose Share, then pick Messages, WhatsApp or Mail in the sheet. The Email, SMS and WhatsApp options open the app with the message text only.</p>
       <button type="submit" className="btn">Preview</button>
     </form>
   )

@@ -7,7 +7,8 @@ import type { PresetKind } from '../engine/equipment'
 import type { YogaPlan, YogaSession } from '../engine/yoga'
 import type { FoodCacheEntry, FoodLogEntry } from '../engine/food'
 
-export const APP_VERSION = '2.0.0'
+/** Comes from package.json at build time (see vite.config.ts). Bump the version there for every release. */
+export const APP_VERSION: string = __APP_VERSION__
 export const DB_SCHEMA_VERSION = 4
 
 /** Equipment is stored once per location (home / gym). */

@@ -5,10 +5,15 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // GitHub Pages serves this repo at https://<user>.github.io/lift/
 // so every asset path must start with /lift/ in production.
+import { readFileSync } from 'node:fs'
+
+// One place for the version: package.json. The app, backups and feedback reports all read it from here.
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
 const base = process.env.VITE_BASE_PATH ?? '/lift/'
 
 export default defineConfig({
   base,
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // Under test the PWA plugin is off, so give its virtual module an inert stand-in.
   resolve: process.env.VITEST ? { alias: { 'virtual:pwa-register': new URL('./src/test/pwa-stub.ts', import.meta.url).pathname } } : {},
   plugins: [

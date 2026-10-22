@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { BottomNav } from './components/BottomNav'
 import { FeedbackHost } from './components/Feedback'
 import { DbGate } from './components/DbGate'
@@ -44,6 +44,8 @@ function Shell() {
   const today = useToday()
   const online = useOnline()
   const { navigate, replace, path } = useRouter()
+  // A new screen starts at the top, never where the last one was scrolled to.
+  useLayoutEffect(() => { document.documentElement.scrollTop = 0; document.body.scrollTop = 0 }, [path])
   const [onboarding, setOnboarding] = useState(false)
   const [deletedNotice, setDeletedNotice] = useState(false)
   const [update, setUpdate] = useState<(() => void) | null>(null)

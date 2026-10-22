@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.0 - Feedback, export and recovery polish (branch feature/v2-complete)
+- The app version now comes from package.json (one place) and must match the top CHANGELOG entry; a test enforces it. Bump it for every release.
+- Feedback: the Share option sends the message and a plain-text file together through the iPhone share sheet (Messages, WhatsApp, Mail). Email, SMS and WhatsApp options put the whole message in the text and no longer download a file. Added Copy. Still never claims delivery.
+- Removed "Save chart as image". Export moved from Progress to a collapsed section in Settings.
+- Every screen opens at the top.
+- Recovery tab redesigned (progress ring, ready and resting lists, per-muscle bars) and recovery times now adjust to your age and training level.
+
 ## 2.2.0 - Phase B3 (branch feature/v2-complete)
 - US-09 One shared muscle model with 14 groups and primary/secondary roles; tests on common and multi-muscle exercises.
 - US-06 Progress now has Results and Recovery. Recovery uses sets, effort, muscle size, frequency and elapsed time; front/back body map, legend, tap for details, honest empty state.

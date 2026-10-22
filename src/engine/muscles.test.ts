@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { CATALOG, exerciseById } from '../data/catalog'
 import { ALL_FINE, musclesOf, musclesOfMany, fineOfCoarse } from './muscleMap'
-import { needHoursFor, overlapWithPlan, recoveryReport } from './recovery'
+import { needHoursFor, overlapWithPlan, recoveryFactor, recoveryReport } from './recovery'
 import type { Exercise, SetLog, WorkoutSession } from './types'
 
 const ex = (o: Partial<Exercise> & { name: string }): Exercise => ({
@@ -120,5 +120,23 @@ describe('recovery model', () => {
     const r = recoveryReport([sess('a', 1)], sets('a', 'nope', 3), NOW)
     expect(r.unmappedExercises).toBe(1)
     expect(r.fresh).toBe(0)
+  })
+  it('recovery time adjusts to the person, within bounds', () => {
+    expect(recoveryFactor(null).factor).toBe(1)
+    expect(recoveryFactor({ age: 30, trainingLevel: 'intermediate' }).factor).toBe(1)
+    expect(recoveryFactor({ age: 30, trainingLevel: 'beginner' }).factor).toBeGreaterThan(1)
+    expect(recoveryFactor({ age: 55, trainingLevel: 'beginner' }).factor).toBeGreaterThan(recoveryFactor({ age: 30, trainingLevel: 'beginner' }).factor)
+    expect(recoveryFactor({ age: 22, trainingLevel: 'regular' }).factor).toBeLessThan(1)
+    expect(recoveryFactor({ age: 80, trainingLevel: 'beginner' }).factor).toBeLessThanOrEqual(1.4)
+    const logs = sets('a', bench.id, 4)
+    const base = recoveryReport([sess('a', 30)], logs, NOW).muscles.chest.remainingHours
+    const slow = recoveryReport([sess('a', 30)], logs, NOW, recoveryFactor({ age: 55, trainingLevel: 'beginner' })).muscles.chest.remainingHours
+    expect(slow).toBeGreaterThan(base)
+  })
+  it('gives each trained muscle a readiness percentage', () => {
+    const r = recoveryReport([sess('a', 30)], sets('a', bench.id, 4), NOW)
+    expect(r.muscles.chest.readiness).toBeGreaterThan(0)
+    expect(r.muscles.chest.readiness).toBeLessThan(100)
+    expect(r.muscles.calves.readiness).toBeUndefined()
   })
 })

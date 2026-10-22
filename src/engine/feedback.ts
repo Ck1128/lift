@@ -21,9 +21,10 @@ export const ELEMENT_CATEGORIES: FeedbackCategory[] = ['bug', 'ui', 'feature', '
 /** Extra choice on the recovery dashboard and muscle map. */
 export const MUSCLE_CATEGORIES: FeedbackCategory[] = ['mapping', 'bug', 'ui', 'feature', 'other']
 
-export type Channel = 'share' | 'email' | 'sms' | 'whatsapp' | 'file'
+export type Channel = 'share' | 'email' | 'sms' | 'whatsapp' | 'copy' | 'file'
 export const CHANNEL_LABEL: Record<Channel, string> = {
-  share: 'Share sheet (best, can include the file)', email: 'Email', sms: 'SMS / text', whatsapp: 'WhatsApp', file: 'Save a file',
+  share: 'Share (pick Messages, WhatsApp or Mail; attaches the file)', email: 'Email (message text only)', sms: 'SMS / text (message text only)',
+  whatsapp: 'WhatsApp (message text only)', copy: 'Copy the message', file: 'Save a file',
 }
 
 export interface FeedbackContext {
@@ -61,6 +62,8 @@ export interface FeedbackReport {
   text: string
   /** The attachment, as JSON text. */
   json: string
+  /** The file that is attached: the readable message followed by the JSON. Plain text, so every app accepts it. */
+  fileText: string
   filename: string
   subject: string
 }
@@ -128,7 +131,8 @@ export function buildReport(input: FeedbackInput, diagnostics: Diagnostics): Fee
   return {
     text: lines.join('\n').trim(),
     json: JSON.stringify(doc, null, 2),
-    filename: `lift-feedback-${stamp.slice(0, 10)}.json`,
+    fileText: `${lines.join('\n').trim()}\n\n---- details (JSON) ----\n${JSON.stringify(doc, null, 2)}\n`,
+    filename: `lift-feedback-${stamp.slice(0, 10)}.txt`,
     subject: `Lift feedback: ${CATEGORY_LABEL[input.category]}`,
   }
 }
@@ -147,9 +151,13 @@ export function parseDestination(channel: Channel, raw: string): { value: string
   return { value: '' }
 }
 
-/** Link that opens the chosen app with the message filled in. Native share and file saving are handled by the caller. */
+/**
+ * Link that opens the chosen app with the message filled in. A link cannot carry a file, so the whole report goes in the
+ * text itself (trimmed if it is too long for the app to accept).
+ */
 export function buildLink(channel: 'email' | 'sms' | 'whatsapp', destination: string, report: FeedbackReport, ios = false): string {
-  const body = report.text.slice(0, 1500)
+  const limit = channel === 'email' ? 1800 : 1200
+  const body = report.text.length > limit ? `${report.text.slice(0, limit - 40)}\n[trimmed]` : report.text
   if (channel === 'email') return `mailto:${encodeURIComponent(destination).replace(/%40/g, '@')}?subject=${encodeURIComponent(report.subject)}&body=${encodeURIComponent(body)}`
   if (channel === 'sms') return `sms:${destination}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`
   return `https://wa.me/${destination}?text=${encodeURIComponent(body)}`
@@ -159,7 +167,6 @@ export interface ShareOutcome { ok: boolean; message: string }
 
 /** What an honest result looks like. "Opened" is not "delivered". */
 export const OPENED = (app: string) => `${app} should now be open with your message ready. Press Send there. This app cannot see whether it was sent or delivered.`
-export const NEEDS_ATTACH = 'Email, SMS and WhatsApp links cannot attach files, so the file is saved to your device. Attach it manually if you want to include it.'
 
 export async function performShare(opts: {
   channel: Channel
@@ -167,7 +174,7 @@ export async function performShare(opts: {
   report: FeedbackReport
   screenshot?: File | null
   ios?: boolean
-  nav?: Pick<Navigator, 'share' | 'canShare'> | Partial<Navigator>
+  nav?: Partial<Navigator>
   open?: (url: string) => void
   save?: (name: string, text: string) => void
 }): Promise<ShareOutcome> {
@@ -175,39 +182,55 @@ export async function performShare(opts: {
   const nav = (opts.nav ?? (typeof navigator === 'undefined' ? {} : navigator)) as Partial<Navigator>
   const open = opts.open ?? ((u: string) => { window.location.href = u })
   const save = opts.save ?? defaultSave
-  const jsonFile = new File([report.json], report.filename, { type: 'application/json' })
+
   if (channel === 'file') {
-    save(report.filename, report.json)
+    save(report.filename, report.fileText)
     return { ok: true, message: `Saved ${report.filename}. Nothing was sent anywhere.` }
   }
-  if (channel === 'share') {
-    const files = screenshot ? [jsonFile, screenshot] : [jsonFile]
-    if (typeof nav.share !== 'function') return { ok: false, message: 'This browser has no share sheet. Choose Email, SMS, WhatsApp or Save a file instead.' }
-    if (typeof nav.canShare === 'function' && !nav.canShare({ files })) {
-      return { ok: false, message: 'This device cannot share files here. Choose Email, SMS, WhatsApp or Save a file instead.' }
-    }
+  if (channel === 'copy') {
     try {
-      await nav.share({ title: report.subject, text: report.text, files })
-      return { ok: true, message: 'The share sheet closed. This app cannot see whether you sent it or where it went.' }
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, message: 'Sharing was cancelled. Nothing was sent.' }
-      return { ok: false, message: 'Sharing did not work on this device. Try Save a file instead.' }
+      await nav.clipboard?.writeText(report.text)
+      if (!nav.clipboard) throw new Error('no clipboard')
+      return { ok: true, message: 'Copied. Paste it into any app. Nothing was sent.' }
+    } catch {
+      return { ok: false, message: 'Copying is not allowed here. Choose Share or Save a file instead.' }
     }
+  }
+  if (channel === 'share') {
+    if (typeof nav.share !== 'function') return { ok: false, message: 'This browser has no share sheet. Choose Email, SMS, WhatsApp, Copy or Save a file instead.' }
+    const file = new File([report.fileText], report.filename, { type: 'text/plain' })
+    const withShot = screenshot ? [file, screenshot] : [file]
+    // Try the most complete version first and step down, telling the person what was left out.
+    const attempts: { data: ShareData; note: string }[] = [
+      { data: { title: report.subject, text: report.text, files: withShot }, note: '' },
+      ...(screenshot ? [{ data: { title: report.subject, text: report.text, files: [file] }, note: ' The screenshot could not be included; attach it yourself.' }] : []),
+      { data: { title: report.subject, text: report.text }, note: ' The file could not be attached on this device, so the message text was shared instead.' },
+    ]
+    for (const a of attempts) {
+      const hasFiles = !!a.data.files?.length
+      if (hasFiles && typeof nav.canShare === 'function' && !nav.canShare({ files: a.data.files })) continue
+      try {
+        await nav.share(a.data)
+        return { ok: true, message: `The share sheet closed. This app cannot see whether you sent it or where it went.${a.note}` }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, message: 'Sharing was cancelled. Nothing was sent.' }
+      }
+    }
+    return { ok: false, message: 'Sharing did not work on this device. Choose Copy, Email, SMS or Save a file instead.' }
   }
   const parsed = parseDestination(channel, opts.destination)
   if ('problem' in parsed) return { ok: false, message: parsed.problem }
   try {
     open(buildLink(channel, parsed.value, report, opts.ios))
   } catch {
-    return { ok: false, message: `Could not open ${channel === 'email' ? 'Mail' : channel === 'sms' ? 'Messages' : 'WhatsApp'}. Choose another way, or save a file.` }
+    return { ok: false, message: `Could not open ${channel === 'email' ? 'Mail' : channel === 'sms' ? 'Messages' : 'WhatsApp'}. Choose Share or Copy instead.` }
   }
-  save(report.filename, report.json)
   const app = channel === 'email' ? 'Your mail app' : channel === 'sms' ? 'Your messages app' : 'WhatsApp'
-  return { ok: true, message: `${OPENED(app)} ${NEEDS_ATTACH}` }
+  return { ok: true, message: `${OPENED(app)} The whole message is in the text. A link cannot attach files or a screenshot; use Share for that.` }
 }
 
 function defaultSave(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }))
   const a = document.createElement('a')
   a.href = url
   a.download = name

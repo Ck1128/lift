@@ -15,7 +15,7 @@ describe('feedback report', () => {
     const j = JSON.parse(r.json)
     expect(j.diagnostics).toBeUndefined()
     expect(j.attached).toBeUndefined()
-    expect(r.filename).toBe('lift-feedback-2026-10-21.json')
+    expect(r.filename).toBe('lift-feedback-2026-10-21.txt')
   })
   it('adds diagnostics and attached data only when chosen, and says so', () => {
     const r = buildReport({ ...input, includeDiagnostics: true, attached: { label: 'Recovery status', data: { chest: 'recent' } } }, diag)
@@ -70,11 +70,12 @@ describe('destinations and links', () => {
 
 describe('sharing is honest', () => {
   const report = buildReport(input, diag)
-  it('opens the app with the message and never claims delivery', async () => {
+  it('opens the app with the full message and never claims delivery or downloads a file', async () => {
     const open = vi.fn(); const save = vi.fn()
     const r = await performShare({ channel: 'email', destination: 'a@b.co', report, open, save })
     expect(open).toHaveBeenCalledOnce()
-    expect(save).toHaveBeenCalledOnce()
+    expect(decodeURIComponent(open.mock.calls[0][0])).toContain('The map is wrong')
+    expect(save).not.toHaveBeenCalled()
     expect(r.ok).toBe(true)
     expect(r.message).toMatch(/cannot see whether/i)
     expect(r.message).not.toMatch(/delivered successfully|has been sent/i)
@@ -85,16 +86,28 @@ describe('sharing is honest', () => {
     expect(r.ok).toBe(false)
     expect(open).not.toHaveBeenCalled()
   })
-  it('uses the native share sheet with the file when the device supports it', async () => {
+  it('the share sheet gets the message and a plain-text file together', async () => {
     const share = vi.fn().mockResolvedValue(undefined)
     const r = await performShare({ channel: 'share', destination: '', report, nav: { share, canShare: () => true } })
     expect(share).toHaveBeenCalledOnce()
-    expect(share.mock.calls[0][0].files[0].name).toBe(report.filename)
+    const data = share.mock.calls[0][0]
+    expect(data.text).toContain('The map is wrong')
+    expect(data.files[0].name).toBe(report.filename)
+    expect(data.files[0].type).toBe('text/plain')
     expect(r.ok).toBe(true)
+  })
+  it('includes the screenshot, and steps down to text only when files are refused, saying so', async () => {
+    const shot = new File(['x'], 'a.png', { type: 'image/png' })
+    const share = vi.fn().mockResolvedValue(undefined)
+    await performShare({ channel: 'share', destination: '', report, screenshot: shot, nav: { share, canShare: () => true } })
+    expect(share.mock.calls[0][0].files).toHaveLength(2)
+    const share2 = vi.fn().mockResolvedValue(undefined)
+    const r = await performShare({ channel: 'share', destination: '', report, screenshot: shot, nav: { share: share2, canShare: () => false } })
+    expect(share2.mock.calls[0][0].files).toBeUndefined()
+    expect(r.message).toMatch(/message text was shared instead/)
   })
   it('explains clearly when sharing is unavailable, cancelled or fails', async () => {
     expect((await performShare({ channel: 'share', destination: '', report, nav: {} })).message).toMatch(/no share sheet/)
-    expect((await performShare({ channel: 'share', destination: '', report, nav: { share: vi.fn(), canShare: () => false } })).message).toMatch(/cannot share files/)
     const abort = vi.fn().mockRejectedValue(new DOMException('x', 'AbortError'))
     expect((await performShare({ channel: 'share', destination: '', report, nav: { share: abort, canShare: () => true } })).message).toMatch(/cancelled/)
     const boom = vi.fn().mockRejectedValue(new Error('x'))
@@ -105,9 +118,12 @@ describe('sharing is honest', () => {
     expect(r.ok).toBe(false)
     expect(r.message).toMatch(/could not open/i)
   })
-  it('saving a file says nothing was sent', async () => {
+  it('copy and save say nothing was sent', async () => {
     const save = vi.fn()
     expect((await performShare({ channel: 'file', destination: '', report, save })).message).toMatch(/nothing was sent/i)
     expect(save).toHaveBeenCalled()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    expect((await performShare({ channel: 'copy', destination: '', report, nav: { clipboard: { writeText } as unknown as Clipboard } })).message).toMatch(/nothing was sent/i)
+    expect(writeText).toHaveBeenCalledWith(report.text)
   })
 })

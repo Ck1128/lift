@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { CATALOG } from '../data/catalog'
 import { profileToForm, rebuildPlan, saveProfile, setLocation, setNutritionGuidance, setYogaLevel, updateExclusions } from '../db/repo'
 import { APP_VERSION, DB_SCHEMA_VERSION } from '../db/schema'
+import { ExportPanel } from '../components/ExportPanel'
 import { BackupPanel } from '../components/BackupPanel'
 import { DeleteAllData, DELETE_CATEGORIES } from '../components/DeleteAllData'
 import { EquipmentEditor } from '../components/EquipmentEditor'
@@ -144,9 +145,13 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
           <li><strong>Finish a workout:</strong> use Finish at the top or bottom. You can reopen it later to edit sets.</li>
           <li><strong>Reset a day:</strong> from the day's page. It asks three separate times.</li>
           <li><strong>Food and yoga:</strong> general wellness guidance, not medical advice. Online food search is off unless you turn it on.</li>
-          <li><strong>Export:</strong> Progress, then Export for CSV, JSON or a chart image.</li>
+          <li><strong>Export:</strong> Settings, then Export your data, for CSV or JSON.</li>
         </ul>
       </Section>
+      <Section title="Export your data">
+        <ExportPanel profile={profile} />
+      </Section>
+
       <Section title="Backup and restore"><BackupPanel /></Section>
 
       <Section title="Delete all data on this device" danger>

@@ -1,6 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { pngSupported, svgToPngBlob } from '../export/png'
-import { deliverFile } from '../export/deliver'
+import { type ReactNode } from 'react'
 
 /** Small dependency-free SVG charts that stay readable on a phone. */
 
@@ -18,27 +16,12 @@ export function DataTable({ columns, rows, caption }: { columns: string[]; rows:
   )
 }
 
-/** A chart with its data table and a "Save image" button where the browser can do it. */
+/** A chart with its data table. */
 export function ChartBlock({ title, children, columns, rows }: { title: string; children: ReactNode; columns: string[]; rows: (string | number)[][] }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [msg, setMsg] = useState('')
-  const save = async () => {
-    const svg = ref.current?.querySelector('svg.chart') as SVGSVGElement | null
-    if (!svg) return setMsg('There is no chart to save yet.')
-    try {
-      const blob = await svgToPngBlob(svg, title)
-      const r = await deliverFile(`${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, blob, 'image/png')
-      setMsg(r === 'cancelled' ? 'Cancelled.' : r === 'shared' ? 'Image shared.' : 'Image saved to your downloads.')
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'The image could not be saved.')
-    }
-  }
   return (
-    <div ref={ref}>
+    <div>
       {children}
       {rows.length > 0 && <DataTable columns={columns} rows={rows} caption={title} />}
-      {pngSupported() && rows.length > 0 && <button type="button" className="link-btn" onClick={() => void save()}>Save chart as image</button>}
-      {msg && <p className="hint" role="status">{msg}</p>}
     </div>
   )
 }

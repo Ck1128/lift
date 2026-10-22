@@ -1099,7 +1099,8 @@ describe('progress and export', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const user = userEvent.setup()
     render(<App />)
-    await user.click(await tab('Progress'))
+    await user.click(await tab('Settings'))
+    await user.click(await screen.findByText('Export your data'))
     await user.click(await screen.findByRole('button', { name: 'Export CSV' }))
     await waitFor(() => expect(created.some((c) => c.startsWith('lift-export-2026-10-21.csv'))).toBe(true))
     const csv = created.find((c) => c.endsWith('.csv') || c.includes('.csv:'))!
