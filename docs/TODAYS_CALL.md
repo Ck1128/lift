@@ -26,3 +26,9 @@ All of this runs on the phone from the person's own log. No server, no account, 
 
 ## Weekly weigh-in
 - Due from Monday until the week has a weight; "Not now" hides it for that day only; never on the day the app was set up.
+
+## Express circuit (v2.9.0)
+- Optional. `DayPlan.circuit` / `ScheduledWorkout.circuit`; built in `generateWorkout`: one exercise per target area (machines, dumbbells, cables and bodyweight first), 3 rounds, 30 s between exercises, about a minute between rounds, 5 minute warm-up. Estimated 28 minutes at most. Very sore areas are skipped.
+
+## Sex and injuries in recovery (v2.9.0)
+- `recoveryFactor` takes `sex` (female x0.95, small and bounded) and `injuredMuscles` (those muscle groups x1.5 through `perMuscle`). Injured areas also count as at least moderately sore for set counts and for Today's Call. Rules of thumb, not medical advice.

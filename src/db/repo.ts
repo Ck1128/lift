@@ -70,6 +70,7 @@ export async function saveProfile(
     excludedExerciseIds: existing?.excludedExerciseIds ?? [],
     excludedPatterns: existing?.excludedPatterns ?? [],
     limitationNote: existing?.limitationNote,
+    injuredMuscles: existing?.injuredMuscles,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   }
@@ -158,7 +159,7 @@ export async function saveBodyBasics(heightCm: number | undefined, weightKg: num
 }
 
 export async function updateExclusions(
-  patch: Partial<Pick<Profile, 'excludedExerciseIds' | 'excludedPatterns' | 'limitationNote'>>,
+  patch: Partial<Pick<Profile, 'excludedExerciseIds' | 'excludedPatterns' | 'limitationNote' | 'injuredMuscles'>>,
 ): Promise<void> {
   const p = await getProfile()
   if (!p) return
@@ -286,7 +287,7 @@ export async function createExtraWorkout(date: string, day: DayPlan, minutes: nu
   const now = nowIso()
   const row: ScheduledWorkout = {
     id: uid(), planId: plan?.id ?? 'none', date, focus: day.focus, targetMuscles: day.muscles,
-    availableMinutes: minutes, status: 'planned', cardioOnly: day.cardioOnly || undefined, createdAt: now, updatedAt: now,
+    availableMinutes: minutes, status: 'planned', cardioOnly: day.cardioOnly || undefined, circuit: day.circuit || undefined, createdAt: now, updatedAt: now,
   }
   await db.scheduled.add(row)
   return row
@@ -301,7 +302,7 @@ export async function applyCallToToday(date: string, day: DayPlan, minutes: numb
   const row = rows.find((r) => r.status === 'planned')
   if (!row) return createExtraWorkout(date, day, minutes)
   const next: ScheduledWorkout = {
-    ...row, focus: day.focus, targetMuscles: day.muscles, cardioOnly: day.cardioOnly || undefined, availableMinutes: minutes,
+    ...row, focus: day.focus, targetMuscles: day.muscles, cardioOnly: day.cardioOnly || undefined, circuit: day.circuit || undefined, availableMinutes: minutes,
     workout: undefined, configHash: undefined, cardioChoice: undefined, keepPlan: false, updatedAt: nowIso(),
   }
   await db.scheduled.put(next)
@@ -348,7 +349,9 @@ export async function generateFor(
   const soreness = await recentSoreness(opts.today)
   // Muscles that are still recovering get the same trimmed sets as mild soreness, unless the person reported more.
   for (const m of opts.light ?? []) if (!soreness[m]) soreness[m] = 1
-  const planDay: DayPlan = { focus: sched.focus, muscles: sched.targetMuscles, cardioOnly: sched.cardioOnly }
+  // An injured area is treated as at least moderately sore: fewer sets, and never the first thing the call picks.
+  for (const m of profile.injuredMuscles ?? []) if ((soreness[m] ?? 0) < 2) soreness[m] = 2
+  const planDay: DayPlan = { focus: sched.focus, muscles: sched.targetMuscles, cardioOnly: sched.cardioOnly, circuit: sched.circuit }
   const input = {
     date: sched.date, planDay, minutes, goal: profile.goal, experience: profile.trainingLevel, equipment,
     excludedExerciseIds: profile.excludedExerciseIds, excludedPatterns: profile.excludedPatterns,

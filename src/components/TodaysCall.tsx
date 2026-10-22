@@ -7,7 +7,7 @@ import { applyYogaPairing } from '../db/yogaRepo'
 import { exerciseById } from '../data/catalog'
 import { musclesOfMany } from '../engine/muscleMap'
 import {
-  checkChoice, FOCUS, FOCUS_ORDER, fineOf, groupReadiness, pairYoga, READY_AT, todaysCall, type CallMode, type FocusKey, type YogaPairing,
+  checkChoice, EXPRESS_MINUTES, FOCUS, FOCUS_ORDER, fineOf, groupReadiness, pairYoga, READY_AT, todaysCall, type CallMode, type FocusKey, type YogaPairing,
 } from '../engine/todaysCall'
 import { MUSCLE_LABEL, type DayPlan, type Muscle, type Profile, type ScheduledWorkout } from '../engine/types'
 import { tracksOf } from '../engine/tracks'
@@ -33,7 +33,10 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   const tracks = tracksOf(profile)
   const { report, loading } = useRecovery()
   const mode = useLiveQuery(() => getSetting<CallMode>(SETTING.callMode, 'tell'), [], undefined)
-  const soreness = useLiveQuery(() => recentSoreness(today), [today], {} as Partial<Record<Muscle, 1 | 2 | 3>>)
+  const reported = useLiveQuery(() => recentSoreness(today), [today], {} as Partial<Record<Muscle, 1 | 2 | 3>>)
+  // An injured area counts as at least moderately sore, so Lift never makes it the first choice.
+  const soreness: Partial<Record<Muscle, 1 | 2 | 3>> = { ...reported }
+  for (const m of profile.injuredMuscles ?? []) if ((soreness[m] ?? 0) < 2) soreness[m] = 2
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
   const [focus, setFocus] = useState<FocusKey | null>(null)
   const [busy, setBusy] = useState(false)
@@ -74,12 +77,13 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   }
 
   const build = async (plan: DayPlan, light: Muscle[]) => {
-    if (minutes === null) { setMessage('Choose a workout length first.'); return }
+    const mins = plan.circuit ? EXPRESS_MINUTES : minutes
+    if (mins === null) { setMessage('Choose a workout length first.'); return }
     setBusy(true)
     setMessage(null)
     try {
-      const row = await applyCallToToday(today, plan, minutes)
-      const r = await generateFor(row.id, minutes, { today, force: true, light })
+      const row = await applyCallToToday(today, plan, mins)
+      const r = await generateFor(row.id, mins, { today, force: true, light })
       if (r.kind === 'workout') navigate('/workout')
       else setMessage(r.message)
     } finally {
@@ -107,10 +111,14 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
         {picked && (
           <>
             <p className="muted" role="status">{picked.note}</p>
-            <p className="label-like">How much time do you have?</p>
-            <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
-            <Button disabled={busy || blocked || minutes === null} onClick={() => void build(picked.plan, picked.light ? tiredOf(picked.plan) : [])}>
-              Design my {FOCUS[focus!].label.toLowerCase()} workout ({minutes ?? '?'} min)
+            {focus !== 'express' && (
+              <>
+                <p className="label-like">How much time do you have?</p>
+                <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
+              </>
+            )}
+            <Button disabled={busy || blocked || (focus !== 'express' && minutes === null)} onClick={() => void build(picked.plan, picked.light ? tiredOf(picked.plan) : [])}>
+              Design my {FOCUS[focus!].label.toLowerCase()} {focus === 'express' ? '' : 'workout '}({focus === 'express' ? EXPRESS_MINUTES : (minutes ?? '?')} min)
             </Button>
           </>
         )}
@@ -135,6 +143,9 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
             Build this workout ({minutes ?? '?'} min)
           </Button>
         </>
+      )}
+      {call.kind === 'train' && !call.light && (
+        <p className="hint">Short on time? <button type="button" className="link-btn" disabled={busy || blocked} onClick={() => void build(FOCUS.express.plan, tiredOf(FOCUS.express.plan))}>Try the 30 minute express circuit</button></p>
       )}
       {call.yoga && (
         <Button variant={call.kind === 'train' ? 'ghost' : 'primary'} onClick={() => void pairYogaNow(call.yoga!)}>{call.yoga.label}</Button>

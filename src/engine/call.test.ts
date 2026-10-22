@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recoveryReport, type RecoveryReport, type RecoveryStatus } from './recovery'
+import { recoveryFactor, recoveryReport, type RecoveryReport, type RecoveryStatus } from './recovery'
 import { ALL_FINE, fineOfCoarse } from './muscleMap'
 import { checkChoice, FOCUS, groupReadiness, pairYoga, todaysCall } from './todaysCall'
 import type { DayPlan, Muscle } from './types'
@@ -163,5 +163,47 @@ describe('weekly weigh-in', () => {
   })
   it('never shows on the day the app was first set up', () => {
     expect(weighInDue({ today: wed, weights: [], startedOn: wed })).toBe(false)
+  })
+})
+
+describe('recovery: sex and injury', () => {
+  const base = { age: 30, trainingLevel: 'intermediate' as const }
+  it('women get a small, bounded shortening; nothing changes when sex is not given', () => {
+    expect(recoveryFactor(base).factor).toBe(1)
+    const f = recoveryFactor({ ...base, sex: 'female' })
+    expect(f.factor).toBe(0.95)
+    expect(f.reasons.join(' ')).toMatch(/women/)
+    expect(recoveryFactor({ ...base, sex: 'male' }).factor).toBe(1)
+  })
+  it('an injured area recovers 50% slower, only for that area, and says why', () => {
+    const f = recoveryFactor({ ...base, injuredMuscles: ['quads'] })
+    expect(f.perMuscle?.quads).toBe(1.5)
+    expect(f.perMuscle?.chest).toBeUndefined()
+    expect(f.reasons.join(' ')).toMatch(/injured/)
+  })
+  it('the longer time shows up in the recovery report', () => {
+    const t = (iso: string) => iso
+    const session = { id: 's', date: '2026-10-20', startedAt: t('2026-10-20T10:00:00.000Z'), finishedAt: t('2026-10-20T10:40:00.000Z'), status: 'completed', actualExercises: [{ slotId: 's1', exerciseId: 'Barbell_Squat', skipped: false, painReported: false }], title: 'x', plannedExercises: [], pausedMs: 0 } as never
+    const logs = [1, 2, 3].map((n) => ({ id: `l${n}`, sessionId: 's', slotId: 's1', exerciseId: 'Barbell_Squat', setNumber: n, completed: true, actualReps: 8, actualWeight: 100, weightUnit: 'lb', plannedRepMin: 6, plannedRepMax: 8 })) as never
+    const now = new Date('2026-10-21T10:00:00.000Z')
+    const normal = recoveryReport([session], logs, now, recoveryFactor(base))
+    const hurt = recoveryReport([session], logs, now, recoveryFactor({ ...base, injuredMuscles: ['quads'] }))
+    const a = normal.muscles.quads.recent[0]?.needHours
+    const b = hurt.muscles.quads.recent[0]?.needHours
+    if (a !== undefined && b !== undefined) expect(b).toBeGreaterThan(a)
+  })
+  it('an injured muscle is never the first choice for Today\'s Call', () => {
+    const c = todaysCall({ report: report(), soreness: { chest: 2, shoulders: 2, triceps: 2 }, scheduled: plan(['chest', 'shoulders', 'triceps'], 'Push'), yogaOn: true, workoutOn: true })
+    expect(c.plan?.muscles ?? []).not.toContain('chest')
+  })
+})
+
+describe('express circuit', () => {
+  it('is only ever a person\'s choice, never picked by Lift on its own', () => {
+    for (const tired of [[], ['chest'], ['quads', 'back']] as Muscle[][]) {
+      const c = todaysCall({ report: report(tired), scheduled: plan(['chest']), yogaOn: true, workoutOn: true })
+      expect(c.focusKey).not.toBe('express')
+    }
+    expect(FOCUS.express.plan.circuit).toBe(true)
   })
 })

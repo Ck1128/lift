@@ -245,6 +245,40 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     return s
   }
 
+  // ---- optional 30 minute express circuit: one exercise per area, done back to back, three rounds ----
+  if (planDay.circuit) {
+    const handy = (e: Exercise) => ['machine', 'dumbbell', 'cable', 'bodyweight', 'smith'].includes(e.exerciseType)
+    const picks: Exercise[] = []
+    for (const m of planDay.muscles) {
+      if ((input.soreness[m] ?? 0) >= 3) continue // very sore: leave that area out
+      const list = pools.get(m)
+      if (!list) continue
+      const fresh = (e: Exercise) => !picks.some((p) => p.id === e.id)
+      const pick = list.find((e) => handy(e) && fresh(e)) ?? list.find(fresh)
+      if (pick) picks.push(pick)
+    }
+    if (picks.length === 0) return { kind: 'error', message: 'No exercises fit your equipment and settings for a circuit. Check Settings.' }
+    const rounds = 3
+    const slots: PlannedExercise[] = picks.map((ex, i) => ({ ...build(ex, i, rounds), repMin: 10, repMax: 15, restSeconds: 30 }))
+    const secs = picks.length * rounds * 70 + (rounds - 1) * 60 + 300
+    const circuitNotes = [
+      `Express circuit: do one set of each exercise in order with about 30 seconds between them, then rest about a minute and repeat. ${rounds} rounds in all.`,
+      'Use a lighter weight than usual so every round stays smooth. This is a short workout for busy days, not a replacement for a full session.',
+      'Spend the first 5 minutes at an easy pace as your warm-up.',
+    ]
+    const sore = planDay.muscles.filter((m) => (input.soreness[m] ?? 0) >= 3)
+    if (sore.length > 0) circuitNotes.push(`Left out because they are very sore or injured: ${sore.map((m) => MUSCLE_LABEL[m].toLowerCase()).join(', ')}.`)
+    return {
+      kind: 'workout',
+      workout: {
+        title: planDay.focus, date: input.date, targetMuscles: planDay.muscles, availableMinutes: 30, estimatedMinutes: Math.ceil(secs / 60), fits: secs <= 1800,
+        cardioMinutes: 0, exercises: slots, notes: [...circuitNotes, ...designNotes(input, avail, false)],
+        assumptions: ['About 40 seconds of work and 30 seconds of rest per set, a minute between rounds, and a 5 minute warm-up. Your real pace will differ.'],
+        generatorVersion: GENERATOR_VERSION, catalogVersion: input.catalog[0]?.catalogVersion ?? 'unknown',
+      },
+    }
+  }
+
   // Add exercises in rank order while the time estimate fits. Cardio time is reserved first.
   let cardioMinutes = cardio?.minutes ?? 0
   const timed = (list: { ex: Exercise; sets: number }[], cm: number) =>

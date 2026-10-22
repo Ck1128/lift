@@ -127,6 +127,8 @@ export interface Profile {
   excludedExerciseIds: string[]
   excludedPatterns: Pattern[]
   limitationNote?: string
+  /** Areas that are injured or being rehabbed. They recover more slowly and get gentler, shorter work. */
+  injuredMuscles?: Muscle[]
   createdAt: string
   updatedAt: string
 }
@@ -136,6 +138,8 @@ export interface DayPlan {
   muscles: Muscle[]
   /** A cardio-only session: no strength exercises. */
   cardioOnly?: boolean
+  /** The optional 30 minute express circuit: one exercise per area, done back to back for rounds. */
+  circuit?: boolean
 }
 
 /** Weekday index (0 = Monday) -> plan, or null for a rest day. */
@@ -262,6 +266,8 @@ export interface ScheduledWorkout {
   cardioChoice?: string
   /** A cardio-only session (no strength exercises). */
   cardioOnly?: boolean
+  /** The 30 minute express circuit. */
+  circuit?: boolean
   workout?: GeneratedWorkout
   rescheduledFromId?: string
   createdAt: string

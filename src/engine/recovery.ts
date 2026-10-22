@@ -10,8 +10,8 @@
  * Then the status is the remaining recovery time compared with what that muscle needed.
  */
 import { exerciseById } from '../data/catalog'
-import { ALL_FINE, LARGE_MUSCLES, musclesOf, type FineMuscle } from './muscleMap'
-import type { Profile, SetLog, WorkoutSession } from './types'
+import { ALL_FINE, fineOfCoarse, LARGE_MUSCLES, musclesOf, type FineMuscle } from './muscleMap'
+import { MUSCLE_LABEL, type Profile, type SetLog, type WorkoutSession } from './types'
 
 export type RecoveryStatus = 'recovered' | 'recovering' | 'recent' | 'no_data'
 export const STATUS_LABEL: Record<RecoveryStatus, string> = {
@@ -65,7 +65,15 @@ export interface RecoveryReport {
  * Adjusts recovery time to the person. Newer lifters and older lifters usually need longer; experienced and younger
  * ones a little less. The effect is deliberately small and bounded, because these are rules of thumb, not measurements.
  */
-export function recoveryFactor(p: Pick<Profile, 'age' | 'trainingLevel'> | null | undefined): { factor: number; reasons: string[] } {
+export interface PersonalRecovery {
+  factor: number
+  reasons: string[]
+  /** Extra multiplier for individual muscles (injured areas). */
+  perMuscle?: Partial<Record<FineMuscle, number>>
+}
+export const INJURY_FACTOR = 1.5
+
+export function recoveryFactor(p: Pick<Profile, 'age' | 'trainingLevel'> & Partial<Pick<Profile, 'sex' | 'injuredMuscles'>> | null | undefined): PersonalRecovery {
   if (!p) return { factor: 1, reasons: [] }
   let f = 1
   const reasons: string[] = []
@@ -76,7 +84,13 @@ export function recoveryFactor(p: Pick<Profile, 'age' | 'trainingLevel'> | null 
     else if (p.age >= 40) { f *= 1.1; reasons.push('recovery slows a little from age 40') }
     else if (p.age < 25) { f *= 0.95; reasons.push('younger lifters tend to recover a little faster') }
   }
-  return { factor: Math.min(1.4, Math.max(0.8, Math.round(f * 100) / 100)), reasons }
+  // A small average difference only: women tend to recover a little faster between sessions. Individuals vary far more.
+  if (p.sex === 'female') { f *= 0.95; reasons.push('women tend to recover slightly faster between sessions, on average') }
+  const perMuscle: Partial<Record<FineMuscle, number>> = {}
+  for (const m of p.injuredMuscles ?? []) for (const fm of fineOfCoarse(m)) perMuscle[fm] = INJURY_FACTOR
+  const hurt = (p.injuredMuscles ?? []).map((m) => MUSCLE_LABEL[m].toLowerCase())
+  if (hurt.length > 0) reasons.push(`you marked ${hurt.join(', ')} as injured, so ${hurt.length === 1 ? 'that area takes' : 'those areas take'} about 50% longer`)
+  return { factor: Math.min(1.4, Math.max(0.8, Math.round(f * 100) / 100)), reasons, perMuscle }
 }
 
 const when = (s: WorkoutSession) => new Date(s.finishedAt ?? s.startedAt).getTime()
@@ -89,7 +103,7 @@ export function needHoursFor(muscle: FineMuscle, effectiveSets: number, avgRpe: 
   return Math.round(base * volume * effort * frequency)
 }
 
-export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: Date, personal: { factor: number; reasons: string[] } = { factor: 1, reasons: [] }): RecoveryReport {
+export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: Date, personal: PersonalRecovery = { factor: 1, reasons: [] }): RecoveryReport {
   const nowMs = now.getTime()
   const done = sessions.filter((s) => (s.status === 'completed' || s.status === 'partial') && when(s) <= nowMs + HOUR)
   const bySession = new Map<string, SetLog[]>()
@@ -126,7 +140,7 @@ export function recoveryReport(sessions: WorkoutSession[], logs: SetLog[], now: 
       const avgRpe = a.rpe.length ? a.rpe.reduce((x, y) => x + y, 0) / a.rpe.length : undefined
       perMuscle[m].push({
         sessionId: s.id, date: s.date, title: s.title, exercises: [...a.names], effectiveSets: a.sets, avgRpe,
-        needHours: Math.round(needHoursFor(m, a.sets, avgRpe, prior7) * personal.factor), hoursSince: Math.max(0, (nowMs - sTime) / HOUR),
+        needHours: Math.round(needHoursFor(m, a.sets, avgRpe, prior7) * personal.factor * (personal.perMuscle?.[m] ?? 1)), hoursSince: Math.max(0, (nowMs - sTime) / HOUR),
       })
     }
   }

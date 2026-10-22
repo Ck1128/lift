@@ -74,6 +74,48 @@ describe("Today's Call on Home", () => {
   })
 })
 
+describe('express circuit', () => {
+  it('is optional: offered as a choice, builds a 30 minute circuit with three rounds', async () => {
+    await seed(WED)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: "I'll choose" }))
+    await user.click(await screen.findByRole('button', { name: 'Express circuit' }))
+    expect(within(screen.getByText("Today's call").closest('section')!).queryByText(/how much time do you have/i)).toBeNull() // the length is fixed at 30
+    await user.click(screen.getByRole('button', { name: /design my express circuit \(30 min\)/i }))
+    await screen.findByRole('button', { name: /start workout/i })
+    const row = (await db.scheduled.where('date').equals('2026-10-21').toArray())[0]
+    expect(row.circuit).toBe(true)
+    const w = row.workout!
+    expect(w.availableMinutes).toBe(30)
+    expect(w.estimatedMinutes).toBeLessThanOrEqual(30)
+    expect(w.exercises.length).toBeGreaterThanOrEqual(4)
+    expect(w.exercises.every((e) => e.sets === 3 && e.restSeconds === 30)).toBe(true)
+    expect(w.notes.join(' ')).toMatch(/express circuit/i)
+  })
+
+  it('is not forced on anyone: the default call is a normal workout with a small link to the circuit', async () => {
+    await seed(WED)
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Lift decides' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /try the 30 minute express circuit/i })).toBeInTheDocument()
+  })
+})
+
+describe('injured areas', () => {
+  it('can be marked in Settings, are saved, and show in the recovery explanation', async () => {
+    await seed(WED)
+    window.history.replaceState(null, '', '#/settings')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Exercises to avoid'))
+    const group = await screen.findByRole('group', { name: 'Injured areas' })
+    await user.click(within(group).getByRole('button', { name: 'Quads' }))
+    await waitFor(async () => expect((await db.profile.toArray())[0].injuredMuscles).toEqual(['quads']))
+    expect(within(group).getByRole('button', { name: 'Quads' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
 describe('weekly weigh-in popup', () => {
   it('appears, can be closed, and returns the next day until a weight is saved', async () => {
     await seed(WED)

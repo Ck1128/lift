@@ -9,7 +9,7 @@ import { DeleteAllData, DELETE_CATEGORIES } from '../components/DeleteAllData'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
 import { Button, Chips, Dialog, ScreenHeader } from '../components/ui'
-import { LEVEL_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
+import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type LocationType, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
 import { HealthPanel } from '../components/HealthPanel'
 import { FeedbackButton, FeedbackForm, setFeedbackIcons, useFeedbackIcons } from '../components/Feedback'
 import { SETTINGS_CATEGORIES } from '../engine/feedback'
@@ -138,6 +138,19 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
             </ul>
           </>
         )}
+        <p className="label-like">Injured or recovering areas</p>
+        <p className="hint">Marked areas recover about 50% slower in your recovery map, get one fewer set, and are never the first choice for Today's Call. This is only a rule of thumb. Please follow the advice of a qualified professional for any injury.</p>
+        <div className="chips" role="group" aria-label="Injured areas">
+          {ALL_MUSCLES.map((m) => {
+            const on = (profile.injuredMuscles ?? []).includes(m)
+            return (
+              <button key={m} type="button" className={on ? 'chip on' : 'chip'} aria-pressed={on}
+                onClick={() => void updateExclusions({ injuredMuscles: on ? (profile.injuredMuscles ?? []).filter((x) => x !== m) : [...(profile.injuredMuscles ?? []), m] })}>
+                {MUSCLE_LABEL[m]}
+              </button>
+            )
+          })}
+        </div>
         <div className="field">
           <label htmlFor="limit-note">Private note (optional)</label>
           <textarea id="limit-note" rows={2} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} onBlur={() => void updateExclusions({ limitationNote: note.trim() || undefined })} />

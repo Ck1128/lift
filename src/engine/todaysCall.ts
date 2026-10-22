@@ -11,7 +11,7 @@ import type { RecoveryReport } from './recovery'
 import type { YogaStyleId } from '../data/yoga'
 
 export type CallMode = 'tell' | 'ask'
-export type FocusKey = 'upper' | 'lower' | 'full' | 'push' | 'pull' | 'legs' | 'cardio'
+export type FocusKey = 'upper' | 'lower' | 'full' | 'push' | 'pull' | 'legs' | 'cardio' | 'express'
 
 export const FOCUS: Record<FocusKey, { label: string; plan: DayPlan }> = {
   upper: { label: 'Upper body', plan: { focus: 'Upper body', muscles: ['chest', 'back', 'shoulders', 'biceps', 'triceps'] } },
@@ -21,8 +21,10 @@ export const FOCUS: Record<FocusKey, { label: string; plan: DayPlan }> = {
   pull: { label: 'Pull', plan: { focus: 'Pull (back, biceps)', muscles: ['back', 'biceps', 'core'] } },
   legs: { label: 'Legs', plan: { focus: 'Legs and glutes', muscles: ['quads', 'hamstrings', 'glutes', 'calves'] } },
   cardio: { label: 'Cardio', plan: { focus: 'Cardio', muscles: [], cardioOnly: true } },
+  express: { label: 'Express circuit', plan: { focus: 'Express circuit (30 min)', muscles: ['quads', 'chest', 'back', 'hamstrings', 'shoulders', 'core'], circuit: true } },
 }
-export const FOCUS_ORDER: FocusKey[] = ['full', 'upper', 'lower', 'push', 'pull', 'legs', 'cardio']
+export const EXPRESS_MINUTES = 30
+export const FOCUS_ORDER: FocusKey[] = ['full', 'upper', 'lower', 'push', 'pull', 'legs', 'cardio', 'express']
 /** Templates the engine may choose on its own. Cardio is only ever a person's choice. */
 const AUTO: FocusKey[] = ['upper', 'lower', 'push', 'pull', 'legs', 'full']
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.0 - Express circuit, and recovery that knows your sex and injuries (branch feature/v2-complete)
+- **30 minute express circuit**, optional. Pick it under "I'll choose" on Home, or tap the small "Try the 30 minute express circuit" link under Today's Call. It is one exercise each for legs, chest, back, hamstrings, shoulders and core, done back to back for three rounds, with lighter weights. Lift never picks it for you.
+- **Injured areas** (Settings > Exercises to avoid): marked areas recover about 50% slower in your recovery map, get one fewer set, and are never the first choice for Today's Call. A very sore area is left out of the circuit.
+- **Sex now shapes recovery** (if you gave it): a small, bounded shortening for women, shown in the recovery explanation. Nothing changes if you left it blank.
+- Developer note: the type check script was not checking anything before; it now runs the real project build (`tsc -b`).
+
 ## 2.8.0 - Today's Call, Machine Taken and Body Story (branch feature/v2-complete)
 - **Today's Call** is the first card on Home. By default Lift decides: it reads your recovery map, your plan and any soreness, and says what to do today and why. Switch to "I'll choose" to pick a focus (full body, upper, lower, push, pull, legs, cardio) and Lift designs that workout. Choosing a tired muscle is never refused; Lift just keeps the sets lighter and says so.
 - Yoga pairs with training. After a workout, Home offers a 10 minute gentle cool-down for the muscles you just worked. On recovery days it offers a yin session. The Yoga screen then favours poses that stretch those muscles, and you can clear that focus.
