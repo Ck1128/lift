@@ -292,6 +292,22 @@ export async function createExtraWorkout(date: string, day: DayPlan, minutes: nu
   return row
 }
 
+/**
+ * Today's Call chose a different workout than the plan. Today's planned row is changed to it (so Workout, Home and
+ * history all agree), or a one-off row is made when today has none.
+ */
+export async function applyCallToToday(date: string, day: DayPlan, minutes: number): Promise<ScheduledWorkout> {
+  const rows = await db.scheduled.where('date').equals(date).toArray()
+  const row = rows.find((r) => r.status === 'planned')
+  if (!row) return createExtraWorkout(date, day, minutes)
+  const next: ScheduledWorkout = {
+    ...row, focus: day.focus, targetMuscles: day.muscles, cardioOnly: day.cardioOnly || undefined, availableMinutes: minutes,
+    workout: undefined, configHash: undefined, cardioChoice: undefined, keepPlan: false, updatedAt: nowIso(),
+  }
+  await db.scheduled.put(next)
+  return next
+}
+
 // ---------- soreness ----------
 export async function addSoreness(muscle: Muscle, level: 1 | 2 | 3, date: string): Promise<void> {
   const existing = await db.soreness.where('date').equals(date).filter((s) => s.muscle === muscle).toArray()
@@ -319,7 +335,7 @@ export function profileGaps(p: Profile): string[] {
 }
 
 export async function generateFor(
-  scheduledId: string, minutes: number, opts: { force?: boolean; today: string },
+  scheduledId: string, minutes: number, opts: { force?: boolean; today: string; /** Muscles to go easier on (still recovering). */ light?: Muscle[] },
 ): Promise<GenerationResult> {
   const sched = await db.scheduled.get(scheduledId)
   const profile = await getProfile()
@@ -330,6 +346,8 @@ export async function generateFor(
   const sessions = await db.sessions.toArray()
   const logs = await db.setLogs.toArray()
   const soreness = await recentSoreness(opts.today)
+  // Muscles that are still recovering get the same trimmed sets as mild soreness, unless the person reported more.
+  for (const m of opts.light ?? []) if (!soreness[m]) soreness[m] = 1
   const planDay: DayPlan = { focus: sched.focus, muscles: sched.targetMuscles, cardioOnly: sched.cardioOnly }
   const input = {
     date: sched.date, planDay, minutes, goal: profile.goal, experience: profile.trainingLevel, equipment,

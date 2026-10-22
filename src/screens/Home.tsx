@@ -10,8 +10,10 @@ import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type DayPlan, type Muscle, type
 import { tracksOf } from '../engine/tracks'
 import { Button, Card, Loading, ProgressBar, ScreenHeader } from '../components/ui'
 import { BodyBasicsCard, DurationPicker, LevelDialog } from '../components/HomeParts'
+import { TodaysCall } from '../components/TodaysCall'
 import { useQuery } from '../hooks/app'
 import { useRouter } from '../router'
+import { ensureStories, getSeen, listStories } from '../db/storyRepo'
 
 const EXTRA: Record<string, DayPlan> = {
   upper: { focus: 'Upper body (extra)', muscles: ['chest', 'back', 'shoulders', 'biceps', 'triceps'] },
@@ -40,6 +42,11 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
   const weekRows = useLiveQuery(() => db.scheduled.toArray(), [], [])
   const soreness = useLiveQuery(() => recentSoreness(today), [today], {} as Partial<Record<Muscle, 1 | 2 | 3>>)
   const gaps = profileGaps(profile)
+  // A finished weekly or monthly Body Story is saved the first time the app opens after Sunday or month-end.
+  useEffect(() => { void ensureStories(today) }, [today])
+  const stories = useLiveQuery(() => listStories(), [], [])
+  const seen = useLiveQuery(() => getSeen(), [], [] as string[])
+  const unseen = stories.filter((s) => !seen.includes(s.id))
 
   const isTraining = sched && sched.status !== 'skipped'
   const week = startOfWeek(today)
@@ -93,6 +100,9 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
       <ScreenHeader title={greeting} subtitle={formatDay(today)} />
 
       {gaps.length > 0 && <BodyBasicsCard profile={profile} />}
+
+      {/* ---- Today's call: the first thing you see ---- */}
+      <TodaysCall profile={profile} today={today} sched={sched} minutes={minutes} setMinutes={setMinutes} blocked={gaps.length > 0} />
 
       {loading && <Loading label="Loading today" />}
 
@@ -173,6 +183,15 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
             {yogaDone.length === 0 && <p className="hint">Your yoga sessions show up here.</p>}
           </div>
         )}
+      </Card>
+
+      <Card title="Body Story">
+        {unseen.length > 0 ? (
+          <p><strong>Your {unseen[0].kind === 'week' ? 'weekly' : 'monthly'} story is ready:</strong> {unseen[0].title}.</p>
+        ) : (
+          <p className="muted">Your week and month in plain words. A new one is saved each Sunday and on the last day of the month.</p>
+        )}
+        <Button variant={unseen.length > 0 ? 'primary' : 'ghost'} onClick={() => navigate('/story')}>{unseen.length > 0 ? 'View my Body Story' : 'Open Body Story'}</Button>
       </Card>
 
       {/* ---- adjust (kept small and out of the way) ---- */}

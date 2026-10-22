@@ -1,3 +1,4 @@
+import { useRouter } from '../router'
 import { useState, type ReactNode } from 'react'
 import { CATALOG } from '../data/catalog'
 import { profileToForm, rebuildPlan, saveProfile, setLocation, setNutritionGuidance, setYogaLevel, updateExclusions } from '../db/repo'
@@ -51,6 +52,7 @@ function Section({ title, children, danger }: { title: string; children: ReactNo
 }
 
 export function Settings({ profile, today, onReset }: { profile: Profile; today: string; onReset: () => void }) {
+  const { navigate } = useRouter()
   const [editLocation, setEditLocation] = useState<LocationType>(profile.preferredLocation)
   const [search, setSearch] = useState('')
   const [note, setNote] = useState(profile.limitationNote ?? '')
@@ -185,6 +187,7 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
       <Section title="About and privacy">
         <p className="muted">Lift version {APP_VERSION} · database v{DB_SCHEMA_VERSION}</p>
         <p className="hint">Your data is stored only on this phone, in the browser's local database. There is no account and no server. If you clear Safari's website data or delete the app, it is gone, so export a backup now and then.</p>
+        <Button variant="ghost" onClick={() => navigate('/privacy')}>See what is stored on this phone</Button>
         <p className="hint">Exercise names, steps and photos come from the public-domain free-exercise-db project. Time, weight and calorie figures are estimates.</p>
       </Section>
       </div>

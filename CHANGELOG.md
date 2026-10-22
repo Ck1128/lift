@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.8.0 - Today's Call, Machine Taken and Body Story (branch feature/v2-complete)
+- **Today's Call** is the first card on Home. By default Lift decides: it reads your recovery map, your plan and any soreness, and says what to do today and why. Switch to "I'll choose" to pick a focus (full body, upper, lower, push, pull, legs, cardio) and Lift designs that workout. Choosing a tired muscle is never refused; Lift just keeps the sets lighter and says so.
+- Yoga pairs with training. After a workout, Home offers a 10 minute gentle cool-down for the muscles you just worked. On recovery days it offers a yin session. The Yoga screen then favours poses that stretch those muscles, and you can clear that focus.
+- **Machine taken**: one tap during a workout swaps in the closest alternative for the same muscle, preferring different equipment, remembers your choice for next time and never swings back to a busy one.
+- **Body Story**: a plain weekly and monthly recap (workouts, yoga, most-worked muscles, new bests, body weight change). A weekly story is saved on Sunday and a monthly one on the last day of the month, the next time you open Lift if you missed the day. Open it any time from Home, including "this week so far". Share as text, with body weight included by default and a switch to leave it out.
+- **Weekly weigh-in**: a popup from Monday that you can close, and that comes back each day until the week has a weight. It never shows on the day you set the app up.
+- **Privacy page** (Settings > About and privacy): what is stored on the phone, and the only things that can leave it.
+- No new database tables: stories and preferences live in settings, so backups and Delete all data already cover them.
+
 ## 2.7.3 - Fixes from your testing (branch feature/v2-complete)
 - Finish workout (and every other sheet) now sits above the navigation bar, so its buttons can be tapped.
 - Feedback by SMS or WhatsApp starts with +1, which you can edit. A 10-digit US number without a code gets 1 added. Once Messages, WhatsApp or Mail opens, the feedback sheet closes.

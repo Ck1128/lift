@@ -10,6 +10,7 @@ import {
   itemTotalSeconds, MAX_YOGA_MINUTES, MIN_YOGA_MINUTES, suggestedProps, YOGA_DURATION_PRESETS, yogaCalories, type YogaPlan, type YogaSession,
 } from '../engine/yoga'
 import { formatDay } from '../engine/dates'
+import { FINE_LABEL } from '../engine/muscleMap'
 import { LEVEL_LABEL, type Profile, type TrainingLevel } from '../engine/types'
 import { LEVEL_HELP } from '../components/ProfileFormView'
 import { DurationPicker } from '../components/HomeParts'
@@ -74,7 +75,7 @@ export function Yoga({ profile, today }: { profile: Profile; today: string }) {
     if (minutes === null) return setError(`Choose a length from ${MIN_YOGA_MINUTES} to ${MAX_YOGA_MINUTES} minutes.`)
     const next = { ...prefs, minutes }
     await saveYogaPrefs(next)
-    const r = await planYoga({ date: today, style: next.style, level, minutes, location: next.location, props: next.props, restrictions: next.restrictions })
+    const r = await planYoga({ date: today, style: next.style, level, minutes, location: next.location, props: next.props, restrictions: next.restrictions, focus: next.focus })
     if (r.kind === 'error') { setPlan(null); setError(r.message) } else setPlan(r.plan)
   }
   const begin = async () => {
@@ -104,6 +105,13 @@ export function Yoga({ profile, today }: { profile: Profile; today: string }) {
         </Card>
       ) : (
         <>
+          {prefs.focus && prefs.focus.length > 0 && (
+            <Card className="focus-note">
+              <p className="eyebrow">Paired with your training</p>
+              <p>Poses that stretch your {prefs.focus.map((m) => FINE_LABEL[m].toLowerCase()).join(', ')} come first.</p>
+              <Button variant="small" onClick={() => update({ focus: undefined })}>Clear focus</Button>
+            </Card>
+          )}
           <Card title="Style">
             <p className="label-like">What are you after?</p>
             <div className="chips" role="group" aria-label="Filter styles by intent">

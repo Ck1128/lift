@@ -36,6 +36,7 @@ function Icon({ id }: { id: ScreenId }) {
 export function tabOf(path: string): ScreenId {
   const p = path.split('?')[0]
     if (p.startsWith('/session')) return 'progress'
+  if (p === '/privacy') return 'settings'
   const first = p.split('/')[1] as ScreenId
   return SCREENS.some((s) => s.id === first) ? first : 'home'
 }

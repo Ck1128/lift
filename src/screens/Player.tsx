@@ -5,7 +5,8 @@ import {
   addSet, finishSession, pauseSession, replaceExercise, resumeSession, setExerciseUnit, setPain, setSessionUnit, setSkipped, undoReplace, updateSet, type LogsChoice,
 } from '../db/repo'
 import { CATALOG, exerciseById } from '../data/catalog'
-import { alternativesFor, equipmentOptions, patternWord, sessionEstimateMinutes } from '../engine/variants'
+import { alternativesFor, equipmentOptions, machineTakenSwap, patternWord, SHAREABLE, sessionEstimateMinutes } from '../engine/variants'
+import { getSetting, setSetting } from '../db/settings'
 import { EQUIPMENT_LABEL, type Exercise, type EquipmentSet, type PlannedExercise, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
 import { useNow } from '../hooks/app'
 import { addRest, formatClock, isFinished, isPaused, pauseRest, remainingMs, resumeRest, startRest, type RestTimer } from '../engine/restTimer'
@@ -28,6 +29,8 @@ export function Player({ session, profile, equipment, onFinished }: {
   const [replacing, setReplacing] = useState<string | null>(null)
   const [change, setChange] = useState<{ slotId: string; toId: string } | null>(null)
   const [swapNote, setSwapNote] = useState<string | null>(null)
+  /** Exercises found busy this session, so "Machine taken" never offers them again. */
+  const [taken, setTaken] = useState<string[]>([])
   const [confirm, setConfirm] = useState<'finish' | 'abandon' | null>(null)
   const paused = !!session.pausedAt
   const now = useNow(rest || !paused ? 250 : 1000)
@@ -62,7 +65,19 @@ export function Player({ session, profile, equipment, onFinished }: {
     await replaceExercise(session.id, slotId, toId, { logs })
     setSwapNote(`Swapped ${from?.name ?? 'the exercise'} for ${exerciseById(toId)?.name ?? 'a new one'}. Only this exercise changed. You can undo it on its card.`)
   }
-  
+
+  // "Machine taken": one tap swaps in the closest alternative, remembers the choice for next time, and never goes back to a busy one.
+  const machineTaken = async (slotId: string, exerciseId: string) => {
+    const cur = exerciseById(exerciseId)
+    if (!cur) return
+    const prefs = await getSetting<Record<string, string>>('swap.pref', {})
+    const pick = machineTakenSwap(cur, rules, inSession, [...taken, exerciseId], prefs[exerciseId])
+    if (!pick) { setSwapNote(`No other exercise fits your equipment and settings for ${cur.primaryMuscles[0]}. Skip ${cur.name} for now and come back to it.`); return }
+    setTaken((t) => [...t, exerciseId])
+    await setSetting('swap.pref', { ...prefs, [exerciseId]: pick.id })
+    requestSwap(slotId, pick.id)
+  }
+
   // The rest timer ends itself. It uses timestamps, so a locked screen or background tab cannot make it drift.
   useEffect(() => {
     if (!rest || isPaused(rest)) return
@@ -122,6 +137,7 @@ export function Player({ session, profile, equipment, onFinished }: {
             rules={rules}
             inSession={inSession}
             onSwap={(toId) => requestSwap(slot.slotId, toId)}
+            onMachineTaken={() => void machineTaken(slot.slotId, actual.exerciseId)}
           />
         )
       })}
@@ -185,7 +201,7 @@ export function Player({ session, profile, equipment, onFinished }: {
   )
 }
 
-function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace, rules, inSession, onSwap }: {
+function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace, rules, inSession, onSwap, onMachineTaken }: {
   slot: PlannedExercise
   actual: WorkoutSession['actualExercises'][number]
   sessionId: string
@@ -196,6 +212,7 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
   rules: Parameters<typeof equipmentOptions>[1]
   inSession: string[]
   onSwap: (toId: string) => void
+  onMachineTaken: () => void
 }) {
   const ex = exerciseById(actual.exerciseId)
   const [undoMsg, setUndoMsg] = useState('')
@@ -252,6 +269,9 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
             <Button variant="small" onClick={() => void addSet(sessionId, slot.slotId)}>Add set</Button>
             <Button variant="small" onClick={onReplace}>Replace</Button>
             <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, true)}>Skip</Button>
+            {ex && SHAREABLE.has(ex.exerciseType) && (
+              <Button variant="small" className="taken" onClick={onMachineTaken}>{ex.exerciseType === 'machine' || ex.exerciseType === 'cable' || ex.exerciseType === 'smith' ? 'Machine taken' : 'Equipment taken'}</Button>
+            )}
             <Button variant="small" className="pain" aria-pressed={actual.painReported} onClick={() => setPain(sessionId, slot.slotId, !actual.painReported)}>
               {actual.painReported ? 'Pain noted ✓' : 'Felt pain'}
             </Button>

@@ -2,6 +2,7 @@ import { db, nowIso, uid } from './schema'
 import { getSetting, setSetting, SETTING } from './settings'
 import { generateYoga, itemTotalSeconds, yogaCacheKey, type YogaInput, type YogaPlan, type YogaResult, type YogaSession } from '../engine/yoga'
 import type { PropId, Restriction, YogaLocation, YogaStyleId } from '../data/yoga'
+import type { FineMuscle } from '../engine/muscleMap'
 
 export interface YogaPrefs {
   style: YogaStyleId
@@ -9,12 +10,20 @@ export interface YogaPrefs {
   location: YogaLocation
   props: PropId[]
   restrictions: Restriction[]
+  /** Set by a cool-down or recovery suggestion. Cleared on the Yoga screen. */
+  focus?: FineMuscle[]
 }
 
 export const DEFAULT_YOGA_PREFS: YogaPrefs = { style: 'hatha', minutes: 20, location: 'home', props: ['mat'], restrictions: [] }
 
 export const getYogaPrefs = () => getSetting<YogaPrefs>(SETTING.yogaPrefs, DEFAULT_YOGA_PREFS)
 export const saveYogaPrefs = (p: YogaPrefs) => setSetting(SETTING.yogaPrefs, p)
+
+/** Opens the Yoga screen set up for a cool-down or recovery session. The person still sees and can change everything. */
+export async function applyYogaPairing(p: { style: YogaStyleId; minutes: number; focus: FineMuscle[] }): Promise<void> {
+  const prefs = await getYogaPrefs()
+  await saveYogaPrefs({ ...prefs, style: p.style, minutes: p.minutes, focus: p.focus })
+}
 
 /** The plan for a date and settings. The same inputs always give the same plan, and the result is cached on the phone. */
 export async function planYoga(input: YogaInput): Promise<YogaResult> {

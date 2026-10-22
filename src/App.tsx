@@ -6,6 +6,9 @@ import { OfflineBanner, UpdateBanner } from './components/Banners'
 import { ConfirmDialog } from './components/ui'
 import { useOnline, useProfile, useToday } from './hooks/app'
 import { registerPwa } from './pwa'
+import { BodyStory } from './screens/BodyStory'
+import { Privacy } from './screens/Privacy'
+import { WeighInPrompt } from './components/WeighInPrompt'
 import { matchPath, RouterProvider, useRouter } from './router'
 import type { Profile } from './engine/types'
 import { Home } from './screens/Home'
@@ -28,6 +31,8 @@ function Routes({ profile, today, onReset }: { profile: Profile; today: string; 
   const yogaSession = matchPath('/yoga/session/:id', p)
   if (yogaSession) return <YogaSessionPage sessionId={yogaSession.id} profile={profile} today={today} />
   if (p === '/yoga') return <Yoga profile={profile} today={today} />
+  if (p === '/story') return <BodyStory profile={profile} today={today} />
+  if (p === '/privacy') return <Privacy />
   const editFood = matchPath('/food/edit/:id', p)
   if (editFood) return <FoodEntry profile={profile} today={today} editId={editFood.id} />
   if (p === '/food/add') return <FoodEntry profile={profile} today={today} />
@@ -91,6 +96,7 @@ function Shell() {
           <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />
         </main>
       </FeedbackHost>
+      <WeighInPrompt profile={profile} today={today} />
       <BottomNav />
     </div>
   )

@@ -14,5 +14,6 @@ export const SETTING = {
   foodEnabled: 'food.enabled',
   foodOnlineSearch: 'food.onlineSearch',
   yogaPrefs: 'yoga.prefs',
+  callMode: 'call.mode',
   pageUnit: (page: string) => `unit.${page}`,
 } as const

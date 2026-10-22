@@ -3,6 +3,8 @@ import {
   type Phase, type Position, type PropId, type Restriction, type Role, type YogaLocation, type YogaPose, type YogaStyle, type YogaStyleId,
 } from '../data/yoga'
 import type { TrainingLevel } from './types'
+import type { FineMuscle } from './muscleMap'
+import { focusScore } from './yogaMuscles'
 
 export const YOGA_GENERATOR_VERSION = 'yoga-gen-1.0'
 export const MIN_YOGA_MINUTES = 5
@@ -24,6 +26,8 @@ export interface YogaInput {
   /** Props the user has. An empty list means no props. */
   props: PropId[]
   restrictions: Restriction[]
+  /** Optional. Muscles to favour, so poses that stretch them are picked first (a cool-down or recovery session). */
+  focus?: FineMuscle[]
 }
 
 export interface YogaItem {
@@ -96,10 +100,11 @@ export interface YogaSession {
   updatedAt: string
 }
 
-export function yogaCacheKey(i: Pick<YogaInput, 'date' | 'style' | 'level' | 'minutes' | 'location' | 'props' | 'restrictions'>): string {
+export function yogaCacheKey(i: Pick<YogaInput, 'date' | 'style' | 'level' | 'minutes' | 'location' | 'props' | 'restrictions' | 'focus'>): string {
   return [
     YOGA_CATALOG_VERSION, YOGA_GENERATOR_VERSION, i.date, i.style, i.level ?? '', i.minutes, i.location,
     [...i.props].sort().join(','), [...i.restrictions].sort().join(','),
+    ...(i.focus && i.focus.length > 0 ? [`f:${[...i.focus].sort().join(',')}`] : []),
   ].join('|')
 }
 
@@ -198,10 +203,13 @@ export function generateYoga(input: YogaInput): YogaResult {
     return { kind: 'plan', plan }
   }
 
+  const focus = input.focus ?? []
   const allowed = (p: YogaPose) => blockedBy(p, input, style) === null
   const rotate = <T,>(list: T[], by: number): T[] => (list.length === 0 ? list : [...list.slice(by % list.length), ...list.slice(0, by % list.length)])
   const byRole = (role: Role, avoid: Set<string>): YogaPose | undefined =>
-    rotate(POSES.filter((p) => p.roles.includes(role) && allowed(p) && !avoid.has(p.id)), seed + role.length).find(() => true)
+    rotate(POSES.filter((p) => p.roles.includes(role) && allowed(p) && !avoid.has(p.id)), seed + role.length)
+      // With a focus, poses that stretch those muscles come first. The sort is stable, so without one nothing changes.
+      .sort((a, b) => focusScore(b.id, focus) - focusScore(a.id, focus))[0]
   const skippedForSettings = new Set<string>()
 
   let mainCount = 0

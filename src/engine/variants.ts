@@ -38,6 +38,28 @@ export function alternativesFor(current: Exercise, rules: Rules, inSession: stri
   }
 }
 
+/** Types that can be taken by someone else at a gym. Bodyweight and bands always can be done. */
+export const SHAREABLE: ReadonlySet<ExerciseType> = new Set<ExerciseType>(['machine', 'cable', 'smith', 'barbell', 'dumbbell', 'ez_bar', 'kettlebell'])
+
+/**
+ * "Machine taken": the closest replacement that keeps the day's intent (same main muscle, same kind of movement first)
+ * and, where possible, uses different equipment, since the first choice is busy. A swap the person has made before for
+ * this exercise comes first. `taken` are exercises already found busy this session, so they are not offered again.
+ */
+export function machineTakenSwap(current: Exercise, rules: Rules, inSession: string[], taken: string[], preferredId?: string): Exercise | undefined {
+  const blocked = [...inSession, ...taken]
+  const { best, related } = alternativesFor(current, rules, blocked)
+  const pool = [...best, ...related]
+  const pref = preferredId ? pool.find((e) => e.id === preferredId) : undefined
+  if (pref) return pref
+  // Same movement first, then different equipment (the first choice is busy), then the usual gym order:
+  // dumbbells and cables before machines, with kettlebells, bands and the EZ bar last.
+  const rank = (e: Exercise) => (['dumbbell', 'cable', 'machine', 'smith', 'barbell', 'bodyweight', 'kettlebell', 'bands', 'ez_bar'] as ExerciseType[]).indexOf(e.exerciseType)
+  const key = (e: Exercise) => [e.movementPattern === current.movementPattern ? 0 : 1, e.exerciseType !== current.exerciseType ? 0 : 1, rank(e)]
+  const ordered = [...pool].sort((x, y) => { const a = key(x), b = key(y); return a[0] - b[0] || a[1] - b[1] || a[2] - b[2] })
+  return ordered[0]
+}
+
 export interface EquipmentOption {
   type: ExerciseType
   label: string

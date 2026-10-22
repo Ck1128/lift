@@ -48,7 +48,8 @@ export function parentOf(path: string): string {
   const p = path.split('?')[0]
   if (p.startsWith('/workout/')) return '/workout'
   if (p.startsWith('/session/')) return '/progress'
-  if (p === '/yoga') return '/home'
+  if (p === '/yoga' || p === '/story') return '/home'
+  if (p === '/privacy') return '/settings'
   if (p.startsWith('/yoga/')) return '/yoga'
   if (p.startsWith('/food/')) return '/food'
   return DEFAULT_PATH
