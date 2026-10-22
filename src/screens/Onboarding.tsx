@@ -12,7 +12,7 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
   const [step, setStep] = useState<'profile' | 'equipment'>('profile')
   const [formStep, setFormStep] = useState(0)
   const saved = useProfile()
-  const [chosen, setChosen] = useState<{ location: LocationType; gymType: GymType; unit: 'lb' | 'kg' }>({ location: 'gym', gymType: 'planet_fitness', unit: 'lb' })
+  const [chosen, setChosen] = useState<{ location: LocationType; gymType: GymType; unit: 'lb' | 'kg' }>({ location: 'gym', gymType: 'standard', unit: 'lb' })
 
   const submit = async (form: ProfileForm, extra: ProfileExtra) => {
     onBegin() // keep onboarding on screen even though a profile now exists
@@ -47,7 +47,7 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
       <Card className="step-card">
         <ProfileFormView
           initial={profileToForm(saved ?? undefined)}
-          initialExtra={{ preferredLocation: 'gym', gymType: 'planet_fitness' }}
+          initialExtra={{ preferredLocation: 'gym', gymType: 'standard' }}
           showLocation
           submitLabel="Continue"
           stepped

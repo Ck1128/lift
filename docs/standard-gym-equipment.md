@@ -1,6 +1,6 @@
-# Planet Fitness equipment and workout design
+# Standard gym equipment and workout design
 
-Version `presets-3`, reviewed 2026-10-21. Source: https://taekwondoking.com/list-of-planet-fitness-equipment/ (constants in `src/engine/planetFitness.ts` and `src/engine/equipment.ts`). Clubs differ, so anything can be switched off in Settings.
+Version `presets-3`, reviewed 2026-10-21. (constants in `src/engine/standardGym.ts` and `src/engine/equipment.ts`). Clubs differ, so anything can be switched off in Settings.
 
 ## What the club has (used for planning)
 - Strength machines: shoulder press, lateral raise, triceps extension, bicep curl, leg press, leg curl, leg extension, calf raise, glute kickback, abdominal crunch, lower back extension; chest press and Hammer-style rows in many clubs.
@@ -10,7 +10,7 @@ Version `presets-3`, reviewed 2026-10-21. Source: https://taekwondoking.com/list
 - Cardio: treadmill, elliptical, rower, upright and recumbent bike, stair climber.
 - Not available: Olympic barbell and plates, squat rack, pull-up bar.
 
-A machine exercise is only offered at Planet Fitness if it is on the list above. Hack squat, T-bar row, leverage deadlift, butterfly, seated calf and similar are never planned there.
+A machine exercise is only offered at a standard gym if it is on the list above. Hack squat, T-bar row, leverage deadlift, butterfly, seated calf and similar are never planned there.
 
 ## How a session is designed (`src/engine/suitability.ts`, `generate.ts`)
 - **Level:** beginners get machines and cables first and no deadlift-type or other skill-heavy lifts; intermediate and regular lifters lead with dumbbells and the Smith machine.

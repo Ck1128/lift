@@ -1,3 +1,4 @@
+import { migrateGymNames } from './migrate'
 import { APP_VERSION, db, DB_SCHEMA_VERSION, nowIso, upgradeProfileV2 } from './schema'
 import { ALL_EQUIPMENT } from '../engine/types'
 
@@ -274,6 +275,8 @@ export async function importBackup(b: BackupFile, mode: 'replace' | 'merge'): Pr
       report.skipped += rows.length - fresh.length
     }
   })
+  // A backup made by an older version may still carry the old gym names.
+  await migrateGymNames()
   return report
 }
 

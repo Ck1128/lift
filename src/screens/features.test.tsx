@@ -13,7 +13,7 @@ const SUN = new Date(2026, 9, 25, 12, 0, 0)
 
 async function seed(now: Date, createdDaysAgo = 7) {
   await resetAllData()
-  await saveProfile({ ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, now)
+  await saveProfile({ ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'standard' }, now)
   const p = (await db.profile.toArray())[0]
   await db.bodyWeights.clear() // onboarding logs the first weight; these tests start without one
   await db.profile.put({ ...p, createdAt: new Date(now.getTime() - createdDaysAgo * 86_400_000).toISOString() })

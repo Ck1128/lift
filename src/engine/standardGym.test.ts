@@ -3,16 +3,16 @@ import { CATALOG, exerciseById } from '../data/catalog'
 import { generateWorkout, type GenerateInput } from './generate'
 import { presetEquipment } from './equipment'
 import { generateWeeklySchedule } from './split'
-import { PF_MACHINE_EXERCISES, pfMachineOk } from './planetFitness'
+import { STANDARD_MACHINES, standardMachineOk } from './standardGym'
 import { STAPLES } from './suitability'
 import { ALL_MUSCLES, type Goal, type TrainingLevel } from './types'
 
 const byName = (n: string) => CATALOG.find((e) => e.name === n)
-const equipment = presetEquipment('planet_fitness', 'lb')
+const equipment = presetEquipment('standard_gym', 'lb')
 
 const base = (o: Partial<GenerateInput> = {}): GenerateInput => ({
   date: '2026-10-21', planDay: { focus: 'Full body A', muscles: ['quads', 'chest', 'back', 'shoulders', 'core'] }, minutes: 60, goal: 'muscle', experience: 'beginner',
-  equipment, excludedExerciseIds: [], excludedPatterns: [], catalog: CATALOG, lastPerformance: {}, soreness: {}, weightUnit: 'lb', weightKg: 75, gym: 'planet_fitness', ...o,
+  equipment, excludedExerciseIds: [], excludedPatterns: [], catalog: CATALOG, lastPerformance: {}, soreness: {}, weightUnit: 'lb', weightKg: 75, gym: 'standard', ...o,
 })
 
 function plan(o: Partial<GenerateInput> = {}) {
@@ -21,7 +21,7 @@ function plan(o: Partial<GenerateInput> = {}) {
   return r.workout
 }
 
-describe('Planet Fitness equipment list', () => {
+describe('Standard gym equipment list', () => {
   it('matches the club list: rowers, kettlebells, bands and EZ bars yes; Olympic barbell and pull-up bar no', () => {
     const on = (id: keyof typeof equipment) => equipment[id]?.available
     for (const id of ['dumbbell', 'machine', 'cable', 'smith', 'bench', 'kettlebell', 'bands', 'ez_bar', 'rower', 'treadmill', 'elliptical', 'exercise_bike', 'stair_climber'] as const) expect(on(id), id).toBe(true)
@@ -29,16 +29,16 @@ describe('Planet Fitness equipment list', () => {
     expect(equipment.dumbbell?.maxWeight).toBe(75)
   })
   it('every listed machine exercise and every staple exists in the catalog', () => {
-    for (const n of PF_MACHINE_EXERCISES) expect(byName(n), n).toBeDefined()
+    for (const n of STANDARD_MACHINES) expect(byName(n), n).toBeDefined()
     for (const [m, names] of Object.entries(STAPLES)) for (const n of names) expect(byName(n), `${m}: ${n}`).toBeDefined()
   })
   it('machines the club does not have are not offered, but listed ones are', () => {
-    for (const n of ['Hack Squat', 'Lying T-Bar Row', 'Leverage Deadlift', 'Butterfly', 'Seated Calf Raise', 'Chair Squat', 'Lunge Sprint']) expect(pfMachineOk(n), n).toBe(false)
-    for (const n of ['Leg Press', 'Seated Leg Curl', 'Leg Extension Machine', 'Glute Kickback Machine', 'Lateral Raise Machine']) expect(pfMachineOk(n), n).toBe(true)
+    for (const n of ['Hack Squat', 'Lying T-Bar Row', 'Leverage Deadlift', 'Butterfly', 'Seated Calf Raise', 'Chair Squat', 'Lunge Sprint']) expect(standardMachineOk(n), n).toBe(false)
+    for (const n of ['Leg Press', 'Seated Leg Curl', 'Leg Extension Machine', 'Glute Kickback Machine', 'Lateral Raise Machine']) expect(standardMachineOk(n), n).toBe(true)
   })
 })
 
-describe('workouts designed for Planet Fitness', () => {
+describe('workouts designed for a standard gym', () => {
   const levels: TrainingLevel[] = ['beginner', 'intermediate', 'regular']
   const goals: Goal[] = ['muscle', 'strength', 'general', 'endurance', 'fat_loss']
 
@@ -55,7 +55,7 @@ describe('workouts designed for Planet Fitness', () => {
           const ex = exerciseById(e.exerciseId)!
           expect(ex.equipmentIds, ex.name).not.toContain('barbell')
           expect(ex.equipmentIds, ex.name).not.toContain('pullup_bar')
-          if (ex.equipmentIds.includes('machine')) expect(pfMachineOk(ex.name), ex.name).toBe(true)
+          if (ex.equipmentIds.includes('machine')) expect(standardMachineOk(ex.name), ex.name).toBe(true)
         }
       }
     }
@@ -100,7 +100,7 @@ describe('workouts designed for Planet Fitness', () => {
     const w = plan({ age: 34 })
     const text = w.notes.join(' ')
     expect(text).toMatch(/Designed for you: Beginner, goal: build muscle, age 34/)
-    expect(text).toMatch(/Planet Fitness/)
+    expect(text).toMatch(/Standard gym/)
     expect(text).toMatch(/Warm up/)
   })
 
@@ -110,17 +110,17 @@ describe('workouts designed for Planet Fitness', () => {
     expect(w.exercises.map((e) => e.name)).not.toContain('Leg Press')
   })
 
-  it('a different gym is not limited to the Planet Fitness machine list', () => {
+  it('a different gym is not limited to the standard gym machine list', () => {
     const gym = presetEquipment('generic_gym', 'lb')
     const w = plan({ equipment: gym, gym: 'generic', experience: 'regular', planDay: { focus: 'Legs', muscles: ['quads', 'hamstrings', 'glutes', 'calves'] } })
     expect(w.exercises.length).toBeGreaterThan(2)
   })
 })
 
-it('covers every muscle with at least one Planet Fitness exercise', () => {
+it('covers every muscle with at least one standard gym exercise', () => {
   const avail = new Set(['bodyweight', 'dumbbell', 'machine', 'cable', 'smith', 'bench', 'kettlebell', 'bands', 'ez_bar', 'mat'])
   for (const m of ALL_MUSCLES) {
-    const n = CATALOG.filter((e) => e.primaryMuscles[0] === m && e.equipmentIds.every((q) => avail.has(q)) && (!e.equipmentIds.includes('machine') || pfMachineOk(e.name))).length
+    const n = CATALOG.filter((e) => e.primaryMuscles[0] === m && e.equipmentIds.every((q) => avail.has(q)) && (!e.equipmentIds.includes('machine') || standardMachineOk(e.name))).length
     expect(n, m).toBeGreaterThanOrEqual(3)
   }
 })

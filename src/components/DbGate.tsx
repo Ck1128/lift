@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { db } from '../db/schema'
+import { migrateGymNames } from '../db/migrate'
 import { Button } from './ui'
 
 /**
@@ -12,7 +13,7 @@ export function DbGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true
-    db.open().catch((e: unknown) => {
+    db.open().then(() => migrateGymNames()).catch((e: unknown) => {
       if (alive) setError(e instanceof Error ? e.message : 'unknown error')
     })
     return () => { alive = false }

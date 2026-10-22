@@ -18,7 +18,7 @@ const base = (over: Partial<GenerateInput> = {}): GenerateInput => ({
   minutes: 45,
   goal: 'muscle',
   experience: 'intermediate',
-  equipment: presetEquipment('planet_fitness', 'lb'),
+  equipment: presetEquipment('standard_gym', 'lb'),
   excludedExerciseIds: [],
   excludedPatterns: [],
   catalog: CATALOG,
@@ -57,14 +57,14 @@ describe('catalog', () => {
 })
 
 describe('equipment and exclusions', () => {
-  it('Planet Fitness preset has no barbell', () => {
-    const avail = availableIds(presetEquipment('planet_fitness', 'lb'))
+  it('Standard gym preset has no barbell', () => {
+    const avail = availableIds(presetEquipment('standard_gym', 'lb'))
     expect(avail.has('barbell')).toBe(false)
     expect(avail.has('smith')).toBe(true)
   })
 
   it('never selects an exercise whose equipment is unavailable (all locations, all muscle splits)', () => {
-    for (const kind of ['home', 'planet_fitness', 'generic_gym'] as const) {
+    for (const kind of ['home', 'standard_gym', 'generic_gym'] as const) {
       const equipment = presetEquipment(kind, 'lb')
       const avail = availableIds(equipment)
       for (const muscles of [['chest', 'back'], ['quads', 'hamstrings', 'glutes', 'calves'], ['shoulders', 'biceps', 'triceps', 'core']] as const) {
@@ -79,7 +79,7 @@ describe('equipment and exclusions', () => {
   })
 
   it('removing equipment changes future workouts', () => {
-    const eq = presetEquipment('planet_fitness', 'lb')
+    const eq = presetEquipment('standard_gym', 'lb')
     const withDb = lifts(workoutOf(base({ equipment: eq, experience: 'regular' }))).map((e) => e.exerciseId)
     eq.dumbbell = { ...eq.dumbbell!, available: false }
     const without = lifts(workoutOf(base({ equipment: eq, experience: 'regular' })))
@@ -347,7 +347,7 @@ describe('validation, units and dates', () => {
     const { catalog: _c, ...rest } = base()
     void _c
     const h1 = configHash({ ...rest, catalogVersion: 'v', recentSessionIds: [] })
-    const eq = presetEquipment('planet_fitness', 'lb')
+    const eq = presetEquipment('standard_gym', 'lb')
     eq.cable = { ...eq.cable!, available: false }
     expect(configHash({ ...rest, equipment: eq, catalogVersion: 'v', recentSessionIds: [] })).not.toBe(h1)
     expect(configHash({ ...rest, minutes: 30, catalogVersion: 'v', recentSessionIds: [] })).not.toBe(h1)

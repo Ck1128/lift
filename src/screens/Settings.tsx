@@ -104,7 +104,7 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
       <Section title="Where you train">
         <Chips label="Training location" options={['gym', 'home'] as const} value={profile.preferredLocation} onChange={(v) => { void setLocation(v); setEditLocation(v) }} format={(v) => (v === 'gym' ? 'Gym' : 'Home')} />
         {profile.preferredLocation === 'gym' && (
-          <Chips label="Which gym" options={['planet_fitness', 'generic'] as const} value={profile.gymType} onChange={(v) => void setLocation('gym', v)} format={(v) => (v === 'planet_fitness' ? 'Planet Fitness' : 'Another gym')} />
+          <Chips label="Which gym" options={['standard', 'generic'] as const} value={profile.gymType} onChange={(v) => void setLocation('gym', v)} format={(v) => (v === 'standard' ? 'Standard gym' : 'Full gym (barbells and racks)')} />
         )}
         <p className="hint">Home and gym each keep their own equipment list.</p>
       </Section>

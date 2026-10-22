@@ -1,7 +1,7 @@
 import type { EquipmentId, EquipmentItem, EquipmentSet, GymType, LocationType, WeightUnit } from './types'
 import { ALL_EQUIPMENT, LOADABLE } from './types'
 
-export type PresetKind = 'home' | 'planet_fitness' | 'generic_gym'
+export type PresetKind = 'home' | 'standard_gym' | 'generic_gym'
 
 export function defaultLoad(id: EquipmentId, unit: WeightUnit): Pick<EquipmentItem, 'minWeight' | 'maxWeight' | 'increment' | 'unit'> | null {
   if (!LOADABLE.includes(id)) return null
@@ -16,19 +16,19 @@ function item(id: EquipmentId, available: boolean, unit: WeightUnit, load?: Part
   return { id, available, ...(available ? defaultLoad(id, unit) : null), ...load }
 }
 
-/** Version and review date of the curated default lists (also in docs/planet-fitness-equipment.md). */
+/** Version and review date of the curated default lists (also in docs/standard-gym-equipment.md). */
 export const PRESET_VERSION = 'presets-3'
 export const PRESET_REVIEWED = '2026-10-21'
 
 /**
  * Starting points only. Individual locations differ.
- * Planet Fitness: see src/engine/planetFitness.ts (machines, cables, Smith, dumbbells to 75 lb, EZ bars, kettlebells,
+ * Standard gym: see src/engine/standardGym.ts (machines, cables, Smith, dumbbells to 75 lb, EZ bars, kettlebells,
  * bands, rowers; no Olympic barbells or squat racks). The user can mark anything missing at their club.
  */
 export const PRESET_EQUIPMENT: Record<PresetKind, EquipmentId[]> = {
   home: ['bodyweight', 'mat'],
-  // From the club equipment list in src/engine/planetFitness.ts: no Olympic barbell or pull-up bar.
-  planet_fitness: ['bodyweight', 'mat', 'dumbbell', 'machine', 'cable', 'smith', 'bench', 'kettlebell', 'bands', 'ez_bar', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
+  // From the club equipment list in src/engine/standardGym.ts: no Olympic barbell or pull-up bar.
+  standard_gym: ['bodyweight', 'mat', 'dumbbell', 'machine', 'cable', 'smith', 'bench', 'kettlebell', 'bands', 'ez_bar', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
   generic_gym: ['bodyweight', 'mat', 'dumbbell', 'barbell', 'ez_bar', 'machine', 'cable', 'smith', 'bench', 'pullup_bar', 'kettlebell', 'bands', 'treadmill', 'exercise_bike', 'elliptical', 'rower', 'stair_climber'],
 }
 
@@ -40,10 +40,10 @@ export function presetEquipment(kind: PresetKind, unit: WeightUnit): EquipmentSe
   for (const id of ids) {
     const available = on[kind].includes(id)
     let load: Partial<EquipmentItem> | undefined
-    if (kind === 'planet_fitness' && id === 'kettlebell') {
+    if (kind === 'standard_gym' && id === 'kettlebell') {
       load = { minWeight: lb ? 10 : 4, maxWeight: lb ? 50 : 24, increment: lb ? 5 : 4, unit }
     }
-    if (kind === 'planet_fitness' && id === 'dumbbell') {
+    if (kind === 'standard_gym' && id === 'dumbbell') {
       load = { minWeight: lb ? 5 : 2.5, maxWeight: lb ? 75 : 35, increment: lb ? 5 : 2.5, unit }
     }
     if (kind === 'generic_gym' && id === 'dumbbell') {
@@ -56,7 +56,7 @@ export function presetEquipment(kind: PresetKind, unit: WeightUnit): EquipmentSe
 
 export function presetFor(location: LocationType, gymType: GymType): PresetKind {
   if (location === 'home') return 'home'
-  return gymType === 'planet_fitness' ? 'planet_fitness' : 'generic_gym'
+  return gymType === 'standard' ? 'standard_gym' : 'generic_gym'
 }
 
 /**

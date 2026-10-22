@@ -45,7 +45,7 @@ export const MANUAL_EXERCISES: Exercise[] = [
   { ...base, id: 'manual-machine-shoulder-press', name: 'Shoulder Press Machine', primaryMuscles: ['shoulders'], secondaryMuscles: ['triceps'],
     movementPattern: 'push', equipmentIds: ['machine'], exerciseType: 'machine', compound: true,
     instructions: ['Adjust the seat so the handles are at shoulder height.', 'Press the handles overhead until your arms are nearly straight.', 'Lower slowly back to shoulder height.'] },
-  // Planet Fitness machines that the public dataset does not have. Instructions only, no photos.
+  // Standard gym machines that the public dataset does not have. Instructions only, no photos.
   { ...base, id: 'manual-lateral-raise-machine', name: 'Lateral Raise Machine', primaryMuscles: ['shoulders'],
     movementPattern: 'isolation', equipmentIds: ['machine'], exerciseType: 'machine', compound: false,
     instructions: ['Adjust the seat so your shoulders line up with the machine\'s pivot points.', 'Rest your forearms against the pads and raise your arms out to the sides until they reach about shoulder height.', 'Pause briefly, then lower slowly without letting the weights crash down.'] },

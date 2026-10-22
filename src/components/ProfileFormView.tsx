@@ -218,11 +218,11 @@ export function ProfileFormView({
         )}
       </Field>
       {extra.preferredLocation === 'gym' && (
-        <Field label="Which gym?" hint="Planet Fitness gets a maintained equipment list. You can exclude anything your club does not have.">
+        <Field label="Which gym?" hint="A standard gym gets a maintained equipment list (machines, cables, dumbbells, no barbell rack). You can exclude anything your gym does not have.">
           {(id) => (
             <select id={id} value={extra.gymType} onChange={(e) => { setExtra({ ...extra, gymType: e.target.value as GymType }); setDirty(true) }}>
-              <option value="planet_fitness">Planet Fitness</option>
-              <option value="generic">Another gym</option>
+              <option value="standard">Standard gym (machines and dumbbells)</option>
+              <option value="generic">Full gym (barbells and racks)</option>
             </select>
           )}
         </Field>

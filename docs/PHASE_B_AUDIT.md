@@ -7,7 +7,7 @@ Source: `fit_workout_phase_b_user_stories.md`. Branch `feature/v2-complete`. Dat
 | Area | Symptom | Root cause | Fix | Test |
 |---|---|---|---|---|
 | Equipment (US-034) | Bodyweight appeared greyed out and could not be changed | The checkbox was locked and the id was always added to the available list | Bodyweight is a normal toggle: on by default, off only when excluded | `App.test.tsx` equipment tests, `engine.test.ts` |
-| Equipment (US-035) | Planet Fitness list did not update after changing gym type | Defaults were applied only at onboarding | `setLocation` now calls `applyDefaultEquipment`; PF stored as `preset` + `excluded` | equipment tests |
+| Equipment (US-035) | Standard gym list did not update after changing gym type | Defaults were applied only at onboarding | `setLocation` now calls `applyDefaultEquipment`; the standard list stored as `preset` + `excluded` | equipment tests |
 | Equipment editor | "Loading..." forever for a location with no saved record | `useLiveQuery` returns `undefined` for both loading and missing | Switched to `useQuery` | equipment tests |
 | Dialogs | Typing in a dialog input lost focus after every key | Focus effect depended on `onClose` | Focus once on mount, `closeRef` for the callback | reset-phrase UI test |
 | Workouts | Risk of a duplicate session when starting a saved day | `startSession` created a new row | It reopens the saved session | db tests |
@@ -22,7 +22,7 @@ Source: `fit_workout_phase_b_user_stories.md`. Branch `feature/v2-complete`. Dat
 ## Regression checklist (manual, on a real iPhone)
 
 - [ ] Fresh install: onboarding, all three levels, beginner asks for height and weight.
-- [ ] Planet Fitness: bodyweight toggles; exclusions persist; changing gym type refreshes the list.
+- [ ] Standard gym: bodyweight toggles; exclusions persist; changing gym type refreshes the list.
 - [ ] Start a workout, use the rest timer (pause, +15s, skip), lock the phone, return.
 - [ ] Finish from the top and bottom buttons. Reopen a completed workout, edit a set, save.
 - [ ] Reset a day: all three confirmations are separate and cancelling at any step keeps data.

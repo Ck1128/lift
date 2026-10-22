@@ -3,7 +3,7 @@ import type {
   Muscle, Pattern, PlannedExercise, WeightUnit, DayPlan,
 } from './types'
 import { EQUIPMENT_LABEL, GOAL_LABEL, LEVEL_LABEL, MUSCLE_LABEL } from './types'
-import { pfMachineOk, PF_SUMMARY } from './planetFitness'
+import { standardMachineOk, STANDARD_SUMMARY } from './standardGym'
 import { suitability, type SuitabilityContext } from './suitability'
 import { availableIds, loadSpec } from './equipment'
 import { assumptionsText, estimateSeconds, restSecondsFor } from './time'
@@ -38,7 +38,7 @@ export interface GenerateInput {
   sex?: 'female' | 'male'
   /** Optional. Older lifters get gentler exercise choices and rep ranges. */
   age?: number
-  /** Set when training at a gym, so a known club (Planet Fitness) only gets exercises it can actually do. */
+  /** Set when training at a gym, so a standard gym only gets exercises it can actually do. */
   gym?: GymType
 }
 
@@ -62,8 +62,8 @@ export function eligible(ex: Exercise, input: Rules, avail: Set<EquipmentId>): b
   if (input.excludedExerciseIds.includes(ex.id)) return false
   if (input.excludedPatterns.includes(ex.movementPattern)) return false
   if (LEVEL_PARAMS[input.experience].maxDifficulty === 'beginner' && ex.difficulty !== 'beginner') return false
-  // A machine is only offered at Planet Fitness if the club really has that machine.
-  if (input.gym === 'planet_fitness' && ex.equipmentIds.includes('machine') && !pfMachineOk(ex.name)) return false
+  // A machine is only offered at a standard gym if it really has that machine.
+  if (input.gym === 'standard' && ex.equipmentIds.includes('machine') && !standardMachineOk(ex.name)) return false
   return ex.equipmentIds.every((q) => avail.has(q))
 }
 
@@ -361,12 +361,12 @@ function designNotes(input: GenerateInput, avail: Set<EquipmentId>, hasCardio: b
   const bits = [LEVEL_LABEL[input.experience], `goal: ${GOAL_LABEL[input.goal].toLowerCase()}`]
   if (input.age !== undefined) bits.push(`age ${input.age}`)
   out.push(`Designed for you: ${bits.join(', ')}. ${LEVEL_PARAMS[input.experience].blurb}`)
-  if (input.gym === 'planet_fitness') out.push(`${PF_SUMMARY} Machines and cables come first for beginners; dumbbells and the Smith machine lead for more experienced lifters.`)
+  if (input.gym === 'standard') out.push(`${STANDARD_SUMMARY} Machines and cables come first for beginners; dumbbells and the Smith machine lead for more experienced lifters.`)
   if (input.age !== undefined && input.age >= 55) out.push('Rep ranges are a little higher and sets a little lower, and jumping or ballistic moves are avoided. Move smoothly and rest as long as you need.')
   else if (input.age !== undefined && input.age >= 50) out.push('Machines and cables are favoured and jumping moves are avoided.')
   const warm = ['treadmill', 'exercise_bike', 'elliptical', 'rower'].find((e) => avail.has(e as EquipmentId))
   const warmName = warm ? EQUIPMENT_LABEL[warm as EquipmentId].toLowerCase() : 'walking in place'
-  out.push(`Warm up: about 5 minutes of easy ${warmName}${hasCardio ? ' (or use your cardio block)' : ''}, then one light set of your first exercise. Cool down with a few minutes of easy movement and stretching${input.gym === 'planet_fitness' ? ' in the stretching area' : ''}.`)
+  out.push(`Warm up: about 5 minutes of easy ${warmName}${hasCardio ? ' (or use your cardio block)' : ''}, then one light set of your first exercise. Cool down with a few minutes of easy movement and stretching${input.gym === 'standard' ? ' in the stretching area' : ''}.`)
   return out
 }
 

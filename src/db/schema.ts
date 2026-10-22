@@ -18,7 +18,7 @@ export interface EquipmentRecord {
   items: EquipmentSet
   updatedAt: string
   /**
-   * When set, `items` follows this maintained preset (for example Planet Fitness) and only `excluded` is the user's choice.
+   * When set, `items` follows this maintained preset (for example the standard gym) and only `excluded` is the user's choice.
    * Missing means the user edited the list by hand.
    */
   preset?: PresetKind

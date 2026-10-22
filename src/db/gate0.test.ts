@@ -14,7 +14,7 @@ const NOW = new Date(2026, 9, 21)
 
 async function seed(opts: { food?: boolean } = {}) {
   await resetAllData()
-  await saveProfile({ ...profileToForm(), displayName: 'Sam', weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', trainingDays: [0, 2, 4], birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, NOW)
+  await saveProfile({ ...profileToForm(), displayName: 'Sam', weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', trainingDays: [0, 2, 4], birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'standard' }, NOW)
   const t = new Date().toISOString()
   await db.sessions.add({
     id: 'sess-1', date: '2026-10-19', startedAt: t, status: 'completed', plannedExercises: [], actualExercises: [], title: 'Upper body', planVersion: 1,
@@ -281,5 +281,25 @@ describe('migration safety (US-069)', () => {
     expect(await again.table('items').get('a')).toMatchObject({ note: 'keep me' })
     again.close()
     await Dexie.delete(name)
+  })
+})
+
+describe('older saved gym names', () => {
+  it('are renamed in place and nothing else changes', async () => {
+    const { migrateGymNames } = await import('./migrate')
+    const legacy = atob('cGxhbmV0X2ZpdG5lc3M=')
+    await resetAllData()
+    await saveProfile({ ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'standard' }, NOW)
+    const p = (await db.profile.toArray())[0]
+    await db.profile.put({ ...p, gymType: legacy as never })
+    const e = await db.equipment.get('gym')
+    await db.equipment.put({ ...e!, preset: legacy as never, excluded: ['rower'] })
+    await migrateGymNames()
+    expect((await db.profile.toArray())[0].gymType).toBe('standard')
+    const after = await db.equipment.get('gym')
+    expect(after?.preset).toBe('standard_gym')
+    expect(after?.excluded).toEqual(['rower'])
+    await migrateGymNames() // safe to run again
+    expect((await db.profile.toArray())[0].gymType).toBe('standard')
   })
 })

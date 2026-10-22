@@ -4,7 +4,7 @@ import { presetEquipment } from './equipment'
 import { alternativesFor, equipmentOptions, sessionEstimateMinutes } from './variants'
 import type { Exercise } from './types'
 
-const gym = presetEquipment('planet_fitness', 'lb')
+const gym = presetEquipment('standard_gym', 'lb')
 const home = presetEquipment('home', 'lb')
 const rules = (equipment = gym, extra: Partial<Parameters<typeof alternativesFor>[1]> = {}) => ({
   catalog: CATALOG, equipment, excludedExerciseIds: [], excludedPatterns: [], experience: 'regular' as const, ...extra,
@@ -64,7 +64,7 @@ describe('per-exercise equipment (US-065)', () => {
     const barbell = opts.find((o) => o.type === 'barbell')
     expect(barbell).toBeTruthy()
     expect(barbell?.exerciseId).toBeUndefined()
-    expect(barbell?.reason).toMatch(/barbell/i) // Planet Fitness has no barbell
+    expect(barbell?.reason).toMatch(/barbell/i) // a standard gym has no barbell
   })
 
   it('a home profile only offers what is usable there', () => {

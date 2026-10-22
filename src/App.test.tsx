@@ -13,7 +13,7 @@ async function seed(extra: Partial<ReturnType<typeof profileToForm>> = {}) {
   await resetAllData()
   await saveProfile(
     { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', birthDate: '1990-05-15', sex: 'male', ...extra },
-    { preferredLocation: 'gym', gymType: 'planet_fitness' },
+    { preferredLocation: 'gym', gymType: 'standard' },
     NOW,
   )
 }
@@ -115,7 +115,7 @@ describe('onboarding', () => {
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByRole('heading', { name: /confirm your equipment/i })).toBeInTheDocument()
     expect(await screen.findByLabelText('Weight machines')).toBeChecked()
-    expect(screen.getByText(/planet fitness equipment applied automatically/i)).toBeInTheDocument()
+    expect(screen.getByText(/standard gym equipment applied automatically/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /looks right/i }))
     expect(await screen.findByRole('heading', { name: 'Hi, Sam' })).toBeInTheDocument()
     expect((await db.profile.toArray())[0].displayName).toBe('Sam')
@@ -530,7 +530,7 @@ describe('equipment', () => {
     const user = userEvent.setup()
     render(<App />)
     await user.click(await tab('Settings'))
-    // Planet Fitness uses its maintained list: Bodyweight is on the list and is not greyed out.
+    // A standard gym uses its maintained list: Bodyweight is on the list and is not greyed out.
     const bw = await screen.findByLabelText('Bodyweight / no equipment')
     expect(bw).toBeEnabled()
     expect(bw).toBeChecked()
@@ -541,27 +541,27 @@ describe('equipment', () => {
     await waitFor(async () => expect((await db.equipment.get('gym'))?.excluded).not.toContain('bodyweight'))
   })
 
-  it('Planet Fitness applies its equipment automatically and lets you exclude what your club lacks', async () => {
+  it('a standard gym applies its equipment automatically and lets you exclude what your gym lacks', async () => {
     await seed()
     const user = userEvent.setup()
     render(<App />)
     await user.click(await tab('Settings'))
-    expect(await screen.findByText(/planet fitness equipment applied automatically/i)).toBeInTheDocument()
+    expect(await screen.findByText(/standard gym equipment applied automatically/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Treadmill')).toBeChecked()
     await user.click(screen.getByLabelText('Treadmill'))
     await waitFor(async () => expect((await db.equipment.get('gym'))?.excluded).toContain('treadmill'))
     expect(screen.getByText(/applied now:/i)).not.toHaveTextContent(/treadmill/i)
   })
 
-  it('switching the gym type to Planet Fitness refreshes the equipment', async () => {
+  it('switching the gym type to a standard gym refreshes the equipment', async () => {
     await seed()
     const user = userEvent.setup()
     render(<App />)
     await user.click(await tab('Settings'))
-    await user.click(within(await screen.findByRole('group', { name: 'Which gym' })).getByRole('button', { name: 'Another gym' }))
+    await user.click(within(await screen.findByRole('group', { name: 'Which gym' })).getByRole('button', { name: /^full gym/i }))
     await waitFor(async () => expect((await db.equipment.get('gym'))?.preset).toBeUndefined())
-    await user.click(within(screen.getByRole('group', { name: 'Which gym' })).getByRole('button', { name: 'Planet Fitness' }))
-    await waitFor(async () => expect((await db.equipment.get('gym'))?.preset).toBe('planet_fitness'))
+    await user.click(within(screen.getByRole('group', { name: 'Which gym' })).getByRole('button', { name: /^standard gym/i }))
+    await waitFor(async () => expect((await db.equipment.get('gym'))?.preset).toBe('standard_gym'))
   })
 })
 
@@ -770,7 +770,7 @@ describe('settings', () => {
     await user.click(screen.getByRole('button', { name: 'Home list' }))
     await user.click(await screen.findByLabelText('Dumbbells'))
     await waitFor(async () => expect((await db.equipment.get('home'))?.items.dumbbell?.available).toBe(true))
-    expect((await db.equipment.get('gym'))?.preset).toBe('planet_fitness') // gym list untouched
+    expect((await db.equipment.get('gym'))?.preset).toBe('standard_gym') // gym list untouched
   })
 
   it('excludes and un-excludes an exercise', async () => {

@@ -60,7 +60,7 @@ export type Track = 'workout' | 'yoga'
 export const ALL_TRACKS: Track[] = ['workout', 'yoga']
 export const TRACK_LABEL: Record<Track, string> = { workout: 'Workout', yoga: 'Yoga' }
 export type LocationType = 'home' | 'gym'
-export type GymType = 'planet_fitness' | 'generic'
+export type GymType = 'standard' | 'generic'
 
 export const GOAL_LABEL: Record<Goal, string> = {
   muscle: 'Build muscle', strength: 'Get stronger', general: 'General fitness',

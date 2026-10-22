@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.10.1 - Brand-neutral gym names (branch feature/v2-complete)
+- Every mention of a specific gym chain is gone from the app, code, file names and documents. The gym choices are now "Standard gym (machines and dumbbells)" and "Full gym (barbells and racks)".
+- Saved profiles, equipment lists and backups made by earlier versions are renamed automatically the first time the app opens. Nothing you chose changes.
+
 ## 2.10.0 - One workout card, injuries on Home, required date of birth and sex (branch feature/v2-complete)
 - **One workout card on Home.** Lift's call, the time picker and the main "Generate / View / update workout" button are now a single card. Under the button are two quiet options: **I'll choose** (pick a focus and Lift designs it) and **Express circuit · 30 min**. The separate "Today's call" card is gone. On a rest day the card says so and offers "I want to train anyway".
 - **Injured or recovering areas** are on Home (Adjust card), as well as in Settings. No more digging.
@@ -65,8 +69,8 @@
 - Progress filters are now a compact date-range switch plus small on/off category toggles with a check mark, so it is clear what is shown.
 - The filter card no longer carries a title or feedback button.
 
-## 2.4.0 - Workouts designed for Planet Fitness and your profile (branch feature/v2-complete)
-- The Planet Fitness equipment list now follows https://taekwondoking.com/list-of-planet-fitness-equipment/: rowers, kettlebells, bands and EZ-curl bars are in; Olympic barbell and pull-up bar are out; dumbbells up to 75 lb.
+## 2.4.0 - Workouts designed for a standard gym and your profile (branch feature/v2-complete)
+- The standard gym equipment list now matches a typical machine-based gym: rowers, kettlebells, bands and EZ-curl bars are in; Olympic barbell and pull-up bar are out; dumbbells up to 75 lb.
 - Machines are limited to the ones the club has (added lateral raise, leg extension, glute kickback and back extension machines). Hack squat, T-bar row, leverage deadlift and similar are never planned there.
 - Exercises are ranked per muscle by a curated best-first list plus your level, goal and age, instead of alphabetically. Beginners get machines and cables first and no deadlift-type lifts.
 - Goal, level and age change reps, sets and rest. Every workout explains who it was designed for and includes a warm-up and cool-down.
@@ -102,7 +106,7 @@
 ## 2.0.0 - Phase B (branch feature/v2-complete)
 - Three training levels (beginner, intermediate, regular gym-goer); beginners provide height and weight.
 - Height in ft/in or cm, kg/lb selector beside every weight field, page default with per-field override; stored as cm and kg.
-- Fixed bodyweight greyed-out bug; Planet Fitness equipment applies automatically, with exclusions.
+- Fixed bodyweight greyed-out bug; Standard gym equipment applies automatically, with exclusions.
 - Durations 30/45/60/75/90 or custom (15 minimum); cardio in workouts and cardio-only days.
 - Finish button at top and bottom; rest timer with pause, resume, skip and +15s; resume or edit a completed workout.
 - Reset a day with three separate confirmations.
@@ -121,7 +125,7 @@
 ## 1.0.0 - Full local-first app (branch feature/v2-complete)
 - Local profile, goals, training days, units, exercise exclusions (Dexie / IndexedDB, schema v2 with migration).
 - 234-exercise bundled catalog (public-domain source + manual entries) with validation.
-- Home / Planet Fitness / generic gym equipment lists with weight ranges and steps.
+- Home / standard gym / full gym equipment lists with weight ranges and steps.
 - Deterministic workout engine: weekly split, daily generation, time estimates, progression, soreness, calories, rescheduling.
 - Workout player: set logging, rest timer, pause, skip, replace, pain flag, finish early, crash-safe saving.
 - Progress: weekly counts, sets per muscle, trends, records, body weight, history.

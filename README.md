@@ -6,7 +6,7 @@ A free, private workout planner for you and your friends, inspired by the genera
 
 - **Weekly plan:** turns your training days into a muscle-group plan (full body, upper/lower, push/pull/legs). Back-to-back days get splits that do not repeat the same muscles.
 - **Daily workout:** pick how many minutes you have; it builds a workout from your equipment, goal, experience, soreness and history.
-- **Home and gym:** separate equipment lists. Planet Fitness starting list (no barbells; Smith machine, dumbbells, machines, cables) and a generic gym list. You confirm what is really there and can untick anything broken or taken.
+- **Home and gym:** separate equipment lists. Standard gym starting list (no barbells; Smith machine, dumbbells, machines, cables) and a generic gym list. You confirm what is really there and can untick anything broken or taken.
 - **Workout player:** log weight, reps and optional effort for every set, rest timer, pause/resume, skip, replace an exercise, "felt pain" flag, finish early. Every set is saved the moment you tap the check.
 - **Progression:** suggests next weights from what you actually did (rules below).
 - **Progress:** workouts per week, sets per muscle, exercise trends, personal records, body weight, and a searchable history you can reopen read-only.
@@ -16,7 +16,7 @@ A free, private workout planner for you and your friends, inspired by the genera
 
 ## New in 2.0
 
-Three training levels, kg/lb and ft/in everywhere, cardio, yoga, food logging, charts with export, a rest timer, Back navigation and a safe day reset. Details: `CHANGELOG.md`, `docs/PHASE_B_AUDIT.md`, `docs/yoga-catalog.md`, `docs/food-providers.md`, `docs/planet-fitness-equipment.md`, `docs/apple-health-native-notes.md`.
+Three training levels, kg/lb and ft/in everywhere, cardio, yoga, food logging, charts with export, a rest timer, Back navigation and a safe day reset. Details: `CHANGELOG.md`, `docs/PHASE_B_AUDIT.md`, `docs/yoga-catalog.md`, `docs/food-providers.md`, `docs/standard-gym-equipment.md`, `docs/apple-health-native-notes.md`.
 
 Food and yoga are general wellness tools, not medical advice. Apple Health is not connected.
 
@@ -113,7 +113,7 @@ New versions are downloaded in the background and wait until you tap **Reload** 
 
 ## Exercise data
 
-`src/data/catalog.json` is built by `scripts/build-catalog.py` from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense, public domain) plus a few hand-written entries (`src/data/manualExercises.ts`). Photos load from that project the first time you view them and are then cached for offline use. Planet Fitness equipment varies by location; the starting list is a guess you confirm.
+`src/data/catalog.json` is built by `scripts/build-catalog.py` from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense, public domain) plus a few hand-written entries (`src/data/manualExercises.ts`). Photos load from that project the first time you view them and are then cached for offline use. Gym equipment varies by location; the starting list is a guess you confirm.
 
 ## Project layout
 

@@ -188,7 +188,7 @@ export async function setLocation(location: LocationType, gymType?: Profile['gym
 
 // ---------- equipment ----------
 /** The list a location uses right now: a maintained preset (minus anything the user excluded), or the user's own list. */
-export async function getEquipment(location: LocationType, unit: WeightUnit, gymType: Profile['gymType'] = 'planet_fitness'): Promise<EquipmentSet> {
+export async function getEquipment(location: LocationType, unit: WeightUnit, gymType: Profile['gymType'] = 'standard'): Promise<EquipmentSet> {
   const rec = await db.equipment.get(location)
   if (rec?.preset) return withExclusions(presetEquipment(rec.preset, unit), rec.excluded)
   if (rec) return rec.items
@@ -204,12 +204,12 @@ export async function saveEquipment(location: LocationType, items: EquipmentSet)
   await db.equipment.put({ location, items, updatedAt: nowIso() })
 }
 
-/** Applies the starting list for a location. Planet Fitness follows the maintained preset; other lists are editable copies. */
+/** Applies the starting list for a location. A standard gym follows the maintained preset; other lists are editable copies. */
 export async function applyDefaultEquipment(location: LocationType, gymType: Profile['gymType'], unit: WeightUnit): Promise<void> {
   const kind: PresetKind = presetFor(location, gymType)
   const prev = await db.equipment.get(location)
   const keepExcluded = prev?.preset === kind ? prev.excluded : undefined
-  if (kind === 'planet_fitness') {
+  if (kind === 'standard_gym') {
     await db.equipment.put({ location, items: presetEquipment(kind, unit), preset: kind, excluded: keepExcluded ?? [], updatedAt: nowIso() })
   } else {
     await db.equipment.put({ location, items: presetEquipment(kind, unit), updatedAt: nowIso() })

@@ -17,7 +17,7 @@ const TODAY_DATE = new Date(2026, 9, 21)
 async function setup(days = [0, 2, 4], level: 'beginner' | 'intermediate' | 'regular' = 'intermediate') {
   await resetAllData()
   const form = { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: level, trainingDays: days, birthDate: '1990-05-15', sex: 'male' as const }
-  return saveProfile(form, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
+  return saveProfile(form, { preferredLocation: 'gym', gymType: 'standard' }, TODAY_DATE)
 }
 
 async function doSession(scheduledId: string, reps = 10, weight = 100) {
@@ -45,7 +45,7 @@ describe('profile and equipment persistence', () => {
     const p = await setup()
     expect((await getProfile())?.id).toBe(p.id)
     expect(p.preferredLocation).toBe('gym')
-    const upd = await saveProfile({ ...profileToForm(p), displayName: 'Sam', weightUnit: 'kg', weightFieldUnit: 'kg', weightValue: '80' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
+    const upd = await saveProfile({ ...profileToForm(p), displayName: 'Sam', weightUnit: 'kg', weightFieldUnit: 'kg', weightValue: '80' }, { preferredLocation: 'gym', gymType: 'standard' }, TODAY_DATE)
     const again = await getProfile()
     expect(again?.displayName).toBe('Sam')
     expect(again?.weightUnit).toBe('kg')
@@ -55,21 +55,21 @@ describe('profile and equipment persistence', () => {
 
   it('records body weight history only when it changes', async () => {
     const p = await setup()
-    await saveProfile(profileToForm(p), { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
+    await saveProfile(profileToForm(p), { preferredLocation: 'gym', gymType: 'standard' }, TODAY_DATE)
     expect(await db.bodyWeights.count()).toBe(1)
-    await saveProfile({ ...profileToForm(p), weightValue: '178' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
+    await saveProfile({ ...profileToForm(p), weightValue: '178' }, { preferredLocation: 'gym', gymType: 'standard' }, TODAY_DATE)
     expect(await db.bodyWeights.count()).toBe(2)
   })
 
   it('saves equipment per location and falls back to presets', async () => {
     await setup()
-    const defaults = await getEquipment('gym', 'lb', 'planet_fitness')
+    const defaults = await getEquipment('gym', 'lb', 'standard')
     expect(defaults.barbell?.available).toBe(false)
     const eq = presetEquipment('home', 'lb')
     eq.dumbbell = { id: 'dumbbell', available: true, minWeight: 10, maxWeight: 40, increment: 5, unit: 'lb' }
     await saveEquipment('home', eq)
     expect((await getEquipment('home', 'lb')).dumbbell?.maxWeight).toBe(40)
-    expect((await getEquipment('gym', 'lb', 'planet_fitness')).dumbbell?.available).toBe(true)
+    expect((await getEquipment('gym', 'lb', 'standard')).dumbbell?.available).toBe(true)
   })
 
   it('stores exclusions and soreness', async () => {
@@ -100,7 +100,7 @@ describe('weekly plan and scheduling', () => {
     await generateFor(sc.id, 45, { today: TODAY })
     const done = (await doSession(sc.id))!
     const before = JSON.stringify(await db.sessions.get(done.id))
-    await saveProfile({ ...profileToForm(p), trainingDays: [1, 3] }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
+    await saveProfile({ ...profileToForm(p), trainingDays: [1, 3] }, { preferredLocation: 'gym', gymType: 'standard' }, TODAY_DATE)
     expect(JSON.stringify(await db.sessions.get(done.id))).toBe(before)
     expect((await db.scheduled.get(sc.id))?.status).toBe('completed')
     expect((await getPlan())?.planVersion).toBe(2)
@@ -146,7 +146,7 @@ describe('generation cache', () => {
     const b = await generateFor(sc.id, 45, { today: TODAY })
     expect(b).toEqual(a)
     expect((await db.scheduled.get(sc.id))!.updatedAt).toBe(stamp) // not rewritten
-    const eq = await getEquipment('gym', 'lb', 'planet_fitness')
+    const eq = await getEquipment('gym', 'lb', 'standard')
     eq.cable = { ...eq.cable!, available: false }
     await saveEquipment('gym', eq)
     await generateFor(sc.id, 45, { today: TODAY })
@@ -323,7 +323,7 @@ describe('schema migration', () => {
     await old.table('profile').add({
       id: 'p2', displayName: 'Sam', age: 30, heightValue: 70, heightUnit: 'in', weightValue: 180, weightUnit: 'lb',
       goal: 'muscle', experienceLevel: 'advanced', trainingDays: [0, 2, 4], preferredDurationMinutes: 45,
-      preferredLocation: 'gym', gymType: 'planet_fitness', excludedExerciseIds: ['x'], excludedPatterns: [],
+      preferredLocation: 'gym', gymType: 'standard', excludedExerciseIds: ['x'], excludedPatterns: [],
     })
     await old.table('sessions').add({ id: 's2', date: '2026-02-02', status: 'completed', plannedExercises: [], actualExercises: [], startedAt: '2026-02-02T10:00:00Z', generatorVersion: 'gen-1.0', pausedMs: 0, targetMuscles: [] })
     await old.table('setLogs').add({ id: 'l2', sessionId: 's2', exerciseId: 'e', slotId: 's1', setNumber: 1, weightUnit: 'lb', completed: true, actualReps: 8, actualWeight: 135 })

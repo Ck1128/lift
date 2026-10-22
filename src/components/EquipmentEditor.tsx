@@ -27,7 +27,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
     return (
       <div>
         <p className="notice">
-          <strong>Planet Fitness equipment applied automatically.</strong>{' '}
+          <strong>Standard gym equipment applied automatically.</strong>{' '}
           List {PRESET_VERSION}, last reviewed {PRESET_REVIEWED}. It is a typical club, not a record of every location, so
           untick anything your club does not have.
         </p>
@@ -47,7 +47,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
         <p className="hint">Not on the standard list: {ALL_EQUIPMENT.filter((id) => !base.includes(id)).map((id) => EQUIPMENT_LABEL[id]).join(', ')}.</p>
         <details>
           <summary>Edit the list myself instead</summary>
-          <p className="hint">Your club has something different? Switch to your own list. It starts from the current one and you can tick anything. It will no longer follow updates to the Planet Fitness list.</p>
+          <p className="hint">Your club has something different? Switch to your own list. It starts from the current one and you can tick anything. It will no longer follow updates to the standard gym list.</p>
           <Button variant="ghost" onClick={() => void saveEquipment(location, items)}>Use my own list</Button>
         </details>
       </div>
@@ -62,7 +62,7 @@ export function EquipmentEditor({ location, gymType, unit }: { location: Locatio
   }
   const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
   const have = availableIds(items)
-  const presetName = location === 'home' ? 'an empty home setup (bodyweight and a mat)' : gymType === 'planet_fitness' ? 'the Planet Fitness list' : 'a typical commercial gym'
+  const presetName = location === 'home' ? 'an empty home setup (bodyweight and a mat)' : gymType === 'standard' ? 'the standard gym list' : 'a typical commercial gym'
 
   return (
     <div>
