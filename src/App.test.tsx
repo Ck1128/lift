@@ -12,7 +12,7 @@ const TODAY = '2026-10-21'
 async function seed(extra: Partial<ReturnType<typeof profileToForm>> = {}) {
   await resetAllData()
   await saveProfile(
-    { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', ...extra },
+    { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', birthDate: '1990-05-15', sex: 'male', ...extra },
     { preferredLocation: 'gym', gymType: 'planet_fitness' },
     NOW,
   )
@@ -35,6 +35,11 @@ afterEach(async () => {
   await new Promise((r) => setTimeout(r, 50))
   db.close()
 })
+
+async function fillAbout(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText('Date of birth'), '1990-05-15')
+  await user.click(within(screen.getByRole('group', { name: 'Sex' })).getByRole('button', { name: 'Male' }))
+}
 
 const tab = async (name: string) => within(await screen.findByRole('navigation', { name: /main navigation/i })).getByRole('button', { name })
 
@@ -79,12 +84,12 @@ describe('onboarding', () => {
     const dur = screen.getByLabelText(/usual workout length/i)
     await user.clear(dur)
     await user.type(dur, '5')
-    await user.click(screen.getByText('Optional details'))
-    await user.type(screen.getByLabelText('Age'), '3')
+    await user.type(screen.getByLabelText('Date of birth'), '2020-01-01')
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByText(/pick at least one training day/i)).toBeInTheDocument()
     expect(screen.getByText(/between 15 and 180/i)).toBeInTheDocument()
-    expect(screen.getByText(/between 13 and 100/i)).toBeInTheDocument()
+    expect(screen.getByText(/13 and over/i)).toBeInTheDocument()
+    expect(screen.getByText(/choose female or male/i)).toBeInTheDocument()
     expect(await db.profile.count()).toBe(0)
   })
 
@@ -106,6 +111,7 @@ describe('onboarding', () => {
     await user.click(screen.getByRole('button', { name: 'Workout' }))
     await user.type(screen.getByLabelText(/nickname/i), 'Sam')
     await user.click(within(screen.getByRole('radiogroup', { name: 'Training level' })).getByRole('radio', { name: /intermediate/i }))
+    await fillAbout(user)
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByRole('heading', { name: /confirm your equipment/i })).toBeInTheDocument()
     expect(await screen.findByLabelText('Weight machines')).toBeChecked()
@@ -122,6 +128,7 @@ describe('onboarding', () => {
     await user.click(screen.getByRole('button', { name: 'Workout' }))
     await user.click(within(screen.getByRole('radiogroup', { name: 'Training level' })).getByRole('radio', { name: /intermediate/i }))
     await user.selectOptions(screen.getByLabelText('Where do you train?'), 'home')
+    await fillAbout(user)
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('heading', { name: /confirm your equipment/i })
     expect(await screen.findByLabelText('Weight machines')).not.toBeChecked()
@@ -146,6 +153,7 @@ describe('onboarding', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
     await user.click(screen.getByRole('button', { name: 'Yoga' }))
+    await fillAbout(user)
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByRole('button', { name: /plan a yoga session/i })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /confirm your equipment/i })).not.toBeInTheDocument()
@@ -285,16 +293,16 @@ describe('home: level, duration, beginner gate', () => {
     await seed({ trainingLevel: 'beginner', heightCm: '', weightValue: '' })
     const user = userEvent.setup()
     render(<App />)
-    expect(await screen.findByText(/one more thing for your beginner plan/i)).toBeInTheDocument()
+    expect(await screen.findByText(/a couple of details for your plan/i)).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /generate workout/i })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: /save height and weight/i }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Enter your height.')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Height, feet'), '5')
     await user.type(screen.getByLabelText('Height, inches'), '9')
     await user.type(screen.getByLabelText('Body weight'), '170')
-    await user.click(screen.getByRole('button', { name: /save height and weight/i }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(async () => expect((await db.profile.toArray())[0].heightCm).toBeCloseTo(175.3, 0))
-    await waitFor(() => expect(screen.queryByText(/one more thing for your beginner plan/i)).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByText(/a couple of details for your plan/i)).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: /generate workout/i })).toBeEnabled()
   })
 
@@ -503,14 +511,15 @@ describe('workout flow', () => {
     expect(await screen.findByText(/1 of \d+ sets done/)).toBeInTheDocument()
   })
 
-  it('shows a rest-day message and lets the user choose to train anyway, including cardio only', async () => {
+  it('shows a rest-day message and lets the user choose to train anyway', async () => {
     await seed({ trainingDays: [0, 4] })
     const user = userEvent.setup()
     render(<App />)
     expect(await screen.findByText(/today is a rest day/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /train anyway/i }))
-    expect(screen.getByRole('button', { name: 'Cardio only' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Cardio' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Lower body' }))
+    await user.click(screen.getByRole('button', { name: /design my lower body workout/i }))
     expect(await screen.findByRole('button', { name: /start workout/i })).toBeInTheDocument()
   })
 })

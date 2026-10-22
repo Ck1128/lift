@@ -17,8 +17,8 @@ import { useRecovery } from '../hooks/useRecovery'
 import { useRouter } from '../router'
 
 /**
- * The first thing on Home. Lift reads your recovery map and says what to do today (default), or you pick a focus
- * and Lift designs that workout. Everything stays on this phone.
+ * The one workout card on Home. Lift reads your recovery and says what to do today (default). Underneath the main
+ * button are two quiet options: "I'll choose" (pick a focus and Lift designs it) and the 30 minute express circuit.
  */
 export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked }: {
   profile: Profile
@@ -43,22 +43,18 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   const [message, setMessage] = useState<string | null>(null)
 
   if (mode === undefined || loading || !tracks.workout) return null
-  const doneToday = sessions.filter((s) => s.date === today && (s.status === 'completed' || s.status === 'partial'))
-  const running = sessions.some((s) => s.status === 'in_progress')
-  if (running) return null
+  const doneToday = sessions.filter((s) => s.date === today && s.status === 'completed')
+  if (sessions.some((s) => s.status === 'in_progress')) return null
 
   const scheduled: DayPlan | null = sched && sched.status !== 'skipped'
     ? { focus: sched.focus, muscles: sched.targetMuscles, cardioOnly: sched.cardioOnly }
     : null
-  const choose = (m: CallMode) => { setFocus(null); setMessage(null); void setSetting(SETTING.callMode, m) }
+  const setMode = (m: CallMode) => { setFocus(null); setMessage(null); void setSetting(SETTING.callMode, m) }
   const pairYogaNow = async (p: YogaPairing) => { await applyYogaPairing(p); navigate('/yoga') }
-
-  const switcher = (
-    <div className="seg seg-wide" role="group" aria-label="Who decides today's workout">
-      <button type="button" aria-pressed={mode === 'tell'} onClick={() => choose('tell')}>Lift decides</button>
-      <button type="button" aria-pressed={mode === 'ask'} onClick={() => choose('ask')}>I'll choose</button>
-    </div>
-  )
+  const tiredOf = (plan: DayPlan): Muscle[] => {
+    const r = groupReadiness(report, soreness)
+    return plan.muscles.filter((m) => r[m] < READY_AT)
+  }
 
   // After a workout today: a short cool-down for what was just worked.
   if (doneToday.length > 0) {
@@ -76,6 +72,7 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
     )
   }
 
+  /** Build a different workout than the plan's. */
   const build = async (plan: DayPlan, light: Muscle[]) => {
     const mins = plan.circuit ? EXPRESS_MINUTES : minutes
     if (mins === null) { setMessage('Choose a workout length first.'); return }
@@ -90,17 +87,34 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
       setBusy(false)
     }
   }
-  const tiredOf = (plan: DayPlan): Muscle[] => {
-    const r = groupReadiness(report, soreness)
-    return plan.muscles.filter((m) => r[m] < READY_AT)
+  /** Open (or build) the workout that is already planned for today. */
+  const openPlanned = async (id: string) => {
+    if (minutes === null) { setMessage('Choose a workout length first.'); return }
+    setBusy(true)
+    setMessage(null)
+    try {
+      const r = await generateFor(id, minutes, { today })
+      if (r.kind === 'workout') navigate('/workout')
+      else setMessage(r.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
+  const length = (
+    <>
+      <p className="label-like">How much time do you have?</p>
+      <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
+    </>
+  )
+  const err = message && <p className="error" role="alert">{message}</p>
+
+  // ---------- I'll choose ----------
   if (mode === 'ask') {
     const picked = focus ? checkChoice(focus, report, soreness) : null
     return (
       <Card className="hero call">
         <p className="eyebrow">Today's call</p>
-        {switcher}
         <p className="hero-title">What do you feel like today?</p>
         <div className="chips" role="group" aria-label="Workout focus">
           {FOCUS_ORDER.map((k) => (
@@ -111,46 +125,48 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
         {picked && (
           <>
             <p className="muted" role="status">{picked.note}</p>
-            {focus !== 'express' && (
-              <>
-                <p className="label-like">How much time do you have?</p>
-                <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
-              </>
-            )}
+            {focus !== 'express' && length}
             <Button disabled={busy || blocked || (focus !== 'express' && minutes === null)} onClick={() => void build(picked.plan, picked.light ? tiredOf(picked.plan) : [])}>
               Design my {FOCUS[focus!].label.toLowerCase()} {focus === 'express' ? '' : 'workout '}({focus === 'express' ? EXPRESS_MINUTES : (minutes ?? '?')} min)
             </Button>
           </>
         )}
-        {message && <p className="error" role="alert">{message}</p>}
+        {err}
+        <p className="call-alt"><button type="button" className="pill" onClick={() => setMode('tell')}>Let Lift decide</button></p>
       </Card>
     )
   }
 
+  // ---------- Lift decides ----------
   const call = todaysCall({ report, soreness, scheduled, yogaOn: tracks.yoga, workoutOn: tracks.workout })
+  const planned = call.kind === 'train' && call.plan ? call.plan : null
+  const hasWorkout = !!sched?.workout
   return (
     <Card className="hero call">
-      <p className="eyebrow">Today's call</p>
-      {switcher}
+      <p className="eyebrow">{planned ? "Today's focus" : "Today's call"}</p>
       <p className="hero-title">{call.headline}</p>
-      {call.reasons.map((r, i) => <p key={i} className="muted">{r}</p>)}
-      {call.kind === 'train' && call.plan && call.onPlan && <p className="hint">This is the workout in your plan below.</p>}
-      {call.kind === 'train' && call.plan && !call.onPlan && (
+      {planned && planned.muscles.length > 0 && <p className="muted">{planned.muscles.map((m) => MUSCLE_LABEL[m]).join(' · ')}</p>}
+      {call.reasons.map((r, i) => <p key={i} className="hint">{r}</p>)}
+      {sched?.status === 'partial' && call.onPlan && <p className="muted">You did part of this workout today.</p>}
+      {planned && (
         <>
-          <p className="label-like">How much time do you have?</p>
-          <DurationPicker value={minutes ?? profile.preferredDurationMinutes} onChange={setMinutes} />
-          <Button disabled={busy || blocked || minutes === null} onClick={() => void build(call.plan!, call.light ? tiredOf(call.plan!) : [])}>
-            Build this workout ({minutes ?? '?'} min)
+          {length}
+          <Button
+            disabled={busy || blocked || minutes === null}
+            onClick={() => void (call.onPlan && sched ? openPlanned(sched.id) : build(planned, call.light ? tiredOf(planned) : []))}
+          >
+            {call.onPlan && sched
+              ? `${hasWorkout ? 'View / update workout' : 'Generate workout'} (${minutes ?? '?'} min)`
+              : `Build this workout (${minutes ?? '?'} min)`}
           </Button>
         </>
       )}
-      {call.kind === 'train' && !call.light && (
-        <p className="hint">Short on time? <button type="button" className="link-btn" disabled={busy || blocked} onClick={() => void build(FOCUS.express.plan, tiredOf(FOCUS.express.plan))}>Try the 30 minute express circuit</button></p>
-      )}
-      {call.yoga && (
-        <Button variant={call.kind === 'train' ? 'ghost' : 'primary'} onClick={() => void pairYogaNow(call.yoga!)}>{call.yoga.label}</Button>
-      )}
-      {message && <p className="error" role="alert">{message}</p>}
+      {call.yoga && <Button variant={planned ? 'ghost' : 'primary'} onClick={() => void pairYogaNow(call.yoga!)}>{call.yoga.label}</Button>}
+      {err}
+      <p className="call-alt">
+        <button type="button" className="pill" onClick={() => setMode('ask')}>{planned ? "I'll choose" : 'I want to train anyway'}</button>
+        <button type="button" className="pill" disabled={busy || blocked} onClick={() => void build(FOCUS.express.plan, tiredOf(FOCUS.express.plan))}>Express circuit · 30 min</button>
+      </p>
       <p className="hint">An estimate from your own log, not medical advice. If something hurts, rest.</p>
     </Card>
   )

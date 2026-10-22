@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { WEEKDAY_LABELS } from '../engine/dates'
+import { toDateKey, WEEKDAY_LABELS } from '../engine/dates'
+import { ageFromBirthDate, birthDateError } from '../engine/age'
 import {
-  ALL_TRACKS, GOAL_LABEL, LEVEL_LABEL, TRACK_LABEL, type Goal, type GymType, type LocationType, type Sex, type Track, type TrainingLevel, type WeightUnit,
+  ALL_TRACKS, GOAL_LABEL, LEVEL_LABEL, TRACK_LABEL, type Goal, type GymType, type LocationType, type Track, type TrainingLevel, type WeightUnit,
 } from '../engine/types'
 import {
   validateProfileForm, withWeightFieldUnit, type FormErrors, type ProfileForm,
@@ -40,7 +41,8 @@ export function ProfileFormView({
 }) {
   const [draft] = useState(() => (draftKey ? loadDraft<{ f: ProfileForm; extra: ProfileExtra }>(draftKey) : null))
   const [restored, setRestored] = useState(draft !== null)
-  const [f, setF] = useState<ProfileForm>(draft?.f ?? initial)
+  // A draft saved by an older version may lack newer fields, so fill those from the current form.
+  const [f, setF] = useState<ProfileForm>(draft?.f ? { ...initial, ...draft.f } : initial)
   const [extra, setExtra] = useState<ProfileExtra>(draft?.extra ?? initialExtra)
   const [errors, setErrors] = useState<FormErrors>({})
   const [busy, setBusy] = useState(false)
@@ -51,6 +53,7 @@ export function ProfileFormView({
   const startOver = () => { setF(initial); setExtra(initialExtra); setErrors({}); setDirty(false); setRestored(false); if (draftKey) clearDraft(draftKey) }
   const workoutOn = f.tracks.includes('workout')
   const beginner = workoutOn && f.trainingLevel === 'beginner'
+  const age = ageFromBirthDate(f.birthDate)
   const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) => { setF((p) => ({ ...p, [k]: v })); setSaved(false); setDirty(true) }
   const update = (fn: (p: ProfileForm) => ProfileForm) => { setF(fn); setSaved(false); setDirty(true) }
 
@@ -148,6 +151,24 @@ export function ProfileFormView({
   )
   const secBody = (
     <>
+      <Field label="Date of birth" hint="Lift works out your age from it, so it stays right every year. It is used for starting weights, recovery times and calorie estimates, and never leaves this phone." error={errors.birthDate}>
+        {(id, d) => (
+          <>
+            <input id={id} type="date" aria-describedby={d} value={f.birthDate} max={toDateKey(new Date())} onChange={(e) => set('birthDate', e.target.value)} />
+            {age !== undefined && birthDateError(f.birthDate) === '' && <p className="hint" role="status">Age: {age}</p>}
+          </>
+        )}
+      </Field>
+      <fieldset className="field">
+        <legend>Sex</legend>
+        <div className="chips">
+          {(['female', 'male'] as const).map((v) => (
+            <button key={v} type="button" className={f.sex === v ? 'chip on' : 'chip'} aria-pressed={f.sex === v} onClick={() => set('sex', v)}>{v === 'female' ? 'Female' : 'Male'}</button>
+          ))}
+        </div>
+        <p className="hint">Needed for starting weights, calorie estimates and recovery times, which differ on average. It stays on this phone.</p>
+        {errors.sex && <p className="error" role="alert">{errors.sex}</p>}
+      </fieldset>
       <div className={beginner ? 'required-block' : ''}>
         <p className="label-like">{beginner ? 'Your height and weight (needed for beginners)' : 'Height and weight (optional)'}</p>
         <HeightField form={f} update={update} error={errors.heightCm} />
@@ -211,19 +232,6 @@ export function ProfileFormView({
   const secOptional = (
     <details className="optional">
       <summary>Optional details</summary>
-      <p className="hint">These are never required. Age and sex are only used for a rough energy estimate. Everything stays on this phone.</p>
-      <Field label="Age" error={errors.age}>
-        {(id, d) => <input id={id} aria-describedby={d} inputMode="numeric" value={f.age} onChange={(e) => set('age', e.target.value)} />}
-      </Field>
-      <Field label="Sex (optional)" hint="Used only in the daily energy estimate on the Food tab. Leave blank to skip it.">
-        {(id) => (
-          <select id={id} value={f.sex} onChange={(e) => set('sex', e.target.value as '' | Sex)}>
-            <option value="">Prefer not to say</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-          </select>
-        )}
-      </Field>
       <label className="check">
         <input type="checkbox" checked={f.nutritionGuidance} onChange={(e) => set('nutritionGuidance', e.target.checked)} />
         <span>Show gentle next-day food guidance (optional)</span>
@@ -235,7 +243,7 @@ export function ProfileFormView({
   const steps: Step[] = [
     { title: 'Let\'s set you up', why: 'A few quick questions so the app fits you.', body: secTracks, fields: ['tracks', 'displayName'] },
     ...(workoutOn ? [{ title: 'Your training', why: 'This decides how many exercises, sets and rest you get.', body: secLevel, fields: [] as string[] }] : []),
-    { title: 'About you', why: 'Used to pick starting weights and rough calorie numbers.', body: <>{secBody}{secOptional}</>, fields: ['heightCm', 'weightValue', 'age'] },
+    { title: 'About you', why: 'Used to pick starting weights, recovery times and calorie numbers.', body: <>{secBody}{secOptional}</>, fields: ['birthDate', 'sex', 'heightCm', 'weightValue'] },
     ...(workoutOn ? [{ title: 'Your week', why: 'Pick the days you can train. The rest are recovery days.', body: secWeek, fields: ['trainingDays', 'preferredDurationMinutes'] }] : []),
     ...(workoutOn && showLocation ? [{ title: 'Where you train', why: 'This sets the equipment your workouts can use.', body: secWhere, fields: [] as string[] }] : []),
   ]

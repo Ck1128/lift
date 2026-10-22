@@ -128,7 +128,7 @@ export function todaysCall(input: CallInput): Call {
       const key = (Object.keys(FOCUS) as FocusKey[]).find((k) => sameSet(FOCUS[k].plan.muscles, scheduled.muscles))
       return { kind: 'train', plan: scheduled, focusKey: key, onPlan: true, light: false, headline: scheduled.focus, reasons: ['No workouts are logged yet, so your plan stands.'] }
     }
-    return { kind: 'rest', onPlan: false, light: false, headline: 'Rest day', reasons: ['Your plan has today off. Log a workout and Lift can read your recovery.'], yoga: input.yogaOn ? pairYoga([], 'recovery') : undefined }
+    return { kind: 'rest', onPlan: false, light: false, headline: 'Rest day', reasons: ['Today is a rest day in your plan. Recovery is part of training. Log a workout and Lift can read your recovery.'], yoga: input.yogaOn ? pairYoga([], 'recovery') : undefined }
   }
 
   // 1. The plan's own workout, if the muscles are ready.

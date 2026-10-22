@@ -314,7 +314,7 @@ describe('rescheduling', () => {
 })
 
 describe('validation, units and dates', () => {
-  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), tracks: ['workout', 'yoga'], ...o })
+  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), tracks: ['workout', 'yoga'], birthDate: '1990-05-15', sex: 'male', ...o })
   it('accepts a minimal profile', () => expect(validateProfileForm(form())).toEqual({}))
   it('requires at least one track, and only asks workout questions when workout is on', () => {
     expect(validateProfileForm(form({ tracks: [] })).tracks).toMatch(/workout, yoga, or both/i)
@@ -322,8 +322,9 @@ describe('validation, units and dates', () => {
     expect(yogaOnly).toEqual({})
   })
   it('rejects bad numbers with understandable messages', () => {
-    const e = validateProfileForm(form({ age: '7', heightCm: '50', weightValue: '20', trainingDays: [], preferredDurationMinutes: 'abc' }))
-    expect(e.age).toMatch(/13 and 100/)
+    const e = validateProfileForm(form({ birthDate: '2020-01-01', sex: '', heightCm: '50', weightValue: '20', trainingDays: [], preferredDurationMinutes: 'abc' }))
+    expect(e.birthDate).toMatch(/13 and over/)
+    expect(e.sex).toMatch(/choose female or male/i)
     expect(e.heightCm).toMatch(/ft .* in/)
     expect(e.weightValue).toMatch(/66 and 66\d lb/)
     expect(e.trainingDays).toMatch(/at least one/)

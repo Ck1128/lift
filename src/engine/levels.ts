@@ -52,5 +52,5 @@ export function requiredProfileGaps(level: TrainingLevel, heightCm: number | und
 }
 
 export function gapsMessage(gaps: string[]): string {
-  return `To build a beginner plan, add your ${gaps.join(' and ')}. The app will not guess it.`
+  return `To build your plan, add your ${gaps.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Lift will not guess it, and it stays on this phone.`
 }

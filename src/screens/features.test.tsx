@@ -13,7 +13,7 @@ const SUN = new Date(2026, 9, 25, 12, 0, 0)
 
 async function seed(now: Date, createdDaysAgo = 7) {
   await resetAllData()
-  await saveProfile({ ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, now)
+  await saveProfile({ ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, now)
   const p = (await db.profile.toArray())[0]
   await db.bodyWeights.clear() // onboarding logs the first weight; these tests start without one
   await db.profile.put({ ...p, createdAt: new Date(now.getTime() - createdDaysAgo * 86_400_000).toISOString() })
@@ -37,12 +37,14 @@ describe("Today's Call on Home", () => {
   it('is the first card on Home, with Lift deciding by default', async () => {
     await seed(WED)
     render(<App />)
-    const decides = await screen.findByRole('button', { name: 'Lift decides' })
-    expect(decides).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText("Today's call")).toBeInTheDocument()
+    await screen.findByRole('button', { name: /express circuit/i })
+    // One workout card: Lift's call, the main button and the two quiet options all live together.
     const main = screen.getByRole('main')
     const cards = main.querySelectorAll('section.card')
-    expect(cards[0].textContent).toMatch(/today's call/i)
+    expect(cards[0].textContent).toMatch(/today's focus/i)
+    expect(within(cards[0] as HTMLElement).getByRole('button', { name: /generate workout/i })).toBeInTheDocument()
+    expect(within(cards[0] as HTMLElement).getByRole('button', { name: "I'll choose" })).toBeInTheDocument()
+    expect(main.querySelectorAll('section.card.hero').length).toBe(1)
   })
 
   it("lets the person choose a focus, says how ready it is, and keeps the choice", async () => {
@@ -55,6 +57,7 @@ describe("Today's Call on Home", () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/logged yet|recovered|recovering/i)
     expect(screen.getByRole('button', { name: /design my upper body workout/i })).toBeEnabled()
     expect(await getSetting('call.mode', 'tell')).toBe('ask')
+    expect(screen.getByRole('button', { name: 'Let Lift decide' })).toBeInTheDocument()
   })
 
   it('designs the chosen workout and opens it', async () => {
@@ -97,8 +100,8 @@ describe('express circuit', () => {
   it('is not forced on anyone: the default call is a normal workout with a small link to the circuit', async () => {
     await seed(WED)
     render(<App />)
-    expect(await screen.findByRole('button', { name: 'Lift decides' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /try the 30 minute express circuit/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /express circuit/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /express circuit/i })).toBeInTheDocument()
   })
 })
 
@@ -110,9 +113,9 @@ describe('injured areas', () => {
     render(<App />)
     await user.click(await screen.findByText('Exercises to avoid'))
     const group = await screen.findByRole('group', { name: 'Injured areas' })
-    await user.click(within(group).getByRole('button', { name: 'Quads' }))
+    await user.click(within(group).getByRole('button', { name: /^quads/i }))
     await waitFor(async () => expect((await db.profile.toArray())[0].injuredMuscles).toEqual(['quads']))
-    expect(within(group).getByRole('button', { name: 'Quads' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(group).getByRole('button', { name: /^quads/i })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -129,7 +132,7 @@ describe('weekly weigh-in popup', () => {
     // Same day, reopened: still hidden.
     first.unmount()
     render(<App />)
-    await screen.findByRole('button', { name: 'Lift decides' })
+    await screen.findByRole('button', { name: /express circuit/i })
     expect(screen.queryByRole('dialog', { name: /weekly weigh-in/i })).toBeNull()
 
     // Next day: back again.
@@ -148,7 +151,7 @@ describe('weekly weigh-in popup', () => {
     cleanup()
     vi.setSystemTime(new Date(2026, 9, 24, 9, 0, 0))
     render(<App />)
-    await screen.findByRole('button', { name: 'Lift decides' })
+    await screen.findByRole('button', { name: /express circuit/i })
     expect(screen.queryByRole('dialog', { name: /weekly weigh-in/i })).toBeNull()
   })
 
@@ -165,7 +168,7 @@ describe('weekly weigh-in popup', () => {
   it('does not show on the day the app was set up', async () => {
     await seed(WED, 0)
     render(<App />)
-    await screen.findByRole('button', { name: 'Lift decides' })
+    await screen.findByRole('button', { name: /express circuit/i })
     expect(screen.queryByRole('dialog', { name: /weekly weigh-in/i })).toBeNull()
   })
 })
@@ -232,5 +235,65 @@ describe('Privacy page', () => {
     expect(await screen.findByRole('heading', { name: 'Privacy' })).toBeInTheDocument()
     expect(screen.getByText(/no account and no lift server/i)).toBeInTheDocument()
     expect(screen.getByText(/open food facts/i)).toBeInTheDocument()
+  })
+})
+
+describe('date of birth and sex', () => {
+  it('age is worked out from the date of birth and moves on with the calendar', async () => {
+    const { ageFromBirthDate, birthDateError } = await import('../engine/age')
+    expect(ageFromBirthDate('1990-10-22', new Date(2026, 9, 21))).toBe(35) // birthday is tomorrow
+    expect(ageFromBirthDate('1990-10-22', new Date(2026, 9, 22))).toBe(36)
+    expect(ageFromBirthDate('1990-02-30', new Date(2026, 9, 22))).toBeUndefined()
+    expect(birthDateError('')).toMatch(/enter your date of birth/i)
+    expect(birthDateError('2099-01-01')).toMatch(/future/i)
+    expect(birthDateError('1990-05-15', new Date(2026, 9, 22))).toBe('')
+    await seed(WED)
+    const { getProfile } = await import('../db/repo')
+    expect((await getProfile())!.age).toBe(36)
+    vi.setSystemTime(new Date(2027, 9, 21, 12))
+    expect((await getProfile())!.age).toBe(37)
+  })
+
+  it('setup will not continue without both, and shows the age it worked out', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Welcome' })
+    await user.click(screen.getByRole('button', { name: 'Yoga' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText(/enter your date of birth/i)).toBeInTheDocument()
+    expect(screen.getByText(/choose female or male/i)).toBeInTheDocument()
+    expect(await db.profile.count()).toBe(0)
+    await user.type(screen.getByLabelText('Date of birth'), '1990-05-15')
+    expect(await screen.findByText('Age: 36')).toBeInTheDocument()
+  })
+
+  it('a saved profile without them gets one short card on Home, and generating waits until they are given', async () => {
+    await seed(WED)
+    const p = (await db.profile.toArray())[0]
+    await db.profile.put({ ...p, birthDate: undefined, sex: undefined, age: undefined })
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByText(/a couple of details for your plan/i)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /generate workout/i })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText(/enter your date of birth/i)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Date of birth'), '1990-05-15')
+    await user.click(within(screen.getByRole('group', { name: 'Sex' })).getByRole('button', { name: 'Female' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(async () => expect((await db.profile.toArray())[0].sex).toBe('female'))
+    await waitFor(() => expect(screen.queryByText(/a couple of details for your plan/i)).toBeNull())
+    expect(screen.getByRole('button', { name: /generate workout/i })).toBeEnabled()
+  })
+})
+
+describe('injured areas on Home', () => {
+  it('can be set without opening Settings and the call avoids them', async () => {
+    await seed(WED)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText(/injured or recovering/i))
+    await user.click(screen.getByRole('button', { name: /^chest, injured area/i }))
+    await waitFor(async () => expect((await db.profile.toArray())[0].injuredMuscles).toEqual(['chest']))
+    expect(await screen.findByText(/injured or recovering\? \(1\)/i)).toBeInTheDocument()
   })
 })

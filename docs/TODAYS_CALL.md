@@ -32,3 +32,7 @@ All of this runs on the phone from the person's own log. No server, no account, 
 
 ## Sex and injuries in recovery (v2.9.0)
 - `recoveryFactor` takes `sex` (female x0.95, small and bounded) and `injuredMuscles` (those muscle groups x1.5 through `perMuscle`). Injured areas also count as at least moderately sore for set counts and for Today's Call. Rules of thumb, not medical advice.
+
+## Home layout (v2.10.0)
+- One workout card (`TodaysCall`): focus and reasons, time picker, main button, then two quiet pills: "I'll choose" and "Express circuit · 30 min". "I'll choose" switches the card to a chooser (saved in `call.mode`) with "Let Lift decide" to switch back.
+- Date of birth (`Profile.birthDate`) is the stored value. `getProfile` derives `age` from it, so nothing stale is ever saved.

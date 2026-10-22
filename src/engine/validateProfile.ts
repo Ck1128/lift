@@ -1,3 +1,4 @@
+import { birthDateError } from './age'
 import { cmToFtIn, fromKg, ftInToCm, HEIGHT_CM_RANGE, tidy1, toKg, weightRange } from './units'
 import type { Goal, HeightUnit, Profile, Sex, Track, TrainingLevel, WeightUnit } from './types'
 import { TRACKS_ERROR } from './tracks'
@@ -5,7 +6,9 @@ import { MAX_SESSION_MINUTES, MIN_SESSION_MINUTES } from './cardio'
 
 export interface ProfileForm {
   displayName: string
-  age: string
+  /** Date of birth, YYYY-MM-DD. Required. */
+  birthDate: string
+  /** Required. */
   sex: '' | Sex
   /** How height is shown. The value is always kept in centimetres in `heightCm`. */
   heightUnit: HeightUnit
@@ -85,7 +88,7 @@ export function profileFormFrom(p?: Profile): ProfileForm {
   const weightUnit = p?.weightUnit ?? 'lb'
   return {
     displayName: p?.displayName ?? '',
-    age: p?.age?.toString() ?? '',
+    birthDate: p?.birthDate ?? '',
     sex: p?.sex ?? '',
     heightUnit,
     heightCm: p?.heightCm?.toString() ?? '',
@@ -107,8 +110,9 @@ export function profileFormFrom(p?: Profile): ProfileForm {
 export function validateProfileForm(f: ProfileForm): FormErrors {
   const e: FormErrors = {}
   if (f.displayName.length > 40) e.displayName = 'Keep the nickname under 40 characters.'
-  const age = num(f.age)
-  if (age !== undefined && (!Number.isInteger(age) || age < 13 || age > 100)) e.age = 'Enter a whole number between 13 and 100, or leave it blank.'
+  const dobError = birthDateError(f.birthDate)
+  if (dobError) e.birthDate = dobError
+  if (f.sex === '') e.sex = 'Choose Female or Male. It sets your starting weights, calorie estimate and recovery times.'
   const h = num(f.heightCm)
   if (h !== undefined) {
     const [lo, hi] = HEIGHT_CM_RANGE

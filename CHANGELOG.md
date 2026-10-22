@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.10.0 - One workout card, injuries on Home, required date of birth and sex (branch feature/v2-complete)
+- **One workout card on Home.** Lift's call, the time picker and the main "Generate / View / update workout" button are now a single card. Under the button are two quiet options: **I'll choose** (pick a focus and Lift designs it) and **Express circuit · 30 min**. The separate "Today's call" card is gone. On a rest day the card says so and offers "I want to train anyway".
+- **Injured or recovering areas** are on Home (Adjust card), as well as in Settings. No more digging.
+- **Date of birth and sex are now required** at setup, for everyone. Age is worked out from the date of birth every time, so it stays right as years pass, and the setup screen shows the age it calculated. Existing profiles without them get one short card on Home, and workouts wait until they are filled in.
+- Sex and age feed starting weights, calorie estimates and recovery times, all on the phone.
+
 ## 2.9.0 - Express circuit, and recovery that knows your sex and injuries (branch feature/v2-complete)
 - **30 minute express circuit**, optional. Pick it under "I'll choose" on Home, or tap the small "Try the 30 minute express circuit" link under Today's Call. It is one exercise each for legs, chest, back, hamstrings, shoulders and core, done back to back for three rounds, with lighter weights. Lift never picks it for you.
 - **Injured areas** (Settings > Exercises to avoid): marked areas recover about 50% slower in your recovery map, get one fewer set, and are never the first choice for Today's Call. A very sore area is left out of the circuit.

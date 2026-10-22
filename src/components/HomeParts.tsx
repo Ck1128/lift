@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { saveBodyBasics } from '../db/repo'
+import { saveAboutYou } from '../db/repo'
+import { ageFromBirthDate, birthDateError } from '../engine/age'
+import { toDateKey } from '../engine/dates'
+import { tracksOf } from '../engine/tracks'
 import { DURATION_PRESETS, MAX_SESSION_MINUTES, MIN_SESSION_MINUTES } from '../engine/cardio'
 import { LEVEL_LABEL, type Profile, type TrainingLevel } from '../engine/types'
 import { formHeightCm, formWeightKg, profileFormFrom, validateProfileForm, withWeightFieldUnit, type ProfileForm } from '../engine/validateProfile'
@@ -54,28 +57,63 @@ export function DurationPicker({ value, onChange, presets = DURATION_PRESETS, mi
 /** Shown to beginners who have not given height and weight. Nothing is guessed. */
 export function BodyBasicsCard({ profile }: { profile: Profile }) {
   const [f, setF] = useState<ProfileForm>(() => profileFormFrom(profile))
-  const [errors, setErrors] = useState<Partial<Record<'heightCm' | 'weightValue', string>>>({})
+  const [errors, setErrors] = useState<Partial<Record<'birthDate' | 'sex' | 'heightCm' | 'weightValue', string>>>({})
   const [saved, setSaved] = useState(false)
   const update = (fn: (p: ProfileForm) => ProfileForm) => { setF(fn); setSaved(false) }
+  // Only what is missing is asked for.
+  const needDob = !profile.birthDate
+  const needSex = !profile.sex
+  const needBody = profile.trainingLevel === 'beginner' && tracksOf(profile).workout && (!profile.heightCm || !profile.weightKg)
+  const age = ageFromBirthDate(f.birthDate)
   const save = async () => {
     const e = validateProfileForm(f)
     const next: typeof errors = {}
-    if (f.heightCm.trim() === '') next.heightCm = 'Enter your height.'
-    else if (e.heightCm) next.heightCm = e.heightCm
-    if (f.weightValue.trim() === '') next.weightValue = 'Enter your body weight.'
-    else if (e.weightValue) next.weightValue = e.weightValue
+    if (needDob && e.birthDate) next.birthDate = e.birthDate
+    if (needSex && e.sex) next.sex = e.sex
+    if (needBody) {
+      if (f.heightCm.trim() === '') next.heightCm = 'Enter your height.'
+      else if (e.heightCm) next.heightCm = e.heightCm
+      if (f.weightValue.trim() === '') next.weightValue = 'Enter your body weight.'
+      else if (e.weightValue) next.weightValue = e.weightValue
+    }
     setErrors(next)
-    if (next.heightCm || next.weightValue) return
-    await saveBodyBasics(formHeightCm(f), formWeightKg(f))
+    if (Object.keys(next).length > 0) return
+    await saveAboutYou({
+      birthDate: needDob ? f.birthDate : undefined, sex: needSex && f.sex !== '' ? f.sex : undefined,
+      heightCm: needBody ? formHeightCm(f) : undefined, weightKg: needBody ? formWeightKg(f) : undefined,
+    })
     setSaved(true)
   }
   return (
-    <Card title="One more thing for your beginner plan">
-      <p>A beginner plan needs your height and weight. They stay on this phone and are only used for loads and calorie estimates.</p>
-      <HeightField form={f} update={update} error={errors.heightCm} />
-      <WeightField label="Body weight" value={f.weightValue} unit={f.weightFieldUnit} pageUnit={f.weightUnit} error={errors.weightValue}
-        onChange={(v, u) => update((p) => withWeightFieldUnit({ ...p, weightValue: v }, u))} />
-      <Button onClick={() => void save()}>Save height and weight</Button>
+    <Card title="A couple of details for your plan">
+      <p>Lift uses these for starting weights, recovery times and calorie estimates. They stay on this phone.</p>
+      {needDob && (
+        <div className="field">
+          <label htmlFor="home-dob">Date of birth</label>
+          <input id="home-dob" type="date" value={f.birthDate} max={toDateKey(new Date())} onChange={(e) => update((p) => ({ ...p, birthDate: e.target.value }))} />
+          {age !== undefined && birthDateError(f.birthDate) === '' && <p className="hint" role="status">Age: {age}</p>}
+          {errors.birthDate && <p className="error" role="alert">{errors.birthDate}</p>}
+        </div>
+      )}
+      {needSex && (
+        <fieldset className="field">
+          <legend>Sex</legend>
+          <div className="chips">
+            {(['female', 'male'] as const).map((v) => (
+              <button key={v} type="button" className={f.sex === v ? 'chip on' : 'chip'} aria-pressed={f.sex === v} onClick={() => update((p) => ({ ...p, sex: v }))}>{v === 'female' ? 'Female' : 'Male'}</button>
+            ))}
+          </div>
+          {errors.sex && <p className="error" role="alert">{errors.sex}</p>}
+        </fieldset>
+      )}
+      {needBody && (
+        <>
+          <HeightField form={f} update={update} error={errors.heightCm} />
+          <WeightField label="Body weight" value={f.weightValue} unit={f.weightFieldUnit} pageUnit={f.weightUnit} error={errors.weightValue}
+            onChange={(v, u) => update((p) => withWeightFieldUnit({ ...p, weightValue: v }, u))} />
+        </>
+      )}
+      <Button onClick={() => void save()}>Save</Button>
       {saved && <p className="ok" role="status">Saved.</p>}
     </Card>
   )

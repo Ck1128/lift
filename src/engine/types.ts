@@ -117,6 +117,8 @@ export interface Profile {
   yogaLevel?: TrainingLevel
   /** Optional. Only used by the energy estimate equation. */
   sex?: Sex
+  /** Date of birth, YYYY-MM-DD. Age is worked out from it each time the profile is read. */
+  birthDate?: string
   /** Optional next-day activity guidance. Off unless the user turns it on. */
   nutritionGuidance: boolean
   /** 0 = Monday ... 6 = Sunday. */

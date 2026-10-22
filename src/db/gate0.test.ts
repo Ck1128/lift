@@ -14,7 +14,7 @@ const NOW = new Date(2026, 9, 21)
 
 async function seed(opts: { food?: boolean } = {}) {
   await resetAllData()
-  await saveProfile({ ...profileToForm(), displayName: 'Sam', weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', trainingDays: [0, 2, 4] }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, NOW)
+  await saveProfile({ ...profileToForm(), displayName: 'Sam', weightValue: '180', heightCm: '178', trainingLevel: 'intermediate', trainingDays: [0, 2, 4], birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'planet_fitness' }, NOW)
   const t = new Date().toISOString()
   await db.sessions.add({
     id: 'sess-1', date: '2026-10-19', startedAt: t, status: 'completed', plannedExercises: [], actualExercises: [], title: 'Upper body', planVersion: 1,

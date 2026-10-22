@@ -16,7 +16,7 @@ const TODAY_DATE = new Date(2026, 9, 21)
 
 async function setup(days = [0, 2, 4], level: 'beginner' | 'intermediate' | 'regular' = 'intermediate') {
   await resetAllData()
-  const form = { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: level, trainingDays: days }
+  const form = { ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: level, trainingDays: days, birthDate: '1990-05-15', sex: 'male' as const }
   return saveProfile(form, { preferredLocation: 'gym', gymType: 'planet_fitness' }, TODAY_DATE)
 }
 

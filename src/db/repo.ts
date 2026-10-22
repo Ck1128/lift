@@ -11,19 +11,27 @@ import { buildLastDone, buildLastPerformance } from '../engine/history'
 import { suggestReschedule } from '../engine/reschedule'
 import { convertWeight, tidy } from '../engine/units'
 import { gapsMessage, requiredProfileGaps } from '../engine/levels'
+import { ageFromBirthDate } from '../engine/age'
 import { tracksOf } from '../engine/tracks'
 import { ALL_TRACKS, type Track } from '../engine/types'
 import type {
-  ActualExercise, DayPlan, EquipmentId, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, ScheduledWorkout,
+  ActualExercise, DayPlan, EquipmentId, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, Sex, ScheduledWorkout,
   SetLog, SorenessEntry, TrainingLevel, WeeklyPlan, WeightUnit, WorkoutSession,
 } from '../engine/types'
 import {
-  formHeightCm, formWeightKg, parseOptional, profileFormFrom, type ProfileForm,
+  formHeightCm, formWeightKg, profileFormFrom, type ProfileForm,
 } from '../engine/validateProfile'
 
 // ---------- profile ----------
+/** Age is never stored on its own: it is worked out from the date of birth every time the profile is read. */
+const withAge = (p: Profile): Profile => {
+  const age = p.birthDate ? ageFromBirthDate(p.birthDate, new Date()) : undefined
+  return age === undefined ? p : { ...p, age }
+}
+
 export async function getProfile(): Promise<Profile | undefined> {
-  return (await db.profile.toArray())[0]
+  const p = (await db.profile.toArray())[0]
+  return p ? withAge(p) : undefined
 }
 
 export function profileToForm(p?: Profile): ProfileForm {
@@ -51,8 +59,9 @@ export async function saveProfile(
   const profile: Profile = {
     id: existing?.id ?? uid(),
     displayName: form.displayName.trim() || undefined,
-    age: parseOptional(form.age),
-    sex: form.sex === '' ? undefined : form.sex,
+    birthDate: form.birthDate || existing?.birthDate,
+    age: ageFromBirthDate(form.birthDate, new Date()) ?? existing?.age,
+    sex: form.sex === '' ? existing?.sex : form.sex,
     heightCm: formHeightCm(form),
     heightDisplayUnit: form.heightUnit,
     weightKg,
@@ -330,9 +339,23 @@ export async function recentSoreness(today: string): Promise<Partial<Record<Musc
 // ---------- generation (with cache) ----------
 /** What is missing before a personalised plan can be built, or an empty list. */
 export function profileGaps(p: Profile): string[] {
-  // Height and weight are a workout requirement for beginners. A yoga-only profile is never asked for them.
-  if (!tracksOf(p).workout) return []
-  return requiredProfileGaps(p.trainingLevel, p.heightCm, p.weightKg)
+  // Date of birth and sex are required for everyone. Height and weight are a workout requirement for beginners.
+  const gaps: string[] = []
+  if (!p.birthDate) gaps.push('date of birth')
+  if (!p.sex) gaps.push('sex')
+  if (tracksOf(p).workout) gaps.push(...requiredProfileGaps(p.trainingLevel, p.heightCm, p.weightKg))
+  return gaps
+}
+
+/** Fills in details a saved profile is missing (date of birth, sex, and for beginners height and weight). */
+export async function saveAboutYou(patch: { birthDate?: string; sex?: Sex; heightCm?: number; weightKg?: number }): Promise<void> {
+  const p = await getProfile()
+  if (!p) return
+  const next: Profile = { ...p, updatedAt: nowIso() }
+  if (patch.birthDate) { next.birthDate = patch.birthDate; next.age = ageFromBirthDate(patch.birthDate, new Date()) }
+  if (patch.sex) next.sex = patch.sex
+  await db.profile.put(next)
+  if (patch.heightCm !== undefined || patch.weightKg !== undefined) await saveBodyBasics(patch.heightCm, patch.weightKg)
 }
 
 export async function generateFor(
