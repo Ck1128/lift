@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { BottomNav } from './components/BottomNav'
+import { BottomNav, tabOf } from './components/BottomNav'
 import { FeedbackHost } from './components/Feedback'
 import { DbGate } from './components/DbGate'
 import { OfflineBanner, UpdateBanner } from './components/Banners'
@@ -46,6 +46,13 @@ function Shell() {
   const { navigate, replace, path } = useRouter()
   // A new screen starts at the top, never where the last one was scrolled to.
   useLayoutEffect(() => { document.documentElement.scrollTop = 0; document.body.scrollTop = 0 }, [path])
+  // Each tab has its own colour mood; the root attribute also tints overscroll and the status bar.
+  const tab = tabOf(path)
+  useEffect(() => {
+    document.documentElement.dataset.tab = tab
+    const hue = getComputedStyle(document.documentElement).getPropertyValue('--bar').trim()
+    if (hue) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', hue)
+  }, [tab])
   const [onboarding, setOnboarding] = useState(false)
   const [deletedNotice, setDeletedNotice] = useState(false)
   const [update, setUpdate] = useState<(() => void) | null>(null)
@@ -69,7 +76,7 @@ function Shell() {
   }
 
   return (
-    <div className="app">
+    <div className="app" data-tab={tab}>
       <OfflineBanner online={online} />
       {update && <UpdateBanner onUpdate={update} onDismiss={() => setUpdate(null)} />}
       {offlineReady && !update && (
@@ -79,7 +86,7 @@ function Shell() {
         </div>
       )}
       <FeedbackHost path={path}>
-        <main className="content">
+        <main className="content" key={tab}>
           <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />
         </main>
       </FeedbackHost>

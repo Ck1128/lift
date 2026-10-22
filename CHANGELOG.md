@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.0 - New look (branch feature/v2-complete)
+- Type: Bricolage Grotesque for headings and numbers, Figtree for text. Both are bundled with the app, so there are no outside font requests and they work offline.
+- Each tab has its own colour (Home ember, Plan teal, Workout red, Yoga violet, Food green, Progress blue, Settings slate). The colour fades in when you switch tabs and tints the top glow, buttons, chips and the status bar.
+- Floating glass navigation bar with clean line icons instead of emoji.
+- Softer cards with a tab-coloured glow, larger rounded corners, sentence-case card titles, press feedback on buttons, and a short fade-in when a tab opens.
+- Dark mode uses brighter versions of each tab colour with dark text on buttons.
+
 ## 2.4.1 - Progress page cleanup (branch feature/v2-complete)
 - Progress filters are now a compact date-range switch plus small on/off category toggles with a check mark, so it is clear what is shown.
 - The filter card no longer carries a title or feedback button.
