@@ -196,7 +196,7 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
           <Card>
             <div className="field">
               <label htmlFor="a-search">Search foods</label>
-              <input id="a-search" type="search" value={query} placeholder="For example: rice, banana, yoghurt" onChange={(e) => setQuery(e.target.value)} />
+              <input id="a-search" type="search" value={query} placeholder="For example: rice, idli, sorakaya, బియ్యం" onChange={(e) => setQuery(e.target.value)} />
               <p className="hint">Pick the exact version you ate. Raw and cooked foods have very different calories per gram.</p>
             </div>
             {searching && <p className="muted" role="status">Searching...</p>}
@@ -206,6 +206,7 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
                 <li key={`${c.item.provider}-${c.item.providerId}-${c.state.state}`}>
                   <button type="button" className="alt" onClick={() => choose(c)}>
                     <strong>{choiceTitle(c)}{c.item.brand ? ` · ${c.item.brand}` : ''}</strong>
+                    {c.item.nameTe && <span className="muted" lang="te">{c.item.nameTe}</span>}
                     <span className="muted">{Math.round(c.state.kcalPer100)} kcal per {c.state.basis === 'serving' ? 'serving' : `100 ${c.state.basis}`} · {PREP_LABEL[c.state.state]}{c.item.approximate ? ' · approx.' : ''}</span>
                   </button>
                 </li>

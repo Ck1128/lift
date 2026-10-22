@@ -3,7 +3,7 @@ import { db, LiftDB } from './schema'
 import {
   acceptReschedule, finishSession, generateFor, getActiveSession, getEquipment, getPlan, getProfile, rebuildPlan,
   replaceExercise, resetAllData, saveEquipment, saveProfile, scheduledOn, setPain, setSkipped, skipScheduled,
-  startSession, updateSet, profileToForm, updateExclusions, addSoreness, recentSoreness,
+  createExtraWorkout, startSession, updateSet, profileToForm, updateExclusions, addSoreness, recentSoreness,
 } from './repo'
 import { backupFilename, exportBackup, importBackup, parseBackup, previewBackup, type BackupFile } from './backup'
 import { buildLastPerformance, exerciseTrend, personalRecords, setsPerMuscle, workoutsPerWeek, activeMinutes } from '../engine/history'
@@ -244,6 +244,58 @@ describe('workout sessions and set logs', () => {
     const s2 = await startSession(sc2.id, 'lb')
     await setPain(s2.id, s2.plannedExercises[0].slotId, true)
     expect((await db.sessions.get(s2.id))?.actualExercises[0].painReported).toBe(true)
+  })
+
+  it('a new workout after finishing one starts clean, and the finished one is really closed', async () => {
+    await setup()
+    const sc = (await scheduledOn(TODAY))!
+    await generateFor(sc.id, 45, { today: TODAY })
+    const first = await startSession(sc.id, 'lb')
+    const firstLogs = await logsOf(first.id)
+    await updateSet(firstLogs[0].id, { actualReps: 9, actualWeight: 55, completed: true })
+    const fin = await finishSession(first.id, 'finish')
+    expect(fin?.status).toBe('partial')
+    expect(await getActiveSession()).toBeUndefined()
+    // The person asks for a new workout for the same day.
+    await generateFor(sc.id, 45, { today: TODAY, force: true })
+    expect((await db.scheduled.get(sc.id))?.status).toBe('planned')
+    const second = await startSession(sc.id, 'lb')
+    expect(second.id).not.toBe(first.id)
+    expect(second.status).toBe('in_progress')
+    const secondLogs = await logsOf(second.id)
+    expect(secondLogs.length).toBeGreaterThan(0)
+    expect(secondLogs.every((l) => !l.completed)).toBe(true)
+    // The first workout is untouched in history.
+    expect((await db.sessions.get(first.id))?.status).toBe('partial')
+    expect((await db.setLogs.get(firstLogs[0].id))?.completed).toBe(true)
+    // Finishing the second one closes it and leaves nothing open.
+    await updateSet(secondLogs[0].id, { actualReps: 8, completed: true })
+    expect((await finishSession(second.id, 'finish'))?.status).toBe('partial')
+    expect(await getActiveSession()).toBeUndefined()
+  })
+
+  it('an extra workout after a finished one is the one the day shows, and starts clean', async () => {
+    await setup()
+    const sc = (await scheduledOn(TODAY))!
+    await generateFor(sc.id, 45, { today: TODAY })
+    const done = (await doSession(sc.id))!
+    expect(done.status).toBe('completed')
+    const extra = await createExtraWorkout(TODAY, { focus: 'upper', muscles: ['chest', 'back'] }, 30)
+    expect((await scheduledOn(TODAY))?.id).toBe(extra.id)
+    await generateFor(extra.id, 30, { today: TODAY })
+    const s = await startSession(extra.id, 'lb')
+    expect(s.id).not.toBe(done.id)
+    expect((await logsOf(s.id)).every((l) => !l.completed)).toBe(true)
+  })
+
+  it('a completed day can still be reopened when no new workout was built', async () => {
+    await setup()
+    const sc = (await scheduledOn(TODAY))!
+    await generateFor(sc.id, 45, { today: TODAY })
+    const done = (await doSession(sc.id))!
+    expect(done.status).toBe('completed')
+    const again = await startSession(sc.id, 'lb')
+    expect(again.id).toBe(done.id)
   })
 
   it('pause and resume are tracked and active minutes exclude pauses', async () => {

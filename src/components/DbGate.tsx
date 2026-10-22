@@ -4,6 +4,14 @@ import { migrateGymNames } from '../db/migrate'
 import { Button } from './ui'
 
 /**
+ * Asks the browser not to clear this app's saved data when the device runs low on space.
+ * It is a request only: nothing is shown, nothing is sent anywhere, and the app works the same if it is refused.
+ */
+function askBrowserToKeepData(): void {
+  try { void navigator.storage?.persist?.().catch(() => undefined) } catch { /* not supported: fine */ }
+}
+
+/**
  * Opens the local database and, if that fails (for example an upgrade could not finish), shows a plain recovery
  * message instead of an endless "Loading...". It never deletes or resets anything: a failed upgrade leaves the old
  * data in place, and reloading is safe.
@@ -13,7 +21,7 @@ export function DbGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true
-    db.open().then(() => migrateGymNames()).catch((e: unknown) => {
+    db.open().then(() => { askBrowserToKeepData(); return migrateGymNames() }).catch((e: unknown) => {
       if (alive) setError(e instanceof Error ? e.message : 'unknown error')
     })
     return () => { alive = false }

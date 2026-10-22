@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { generateFor, getEquipment, scheduledOn, setCardioChoice, startSession } from '../db/repo'
@@ -17,6 +17,14 @@ import { cardioById } from '../data/cardio'
 import { formatWeight } from '../engine/units'
 import { useRouter } from '../router'
 
+/** The route stays /workout while the preview becomes the player, so the page must be sent back to the top by hand. */
+function useScrollTopOn(key: string) {
+  useLayoutEffect(() => {
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [key])
+}
+
 export function Workout({ profile, today }: { profile: Profile; today: string }) {
   const { navigate } = useRouter()
   const [summaryId, setSummaryId] = useState<string | null>(null)
@@ -28,6 +36,8 @@ export function Workout({ profile, today }: { profile: Profile; today: string })
     return s ? (await db.sessions.where('scheduledWorkoutId').equals(s.id).toArray()).filter((x) => x.status !== 'abandoned' && x.status !== 'in_progress')[0] : undefined
   }, [today])
 
+  const view = summaryId ? `summary:${summaryId}` : activeQ.value ? `play:${activeQ.value.id}` : 'preview'
+  useScrollTopOn(view)
   if (summaryId) {
     return <SessionSummary sessionId={summaryId} profile={profile} onClose={() => { setSummaryId(null); navigate('/home') }} />
   }
@@ -79,6 +89,16 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
   const chooseCardio = async (choice: string | undefined) => {
     await setCardioChoice(scheduledId, choice)
     await regenerate(w.availableMinutes, true)
+  }
+  const resuming = sched.status === 'partial'
+  const startNew = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await generateFor(scheduledId, w.availableMinutes, { today, force: true })
+      if (r.kind !== 'workout') { setError(r.message); return }
+      await startSession(scheduledId, profile.weightUnit)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not start the workout.') } finally { setBusy(false) }
   }
   const start = async () => {
     setBusy(true)
@@ -163,8 +183,18 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
       )}
 
       {error && <p className="error" role="alert">{error}</p>}
-      <Button disabled={busy} onClick={start}>Start workout</Button>
-      <Button variant="ghost" disabled={busy} onClick={() => regenerate(w.availableMinutes, true)}>Build a fresh version</Button>
+      {resuming ? (
+        <>
+          <p className="hint">You already did part of this workout today. Continue it, or start a new one with every set blank.</p>
+          <Button disabled={busy} onClick={start}>Continue my workout</Button>
+          <Button variant="ghost" disabled={busy} onClick={startNew}>Start a new workout</Button>
+        </>
+      ) : (
+        <>
+          <Button disabled={busy} onClick={start}>Start workout</Button>
+          <Button variant="ghost" disabled={busy} onClick={() => regenerate(w.availableMinutes, true)}>Build a fresh version</Button>
+        </>
+      )}
     </>
   )
 }

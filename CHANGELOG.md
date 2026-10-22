@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.11.0 - Fixes for finishing and starting workouts, and 370 Indian foods with Telugu names (branch feature/v2-complete)
+- **Fixed: a new workout showed the old sets still done.** Starting a workout on a day that already had a saved one reopened the old workout. Now a workout you rebuild or ask for fresh starts with every set blank, and the one you finished stays safely in your history. If you did part of a workout, the screen asks plainly: **Continue my workout** or **Start a new workout**.
+- **Fixed: an extra workout after a finished one was hidden.** The day now shows the workout still to do first.
+- **Fixed: Start workout opened the next page halfway down.** The workout page, and the saved-workout summary, now open at the top.
+- **Indian foods, with Telugu names.** Search finds about 370 foods without internet: dals, millets, vegetables, greens, fruits, tiffins, biryanis, curries, non-veg, snacks, sweets, drinks and spices. Search in Telugu script (సొరకాయ), Telugu in English letters (sorakaya), Hindi or English (squash, lauki, bottle gourd). Values are typical home-style estimates and are marked approximate.
+- **Your data and updates.** Checked and tested: an update never erases saved data. A test now opens a database saved by the very first version and confirms every row survives, and another test fails if any new code could clear storage. The app also asks the browser to keep your data when the phone is short on space.
+
 ## 2.10.1 - Brand-neutral gym names (branch feature/v2-complete)
 - Every mention of a specific gym chain is gone from the app, code, file names and documents. The gym choices are now "Standard gym (machines and dumbbells)" and "Full gym (barbells and racks)".
 - Saved profiles, equipment lists and backups made by earlier versions are renamed automatically the first time the app opens. Nothing you chose changes.

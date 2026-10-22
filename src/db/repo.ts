@@ -287,7 +287,9 @@ export async function ensureScheduled(today: string, days: number, profile?: Pro
 
 export async function scheduledOn(date: string): Promise<ScheduledWorkout | undefined> {
   const rows = await db.scheduled.where('date').equals(date).toArray()
-  return rows.find((r) => r.status !== 'skipped') ?? rows[0]
+  // A day can hold more than one workout (a finished one and a new one). The one still to do comes first.
+  const rank = (r: ScheduledWorkout) => (r.status === 'planned' ? 0 : r.status === 'partial' ? 1 : r.status === 'completed' ? 2 : 3)
+  return [...rows].sort((x, y) => rank(x) - rank(y) || x.createdAt.localeCompare(y.createdAt))[0]
 }
 
 /** User explicitly asked to train on a rest day. Creates a one-off scheduled workout. */
@@ -397,6 +399,8 @@ export async function generateFor(
   if (result.kind === 'workout') {
     await db.scheduled.put({
       ...sched, availableMinutes: minutes, workout: result.workout, configHash: hash, keepPlan: false,
+      // A workout the person asked to rebuild is a new workout, even on a day that already has a saved one.
+      status: opts.force && (sched.status === 'completed' || sched.status === 'partial') ? 'planned' : sched.status,
       generatorVersion: GENERATOR_VERSION, updatedAt: nowIso(),
     })
   }
@@ -423,8 +427,10 @@ export async function sessionForScheduled(scheduledId: string): Promise<WorkoutS
 export async function startSession(scheduledId: string, unit: WeightUnit): Promise<WorkoutSession> {
   const existing = await getActiveSession()
   if (existing) return existing
-  // A day that already has a saved workout is reopened, never duplicated.
-  const saved = await sessionForScheduled(scheduledId)
+  // A day whose workout was finished and not rebuilt is reopened, never duplicated.
+  // A rebuilt day (status back to planned) gets a fresh session, with no sets marked done.
+  const day = await db.scheduled.get(scheduledId)
+  const saved = day && (day.status === 'completed' || day.status === 'partial') ? await sessionForScheduled(scheduledId) : undefined
   if (saved) {
     const reopened = await reopenSession(saved.id)
     if (reopened.ok) return reopened.session

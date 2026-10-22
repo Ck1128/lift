@@ -1,4 +1,5 @@
 import { LOCAL_FOODS } from '../data/foods'
+import { INDIAN_FOODS } from '../data/indianFoods'
 import type { FoodItem, FoodState } from '../engine/food'
 
 /**
@@ -23,10 +24,14 @@ export class ProviderError extends Error {
   }
 }
 
-const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()
+// Letters in any script are kept (Telugu included). Accents on Latin letters are dropped so "cafe" finds "café".
+/** Every food bundled with the app: common foods plus Indian foods with Telugu names. */
+export const ALL_LOCAL_FOODS: FoodItem[] = [...LOCAL_FOODS, ...INDIAN_FOODS]
+
+const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{M}\p{N} ]+/gu, ' ').replace(/\s+/g, ' ').trim()
 
 /** Matches when every word of the query appears in the name or an alias. */
-export function matchLocal(query: string, foods: FoodItem[] = LOCAL_FOODS): FoodItem[] {
+export function matchLocal(query: string, foods: FoodItem[] = ALL_LOCAL_FOODS): FoodItem[] {
   const words = norm(query).split(' ').filter(Boolean)
   if (words.length === 0) return []
   const scored: [number, FoodItem][] = []
@@ -45,7 +50,7 @@ export function matchLocal(query: string, foods: FoodItem[] = LOCAL_FOODS): Food
 export const localProvider: FoodDataProvider = {
   id: 'local',
   name: 'Common foods (on this phone)',
-  attribution: 'Bundled common foods. USDA FoodData Central reference values (public domain), rounded. Estimates.',
+  attribution: 'Bundled common foods. USDA FoodData Central reference values (public domain), rounded, plus typical Indian home-style values. Estimates.',
   requiresNetwork: false,
   async search(query) {
     return matchLocal(query)

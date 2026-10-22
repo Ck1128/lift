@@ -303,3 +303,46 @@ describe('older saved gym names', () => {
     expect((await db.profile.toArray())[0].gymType).toBe('standard')
   })
 })
+
+describe('updating the app never erases saved data', () => {
+  it('a database saved by the very first version keeps every row after all upgrades', async () => {
+    const name = 'upgrade-keeps-everything'
+    await Dexie.delete(name)
+    const old = new Dexie(name)
+    old.version(1).stores({
+      profile: 'id', equipment: 'location', plans: 'id, profileId, startDate', scheduled: 'id, date, planId, status',
+      sessions: 'id, date, status, scheduledWorkoutId', setLogs: 'id, sessionId, exerciseId, slotId', settings: 'key',
+    })
+    await old.open()
+    await old.table('profile').add({ id: 'p1', displayName: 'Sam', heightValue: 70, heightUnit: 'in', weightValue: 180, weightUnit: 'lb', experienceLevel: 'intermediate' })
+    await old.table('sessions').add({ id: 's1', date: '2026-01-05', status: 'completed', scheduledWorkoutId: 'w1', startedAt: '2026-01-05T10:00:00Z', title: 'Old' })
+    await old.table('setLogs').bulkAdd([
+      { id: 'l1', sessionId: 's1', exerciseId: 'e', slotId: 'a', setNumber: 1, completed: true, actualReps: 8 },
+      { id: 'l2', sessionId: 's1', exerciseId: 'e', slotId: 'a', setNumber: 2, completed: true, actualReps: 7 },
+    ])
+    await old.table('settings').add({ key: 'swap.pref', value: { keep: true } })
+    old.close()
+
+    const { LiftDB } = await import('./schema')
+    const now = new LiftDB(name)
+    await now.open()
+    expect(await now.table('sessions').count()).toBe(1)
+    expect(await now.table('setLogs').count()).toBe(2)
+    expect((await now.table('setLogs').get('l1')).actualReps).toBe(8)
+    expect((await now.table('settings').get('swap.pref')).value).toEqual({ keep: true })
+    const p = await now.table('profile').get('p1')
+    expect(p.displayName).toBe('Sam')
+    expect(p.heightCm).toBeCloseTo(177.8, 1)
+    now.close()
+    await Dexie.delete(name)
+  })
+
+  it('only the delete-all, backup restore and food cache code can empty a table', () => {
+    const sources = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', eager: true, import: 'default' }) as Record<string, string>
+    const risky = /\.clear\(\)|deleteDatabase|Dexie\.delete\(|localStorage\.clear|caches\.delete/
+    const offenders = Object.entries(sources)
+      .filter(([f, text]) => !/\.test\./.test(f) && risky.test(text))
+      .map(([f]) => f.replace(/^\//, ''))
+    expect(offenders.sort()).toEqual(['src/db/backup.ts', 'src/db/foodRepo.ts', 'src/db/repo.ts'])
+  })
+})

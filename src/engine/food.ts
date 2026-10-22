@@ -45,6 +45,8 @@ export interface FoodItem {
   name: string
   brand?: string
   aliases?: string[]
+  /** The Telugu name (script and letters), shown under the English name. */
+  nameTe?: string
   states: FoodState[]
   kind: FoodKind
   source: string
