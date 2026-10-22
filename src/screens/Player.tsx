@@ -248,11 +248,11 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
           </div>
           <div className="set-head" aria-hidden="true"><span>Set</span><span>{unit}</span><span>Reps</span><span>RPE</span><span /></div>
           {logs.map((l) => <SetRow key={l.id} log={l} onDone={onSetDone} />)}
-          <div className="inline">
+          <div className="set-actions">
             <Button variant="small" onClick={() => void addSet(sessionId, slot.slotId)}>Add set</Button>
             <Button variant="small" onClick={onReplace}>Replace</Button>
             <Button variant="small" onClick={() => setSkipped(sessionId, slot.slotId, true)}>Skip</Button>
-            <Button variant="small" aria-pressed={actual.painReported} onClick={() => setPain(sessionId, slot.slotId, !actual.painReported)}>
+            <Button variant="small" className="pain" aria-pressed={actual.painReported} onClick={() => setPain(sessionId, slot.slotId, !actual.painReported)}>
               {actual.painReported ? 'Pain noted ✓' : 'Felt pain'}
             </Button>
           </div>

@@ -152,16 +152,10 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
       {tracks.workout && tracks.yoga && yogaCard(false)}
 
       {!tracks.yoga && (
-        <Card title="Yoga is turned off">
-          <p className="muted">Yoga sessions, history and charts are hidden, not deleted.</p>
-          <Button variant="ghost" onClick={() => void setTrack('yoga', true)}>Turn on Yoga</Button>
-        </Card>
+        <p className="quiet-row">Yoga is off. Your history is kept. <button type="button" className="link-btn" aria-label="Turn on Yoga" onClick={() => void setTrack('yoga', true)}>Turn on</button></p>
       )}
       {!tracks.workout && (
-        <Card title="Workouts are turned off">
-          <p className="muted">Turn them on to see your plan and generate workouts. Your history is kept.</p>
-          <Button variant="ghost" onClick={() => void setTrack('workout', true)}>Turn on Workouts</Button>
-        </Card>
+        <p className="quiet-row">Workouts are off. Your history is kept. <button type="button" className="link-btn" aria-label="Turn on Workouts" onClick={() => void setTrack('workout', true)}>Turn on</button></p>
       )}
 
       {/* ---- progress ---- */}

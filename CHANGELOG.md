@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.6.0 - Guided first run and a calmer interface (branch feature/v2-complete)
+- First run is now five short screens (what you use Lift for, your training, about you, your week, where you train) with a progress bar, Back and Next. Settings keeps the single page.
+- Radio buttons, check boxes, the file picker and drop-downs now look finished and match the tab colour.
+- The feedback button is a small, quiet speech bubble. "Ready to use offline" is a short toast that leaves by itself.
+- Home: a switched-off feature is one quiet line instead of a card.
+- Workout preview leads with the summary. Extra notes sit under "Why this workout".
+- Workout screen: Add set, Replace and Skip sit in one tidy row, and finishing a set gives a small pop.
+- Settings is one grouped list with a coloured icon on each row.
+- Empty screens have an icon and clearer text.
+
 ## 2.5.0 - New look (branch feature/v2-complete)
 - Type: Bricolage Grotesque for headings and numbers, Figtree for text. Both are bundled with the app, so there are no outside font requests and they work offline.
 - Each tab has its own colour (Home ember, Plan teal, Workout red, Yoga violet, Food green, Progress blue, Settings slate). The colour fades in when you switch tabs and tints the top glow, buttons, chips and the status bar.

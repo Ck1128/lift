@@ -22,10 +22,29 @@ const PATTERNS: { id: Pattern; label: string }[] = [
  * A collapsible group. It is a native <details>, so keyboards and screen readers get the open/closed state for free.
  * It is never given an `open` attribute: every section starts closed on every load, and the open state is not saved (US-04).
  */
+const ROW_ICON: Record<string, { c: string; d: string }> = {
+  'Profile and goals': { c: '#e5480f', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.500 20a7.500 7.500 0 0 1 15 0' },
+  'Yoga and food': { c: '#6d4fc7', d: 'M12 21c-4.500-1.500-7-5-7-9.500 3 .2 5.500 1.700 7 4.200 1.500-2.500 4-4 7-4.200 0 4.500-2.500 8-7 9.500Z' },
+  'Where you train': { c: '#0b7f8a', d: 'M12 21s-6.500-5.500-6.500-11a6.500 6.500 0 0 1 13 0c0 5.500-6.500 11-6.500 11ZM12 12a2.200 2.200 0 1 0 0-4.400 2.200 2.200 0 0 0 0 4.400Z' },
+  'Equipment': { c: '#d62f35', d: 'M2.500 9.500v5M5.500 7v10M18.500 7v10M21.500 9.500v5M5.500 12h13' },
+  'Exercises to avoid': { c: '#b45309', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM5.600 5.600l12.800 12.800' },
+  'Weekly schedule': { c: '#2b63d9', d: 'M4 6.500h16v13H4zM4 10.500h16M8.500 3.500v5M15.500 3.500v5' },
+  'Apple Health and wearables': { c: '#d6336c', d: 'M12 20s-7.500-4.500-7.500-10A4.200 4.200 0 0 1 12 7.600 4.200 4.200 0 0 1 19.500 10c0 5.500-7.500 10-7.500 10Z' },
+  'Feedback and support': { c: '#25813a', d: 'M20 12a7.500 7.500 0 0 1-10.800 6.700L4 20l1.400-4.300A7.500 7.500 0 1 1 20 12Z' },
+  'Help': { c: '#566073', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 .9-1 1.700M12 16.800v.01' },
+  'Export your data': { c: '#2b63d9', d: 'M12 15V4M8 8l4-4 4 4M5 14v5.500h14V14' },
+  'Backup and restore': { c: '#0b7f8a', d: 'M4 7h16v4H4zM5.500 11v8h13v-8M10 15h4' },
+  'Delete all data on this device': { c: '#d92d20', d: 'M5 7h14M10 7V4.500h4V7M7 7l1 13h8l1-13' },
+  'About and privacy': { c: '#566073', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v6M12 7.500v.01' },
+}
 function Section({ title, children, danger }: { title: string; children: ReactNode; danger?: boolean }) {
+  const ic = ROW_ICON[title]
   return (
     <details className={`card section${danger ? ' danger-zone' : ''}`}>
-      <summary className="section-head"><span className="card-title">{title}</span><span className="chev" aria-hidden="true" /></summary>
+      <summary className="section-head">
+        {ic && <span className="row-icon" style={{ background: ic.c }} aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ic.d} /></svg></span>}
+        <span className="card-title">{title}</span><span className="chev" aria-hidden="true" />
+      </summary>
       <div className="section-body"><div className="section-fb"><FeedbackButton component={title} /></div>{children}</div>
     </details>
   )
@@ -48,6 +67,7 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
     <>
       <ScreenHeader title="Settings" subtitle="Profile, equipment, backup" />
 
+      <div className="group">
       <Section title="Profile and goals">
         <div>
           <ProfileFormView
@@ -154,6 +174,9 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
 
       <Section title="Backup and restore"><BackupPanel /></Section>
 
+      </div>
+
+      <div className="group">
       <Section title="Delete all data on this device" danger>
         <p className="hint">Permanently removes everything the app saved on this device. It asks three different questions first. Make a backup first if you might want it.</p>
         <ul className="plain hint">{DELETE_CATEGORIES.map((c) => <li key={c}>{c}</li>)}</ul>
@@ -165,6 +188,7 @@ export function Settings({ profile, onReset }: { profile: Profile; onReset: () =
         <p className="hint">Your data is stored only on this phone, in the browser's local database. There is no account and no server. If you clear Safari's website data or delete the app, it is gone, so export a backup now and then.</p>
         <p className="hint">Exercise names, steps and photos come from the public-domain free-exercise-db project. Time, weight and calorie figures are estimates.</p>
       </Section>
+      </div>
 
       {levelAsk && (
         <Dialog title="Training level changed" onClose={() => setLevelAsk(null)}>

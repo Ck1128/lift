@@ -9,6 +9,7 @@ import type { GymType, LocationType } from '../engine/types'
 
 export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: { onBegin: () => void; onDone: () => void; deletedNotice?: boolean; onDismissNotice?: () => void }) {
   const [step, setStep] = useState<'profile' | 'equipment'>('profile')
+  const [formStep, setFormStep] = useState(0)
   const [chosen, setChosen] = useState<{ location: LocationType; gymType: GymType; unit: 'lb' | 'kg' }>({ location: 'gym', gymType: 'planet_fitness', unit: 'lb' })
 
   const submit = async (form: ProfileForm, extra: ProfileExtra) => {
@@ -33,25 +34,29 @@ export function Onboarding({ onBegin, onDone, deletedNotice, onDismissNotice }: 
   }
   return (
     <>
-      {deletedNotice && (
+      {deletedNotice && formStep === 0 && (
         <div className="notice" role="status">
           <p><strong>All data on this device was deleted.</strong> You are back at first-run setup. Start fresh below, or restore a backup at the bottom of this page.</p>
           <Button variant="small" onClick={onDismissNotice}>OK</Button>
         </div>
       )}
-      <ScreenHeader title="Welcome" subtitle="A few questions so the app fits you. No account needed, and nothing leaves this phone." />
-      <Card>
+      {formStep === 0 && <ScreenHeader title="Welcome" subtitle="No account needed, and nothing leaves this phone." />}
+      <Card className="step-card">
         <ProfileFormView
           initial={profileToForm()}
           initialExtra={{ preferredLocation: 'gym', gymType: 'planet_fitness' }}
           showLocation
           submitLabel="Continue"
+          stepped
+          onStepChange={setFormStep}
           onSubmit={submit}
         />
       </Card>
-      <Card title="Already have a backup?">
-        <ImportPanel />
-      </Card>
+      {formStep === 0 && (
+        <Card title="Already have a backup?">
+          <ImportPanel />
+        </Card>
+      )}
     </>
   )
 }

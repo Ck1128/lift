@@ -89,9 +89,16 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
     <>
       <ScreenHeader title={w.title} subtitle={w.targetMuscles.map((m) => MUSCLE_LABEL[m]).join(' · ') || 'Cardio'} />
       <Card>
-        <p className="big">About {w.estimatedMinutes} min <span className="muted">(estimate, you chose {w.availableMinutes})</span></p>
+        <p className="big">About {w.estimatedMinutes} min</p>
+        <p className="hint">(estimate, you chose {w.availableMinutes})</p>
         {!w.fits && <p className="error" role="alert">This is longer than the time you chose.</p>}
-        {w.notes.map((n, i) => <p key={i} className="notice">{n}</p>)}
+        {w.notes[0] && <p className="lede">{w.notes[0]}</p>}
+        {w.notes.length > 1 && (
+          <details className="why">
+            <summary>Why this workout</summary>
+            {w.notes.slice(1).map((n, i) => <p key={i} className="why-note">{n}</p>)}
+          </details>
+        )}
         <details>
           <summary className="muted">How the time is estimated</summary>
           <ul className="plain">{w.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>

@@ -61,6 +61,12 @@ function Shell() {
   useEffect(() => {
     registerPwa({ onNeedRefresh: (fn) => setUpdate(() => fn), onOfflineReady: () => setOfflineReady(true) })
   }, [])
+  // The offline note is a passing toast, not a bar that waits to be dismissed.
+  useEffect(() => {
+    if (!offlineReady) return
+    const t = setTimeout(() => setOfflineReady(false), 3500)
+    return () => clearTimeout(t)
+  }, [offlineReady])
 
   if (profile === undefined) return <div className="app"><main className="content"><p className="muted">Loading...</p></main></div>
 
@@ -79,12 +85,7 @@ function Shell() {
     <div className="app" data-tab={tab}>
       <OfflineBanner online={online} />
       {update && <UpdateBanner onUpdate={update} onDismiss={() => setUpdate(null)} />}
-      {offlineReady && !update && (
-        <div className="banner update" role="status">
-          <span>Ready to use offline.</span>
-          <button type="button" onClick={() => setOfflineReady(false)}>OK</button>
-        </div>
-      )}
+      {offlineReady && !update && <div className="toast" role="status">Ready to use offline</div>}
       <FeedbackHost path={path}>
         <main className="content" key={tab}>
           <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />

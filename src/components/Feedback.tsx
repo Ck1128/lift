@@ -49,7 +49,7 @@ export function FeedbackButton({ component, element, options }: { component: str
   const what = element ?? component
   return (
     <button type="button" className="icon-btn fb" aria-label={`Send feedback about ${what}`} title="Send feedback" onClick={() => scope.open({ screen: scope.screen, component, element }, options)}>
-      <span aria-hidden="true">F</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12a7.500 7.500 0 0 1-10.800 6.700L4 20l1.400-4.300A7.500 7.500 0 1 1 20 12Z" /></svg>
     </button>
   )
 }

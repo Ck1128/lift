@@ -23,7 +23,7 @@ export const LEVEL_HELP: Record<TrainingLevel, string> = {
 const LEVELS: TrainingLevel[] = ['beginner', 'intermediate', 'regular']
 
 export function ProfileFormView({
-  initial, initialExtra, showLocation, submitLabel, onSubmit, onLevelChange,
+  initial, initialExtra, showLocation, submitLabel, onSubmit, onLevelChange, stepped, onStepChange,
 }: {
   initial: ProfileForm
   initialExtra: ProfileExtra
@@ -32,6 +32,9 @@ export function ProfileFormView({
   onSubmit: (form: ProfileForm, extra: ProfileExtra, opts?: { levelChange?: 'update' | 'keep' }) => Promise<void> | void
   /** Called when the level is about to change on a saved profile, so the page can ask what to do with upcoming workouts. */
   onLevelChange?: (from: TrainingLevel, to: TrainingLevel, proceed: (mode: 'update' | 'keep') => void) => void
+  /** First-run mode: one topic per screen with Back and Next. Settings keeps the single page. */
+  stepped?: boolean
+  onStepChange?: (index: number) => void
 }) {
   const [f, setF] = useState<ProfileForm>(initial)
   const [extra, setExtra] = useState<ProfileExtra>(initialExtra)
@@ -39,6 +42,7 @@ export function ProfileFormView({
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [stepNo, setStepNo] = useState(0)
   useUnsavedGuard(dirty)
   const workoutOn = f.tracks.includes('workout')
   const beginner = workoutOn && f.trainingLevel === 'beginner'
@@ -65,7 +69,13 @@ export function ProfileFormView({
       if (f.weightValue.trim() === '') errs.weightValue = 'Beginner plans need your body weight. It stays on this phone.'
     }
     setErrors(errs)
-    if (Object.keys(errs).length > 0) return
+    if (Object.keys(errs).length > 0) {
+      if (stepped) {
+        const at = steps.findIndex((st) => st.fields.some((k) => errs[k as keyof FormErrors]))
+        if (at >= 0) goStep(at)
+      }
+      return
+    }
     if (workoutOn && onLevelChange && initial.trainingLevel !== f.trainingLevel) {
       onLevelChange(initial.trainingLevel, f.trainingLevel, (mode) => void doSubmit(mode))
       return
@@ -87,8 +97,9 @@ export function ProfileFormView({
       return follows ? withWeightFieldUnit(next, u) : next
     })
 
-  return (
-    <form onSubmit={submit} noValidate>
+  // Sections of the form. Settings shows them in one page; first run shows them as steps.
+  const secTracks = (
+    <>
       <fieldset className="field">
         <legend>What do you want to use Lift for?</legend>
         <div role="group" aria-label="Activities" className="chips">
@@ -103,9 +114,10 @@ export function ProfileFormView({
       <Field label="Nickname (optional)" hint="Only used to greet you. You do not need your real name." error={errors.displayName}>
         {(id, d) => <input id={id} aria-describedby={d} value={f.displayName} maxLength={40} onChange={(e) => set('displayName', e.target.value)} />}
       </Field>
-
-      {workoutOn && (
-        <>
+    </>
+  )
+  const secLevel = (
+    <>
       <Field label="Main goal" hint="This sets rep ranges and rest times. It does not promise any particular result.">
         {(id) => (
           <select id={id} value={f.goal} onChange={(e) => set('goal', e.target.value as Goal)}>
@@ -126,10 +138,10 @@ export function ProfileFormView({
         </div>
         <p className="hint">Up to {LEVEL_PARAMS[f.trainingLevel].maxExercises} exercises per workout at this level. You can change it any time.</p>
       </fieldset>
-
-        </>
-      )}
-
+    </>
+  )
+  const secBody = (
+    <>
       <div className={beginner ? 'required-block' : ''}>
         <p className="label-like">{beginner ? 'Your height and weight (needed for beginners)' : 'Height and weight (optional)'}</p>
         <HeightField form={f} update={update} error={errors.heightCm} />
@@ -148,9 +160,10 @@ export function ProfileFormView({
         <Chips label="Weight units" options={['lb', 'kg'] as const} value={f.weightUnit} onChange={setPageUnit} />
         <p className="hint">The default for the weights you lift and your body weight. Each weight box can use its own unit too.</p>
       </div>
-
-      {workoutOn && (
-        <>
+    </>
+  )
+  const secWeek = (
+    <>
       <fieldset className="field">
         <legend>Training days</legend>
         <div role="group" aria-label="Training days" className="chips">
@@ -165,56 +178,109 @@ export function ProfileFormView({
       <Field label="Usual workout length (minutes)" hint="You can change it each day." error={errors.preferredDurationMinutes}>
         {(id, d) => <input id={id} aria-describedby={d} inputMode="numeric" value={f.preferredDurationMinutes} onChange={(e) => set('preferredDurationMinutes', e.target.value)} />}
       </Field>
-
-      {showLocation && (
-        <>
-          <Field label="Where do you train?" hint="You can switch any time in Settings.">
-            {(id) => (
-              <select id={id} value={extra.preferredLocation} onChange={(e) => { setExtra({ ...extra, preferredLocation: e.target.value as LocationType }); setDirty(true) }}>
-                <option value="gym">Gym</option>
-                <option value="home">Home</option>
-              </select>
-            )}
-          </Field>
-          {extra.preferredLocation === 'gym' && (
-            <Field label="Which gym?" hint="Planet Fitness gets a maintained equipment list. You can exclude anything your club does not have.">
-              {(id) => (
-                <select id={id} value={extra.gymType} onChange={(e) => { setExtra({ ...extra, gymType: e.target.value as GymType }); setDirty(true) }}>
-                  <option value="planet_fitness">Planet Fitness</option>
-                  <option value="generic">Another gym</option>
-                </select>
-              )}
-            </Field>
-          )}
-        </>
-      )}
-
-        </>
-      )}
-
-      <details className="optional">
-        <summary>Optional details</summary>
-        <p className="hint">These are never required. Age and sex are only used for a rough energy estimate. Everything stays on this phone.</p>
-        <Field label="Age" error={errors.age}>
-          {(id, d) => <input id={id} aria-describedby={d} inputMode="numeric" value={f.age} onChange={(e) => set('age', e.target.value)} />}
-        </Field>
-        <Field label="Sex (optional)" hint="Used only in the daily energy estimate on the Food tab. Leave blank to skip it.">
+    </>
+  )
+  const secWhere = showLocation ? (
+    <>
+      <Field label="Where do you train?" hint="You can switch any time in Settings.">
+        {(id) => (
+          <select id={id} value={extra.preferredLocation} onChange={(e) => { setExtra({ ...extra, preferredLocation: e.target.value as LocationType }); setDirty(true) }}>
+            <option value="gym">Gym</option>
+            <option value="home">Home</option>
+          </select>
+        )}
+      </Field>
+      {extra.preferredLocation === 'gym' && (
+        <Field label="Which gym?" hint="Planet Fitness gets a maintained equipment list. You can exclude anything your club does not have.">
           {(id) => (
-            <select id={id} value={f.sex} onChange={(e) => set('sex', e.target.value as '' | Sex)}>
-              <option value="">Prefer not to say</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
+            <select id={id} value={extra.gymType} onChange={(e) => { setExtra({ ...extra, gymType: e.target.value as GymType }); setDirty(true) }}>
+              <option value="planet_fitness">Planet Fitness</option>
+              <option value="generic">Another gym</option>
             </select>
           )}
         </Field>
-        <label className="check">
-          <input type="checkbox" checked={f.nutritionGuidance} onChange={(e) => set('nutritionGuidance', e.target.checked)} />
-          <span>Show gentle next-day food guidance (optional)</span>
-        </label>
-      </details>
+      )}
+    </>
+  ) : null
+  const secOptional = (
+    <details className="optional">
+      <summary>Optional details</summary>
+      <p className="hint">These are never required. Age and sex are only used for a rough energy estimate. Everything stays on this phone.</p>
+      <Field label="Age" error={errors.age}>
+        {(id, d) => <input id={id} aria-describedby={d} inputMode="numeric" value={f.age} onChange={(e) => set('age', e.target.value)} />}
+      </Field>
+      <Field label="Sex (optional)" hint="Used only in the daily energy estimate on the Food tab. Leave blank to skip it.">
+        {(id) => (
+          <select id={id} value={f.sex} onChange={(e) => set('sex', e.target.value as '' | Sex)}>
+            <option value="">Prefer not to say</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+          </select>
+        )}
+      </Field>
+      <label className="check">
+        <input type="checkbox" checked={f.nutritionGuidance} onChange={(e) => set('nutritionGuidance', e.target.checked)} />
+        <span>Show gentle next-day food guidance (optional)</span>
+      </label>
+    </details>
+  )
 
-      <Button type="submit" disabled={busy}>{busy ? 'Saving...' : submitLabel}</Button>
+  type Step = { title: string; why: string; body: React.ReactNode; fields: string[] }
+  const steps: Step[] = [
+    { title: 'Let\'s set you up', why: 'A few quick questions so the app fits you.', body: secTracks, fields: ['tracks', 'displayName'] },
+    ...(workoutOn ? [{ title: 'Your training', why: 'This decides how many exercises, sets and rest you get.', body: secLevel, fields: [] as string[] }] : []),
+    { title: 'About you', why: 'Used to pick starting weights and rough calorie numbers.', body: <>{secBody}{secOptional}</>, fields: ['heightCm', 'weightValue', 'age'] },
+    ...(workoutOn ? [{ title: 'Your week', why: 'Pick the days you can train. The rest are recovery days.', body: secWeek, fields: ['trainingDays', 'preferredDurationMinutes'] }] : []),
+    ...(workoutOn && showLocation ? [{ title: 'Where you train', why: 'This sets the equipment your workouts can use.', body: secWhere, fields: [] as string[] }] : []),
+  ]
+  const cur = Math.min(stepNo, steps.length - 1)
+  const lastStep = cur === steps.length - 1
+  const goStep = (i: number) => {
+    // Going forward from the first step needs a choice of Workout, Yoga or both.
+    if (i > cur && steps[cur].fields.includes('tracks')) {
+      const err = validateProfileForm(f).tracks
+      if (err) { setErrors((p) => ({ ...p, tracks: err })); return }
+    }
+    setStepNo(i); onStepChange?.(i); window.scrollTo?.(0, 0)
+  }
+
+  const submitRow = (
+    <>
+      <Button type="submit" disabled={busy} className={stepped && !lastStep ? 'step-off' : ''}>{busy ? 'Saving...' : submitLabel}</Button>
       {saved && <p className="ok" role="status">Saved.</p>}
+    </>
+  )
+
+  if (!stepped) {
+    return (
+      <form onSubmit={submit} noValidate>
+        {secTracks}
+        {workoutOn && secLevel}
+        {secBody}
+        {workoutOn && <>{secWeek}{secWhere}</>}
+        {secOptional}
+        {submitRow}
+      </form>
+    )
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="stepped">
+      <div className="step-progress" role="progressbar" aria-label="Setup progress" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={cur + 1}>
+        {steps.map((st, i) => <span key={st.title} className={i <= cur ? 'dot on' : 'dot'} />)}
+      </div>
+      {steps.map((st, i) => (
+        <div key={st.title} className={i === cur ? 'step' : 'step step-off'}>
+          <h2 className="step-title">{st.title}</h2>
+          <p className="step-why">{st.why}</p>
+          {st.body}
+        </div>
+      ))}
+      <div className="step-nav">
+        {cur > 0 && <Button variant="ghost" onClick={() => goStep(cur - 1)}>Back</Button>}
+        {!lastStep && <Button onClick={() => goStep(cur + 1)}>Next</Button>}
+        {submitRow}
+      </div>
     </form>
   )
 }
