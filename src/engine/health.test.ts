@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { zipSync, strToU8 } from 'fflate'
 import {
-  batchesOf, foodItems, liftIntervals, localStamp, parseHealthText, planMerge, runShortcutUrl, stampOf, unsentOnly, weightItem, workoutItem, yogaItem,
+  batchesOf, foodItems, parseMinutes, parseNumber, liftIntervals, localStamp, parseHealthText, planMerge, runShortcutUrl, stampOf, unsentOnly, weightItem, workoutItem, yogaItem,
   type HealthBatch,
 } from './health'
 import { HealthXmlReader, readHealthExport, workoutTypeName } from './healthXml'
@@ -38,6 +38,21 @@ describe('reading Shortcut text', () => {
     expect(localStamp('2026-10-21 07:30:12 -0400')).toBe('2026-10-21T07:30')
     expect(localStamp('2026-10-21')).toBe('2026-10-21T12:00')
     expect(localStamp('nope')).toBeNull()
+  })
+})
+
+describe('reading text the way Shortcuts writes it', () => {
+  it('understands durations, units and thousands', () => {
+    expect(parseMinutes('32 min')).toBe(32)
+    expect(parseMinutes('1 hr 5 min')).toBe(65)
+    expect(parseMinutes('1:05:00')).toBe(65)
+    expect(parseMinutes('1950 sec')).toBe(32.5)
+    expect(parseMinutes('45')).toBe(45)
+    expect(parseNumber('1,234.5 kcal')).toBe(1234.5)
+    expect(parseNumber('77,5')).toBe(77.5)
+    const b = parseHealthText('B|2026-10-21T07:30|172.4 lb\nK|2026-10-21T18:05|Running|32 min|310.4 kcal')
+    expect(b.weights[0].kg).toBeCloseTo(78.2, 1)
+    expect(b.workouts[0]).toMatchObject({ minutes: 32, kcal: 310 })
   })
 })
 

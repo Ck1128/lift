@@ -31,3 +31,34 @@ F|2026-10-21|1850                    one day of food calories
 
 ## Not included
 Steps, heart rate, sleep and other Health data types are not read. A native companion app (paid developer account) would be the way to get live access.
+
+## Setting up the two shortcuts (about 10 minutes, once)
+
+Open the Shortcuts app on the iPhone. Names must match Settings > Apple Health (or change them there). Apple renames actions between iOS versions: pick the closest one. Neither shortcut has been run on a real iPhone by the developer.
+
+### A. "Health to Lift" (reads Health)
+1. Tap +, name it **Health to Lift**.
+2. **Find Health Samples**. Filters: Type is Body Mass; Start Date is in the last 90 days. Sort by Start Date, Latest First. Limit 100.
+3. **Repeat with Each** (Health Samples). Inside:
+   - **Format Date** on the item's Start Date. Date Format: Custom, `yyyy-MM-dd'T'HH:mm`.
+   - **Text**: `B|` Formatted Date `|` item Value `|` item Unit
+   - **Add to Variable**, name it `Lines`.
+4. After the loop add **Find Health Samples** again with Type Workouts (or **Find Workouts**). Same date filter, limit 50.
+5. **Repeat with Each**. Inside: **Format Date** as above, then **Text**: `K|` Formatted Date `|` Workout Type `|` Duration `|` Active Energy. **Add to Variable** `Lines`.
+6. **Combine Text** (Lines, New Lines), then **Copy to Clipboard**, then **Show Notification** "Copied. Open Lift and tap Paste."
+7. Run it once with the play button and allow the Health permissions.
+
+Lift accepts "32 min", "1 hr 5 min" and "310 kcal" in those slots.
+
+### B. "Lift to Health" (writes to Health)
+1. Tap +, name it **Lift to Health**.
+2. **Split Text**: Shortcut Input, separator New Lines.
+3. **Repeat with Each** (Split Text). Inside:
+   - **Split Text**: Repeat Item, separator Custom, a vertical bar `|`.
+   - Five times, **Get Item from List** (item 1 to 5), each followed by **Set Variable**: `kind`, `when`, `what`, `amount`, `extra`.
+   - **Get Dates from Input** on `when`.
+   - **If** `kind` is K: **If** `what` is Yoga: **Log Workout** (Yoga, Duration `amount` minutes, Start Date from `when`). **Otherwise**: **Log Workout** (Traditional Strength Training, same fields). Add Calories from `extra` if present.
+   - **If** `kind` is B: **Log Health Sample**: Body Mass, value `amount`, unit `extra`, date from `when`.
+   - **If** `kind` is F: **Log Health Sample**: Dietary Energy, value `amount`, date from `when`.
+4. Run it once from Lift (Settings > Apple Health > Send) and allow the Health permissions.
+5. If Log Workout has no start date, workouts are logged at the time of sending, so send right after training.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.1 - Easier Apple Health shortcut setup (branch feature/v2-complete)
+- Pasted text can use Shortcuts' own wording: "32 min", "1 hr 5 min", "310 kcal", "172.4 lb".
+- Step-by-step shortcut setup added to docs/APPLE_HEALTH.md.
+
 ## 2.7.0 - Apple Health, both ways (branch feature/v2-complete)
 - Settings > Apple Health: send workouts, yoga, body weight and (optional) food calories to Health through a shortcut, and bring body weight and Apple Watch workouts back.
 - Read Apple's own Health export (export.zip) on the phone, as a stream, with a preview and a "how far back" choice. Nothing is uploaded.

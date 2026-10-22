@@ -49,6 +49,32 @@ export function localStamp(s: string): string | null {
   return null
 }
 
+/** "172.4", "172,4", "1,234.5" and "172.4 lb" all give a number. */
+export function parseNumber(raw: string | undefined): number {
+  if (raw === undefined) return NaN
+  const m = /-?\d[\d,]*(?:\.\d+)?|-?\d*,\d+/.exec(raw.trim())
+  if (!m) return NaN
+  const t = m[0]
+  return Number(/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.'))
+}
+
+/** Shortcuts writes durations as text: "32 min", "1 hr 5 min", "1:05:00", "1950 sec". A bare number means minutes. */
+export function parseMinutes(raw: string | undefined): number {
+  if (raw === undefined) return NaN
+  const t = raw.trim().toLowerCase()
+  const clock = /^(\d+):(\d{2})(?::(\d{2}))?$/.exec(t)
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2]) + Number(clock[3] ?? 0) / 60
+  let total = 0
+  let any = false
+  for (const m of t.matchAll(/(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b/g)) {
+    const v = Number(m[1].replace(',', '.'))
+    const u = m[2][0]
+    total += u === 'h' ? v * 60 : u === 's' ? v / 60 : v
+    any = true
+  }
+  return any ? total : parseNumber(t)
+}
+
 export function toKg(value: number, unit: string): number | null {
   const u = unit.trim().toLowerCase()
   if (!Number.isFinite(value)) return null
@@ -101,8 +127,11 @@ export function parseHealthText(text: string): HealthBatch {
     if (!line) continue
     const f = line.split('|').map((x) => x.trim())
     const kind = f[0].toUpperCase()
-    if (kind === 'B' || kind === 'W') addWeight(b, localStamp(f[1] ?? ''), Number((f[2] ?? '').replace(',', '.')), f[3] ?? 'kg')
-    else if (kind === 'K') addWorkout(b, localStamp(f[1] ?? ''), f[2] ?? '', Number((f[3] ?? '').replace(',', '.')), f[4] ? Number(f[4].replace(',', '.')) : undefined)
+    if (kind === 'B' || kind === 'W') {
+      // The unit is normally its own field, but "172.4 lb" in the value field works too.
+      const unit = f[3] || /[a-z]+/i.exec(f[2] ?? '')?.[0] || 'kg'
+      addWeight(b, localStamp(f[1] ?? ''), parseNumber(f[2]), unit)
+    } else if (kind === 'K') addWorkout(b, localStamp(f[1] ?? ''), f[2] ?? '', parseMinutes(f[3]), f[4] ? parseNumber(f[4]) : undefined)
     else b.ignored++
   }
   return b
