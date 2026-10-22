@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.14.0 - Premium look (branch feature/v2-complete)
+A design-only change in its own commit and its own file (`src/theme-premium.css`). Revert that commit to get the 2.12 look back.
+- **Deep ink hero card** on Home with a glow in the tab colour, large confident headings and a glowing primary button.
+- **Dark glass dock** for the bottom bar, with the current tab lit in its colour.
+- **Layered soft depth** on cards, a faint aurora behind each page that changes with the tab, bigger tighter headings and numbers.
+- Pill chips with a glow when on, softer fields with a clear focus ring, glowing progress bars, a glass sheet for dialogs.
+- Cards rise in gently when a page opens. Motion is off for people who ask for less.
+
 ## 2.13.1 - Reverted the "Docs-clean" look (branch feature/v2-complete)
 - Undid the 2.13.0 design change (commit c75d82a). The app looks exactly as it did in 2.12.0. Nothing else changed.
 
