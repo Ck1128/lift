@@ -2,12 +2,15 @@ import type {
   GymType, EquipmentId, EquipmentSet, Exercise, Experience, GeneratedWorkout, GenerationResult, Goal, LastPerformance,
   Muscle, Pattern, PlannedExercise, WeightUnit, DayPlan,
 } from './types'
+import { hasPain, painBlocks, painNotes, painTrims, type PainReport } from './pain'
+import { adaptDelta, adaptNotes, type AdaptPlan } from './adapt'
 import { EQUIPMENT_LABEL, GOAL_LABEL, LEVEL_LABEL, MUSCLE_LABEL } from './types'
 import { standardMachineOk, STANDARD_SUMMARY } from './standardGym'
 import { suitability, type SuitabilityContext } from './suitability'
 import { availableIds, loadSpec } from './equipment'
 import { assumptionsText, estimateSeconds, restSecondsFor } from './time'
-import { startingWeight, suggestLoad, type LoadSpec } from './progression'
+import { idealWeight, startingWeight, suggestLoad, type LoadSpec } from './progression'
+import { needsBench } from './requirements'
 import { validateExercise } from './validate'
 import { LEVEL_PARAMS, setsFor } from './levels'
 import { cardioCalories, MAX_SESSION_MINUTES, MIN_SESSION_MINUTES, pickCardio } from './cardio'
@@ -40,6 +43,10 @@ export interface GenerateInput {
   age?: number
   /** Set when training at a gym, so a standard gym only gets exercises it can actually do. */
   gym?: GymType
+  /** The pain check for today. Moderate or severe pain removes exercises that load that area; mild pain trims a set. */
+  pain?: PainReport
+  /** How the last sessions went (effort and how many sets were finished). Changes sets for each muscle. */
+  adapt?: AdaptPlan
 }
 
 const REPS: Record<Goal, { compound: [number, number]; iso: [number, number] }> = {
@@ -64,7 +71,20 @@ export function eligible(ex: Exercise, input: Rules, avail: Set<EquipmentId>): b
   if (LEVEL_PARAMS[input.experience].maxDifficulty === 'beginner' && ex.difficulty !== 'beginner') return false
   // A machine is only offered at a standard gym if it really has that machine.
   if (input.gym === 'standard' && ex.equipmentIds.includes('machine') && !standardMachineOk(ex.name)) return false
+  if (needsBench(ex) && !avail.has('bench')) return false
   return ex.equipmentIds.every((q) => avail.has(q))
+}
+
+/** Is the weight range the person owns sensible for this exercise and this body? Unknown body data counts as fine. */
+export function weightFit(ex: Exercise, equipment: EquipmentSet, unit: WeightUnit, who: { weightKg?: number; sex?: 'female' | 'male'; level: Experience }): 'ok' | 'heavy' | 'light' {
+  if (ex.exerciseType !== 'dumbbell' && ex.exerciseType !== 'kettlebell') return 'ok'
+  const spec = loadSpec(equipment, ex.exerciseType as EquipmentId)
+  if (!spec) return 'ok'
+  const ideal = idealWeight({ exerciseType: ex.exerciseType, compound: ex.compound, primaryMuscles: ex.primaryMuscles, level: who.level, weightKg: who.weightKg, sex: who.sex }, unit)
+  if (ideal === undefined) return 'ok'
+  if (spec.min > ideal * 1.6) return 'heavy'
+  if (spec.max < ideal * 0.5) return 'light'
+  return 'ok'
 }
 
 /** Rep ranges for the goal, eased for newer and older lifters so the first weeks are about form, not maxes. */
@@ -167,21 +187,30 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
   }
 
   // ---- strength ----
-  const pool = input.catalog.filter((e) => eligible(e, input, avail))
+  const pool = input.catalog.filter((e) => eligible(e, input, avail) && !painBlocks(input.pain, e))
   if (pool.length === 0) {
     return { kind: 'error', message: 'No exercises match your equipment and exclusions. Check Settings: confirm your equipment or remove an exclusion.' }
   }
+  const who = { weightKg: input.weightKg, sex: input.sex, level: input.experience }
   const fit: SuitabilityContext = { level: input.experience, goal: input.goal, age: input.age }
   const pools = new Map<Muscle, Exercise[]>()
   for (const m of planDay.muscles) {
     const primary = pool.filter((e) => e.primaryMuscles[0] === m)
     const any = pool.filter((e) => e.primaryMuscles.includes(m))
-    const list = sortCandidates(primary.length > 0 ? primary : any, lastDone, fit)
+    const sorted = sortCandidates(primary.length > 0 ? primary : any, lastDone, fit)
+    // Prefer exercises your weights suit. If none do, keep them all and say so in the exercise note.
+    const fitting = sorted.filter((e) => weightFit(e, input.equipment, input.weightUnit, who) === 'ok')
+    const allHeavy = fitting.length === 0 && sorted.every((e) => weightFit(e, input.equipment, input.weightUnit, who) === 'heavy')
+    if (allHeavy && planDay.muscles.length > 1) {
+      notes.push(`Your lightest weight is too heavy to do ${MUSCLE_LABEL[m].toLowerCase()} work safely right now, so it is skipped. A lighter pair of dumbbells or a resistance band would unlock it.`)
+      continue
+    }
+    const list = fitting.length > 0 ? fitting : sorted
     if (list.length === 0) notes.push(`No exercise for ${MUSCLE_LABEL[m].toLowerCase()} fits your equipment and exclusions, so it is skipped today.`)
     else pools.set(m, list)
   }
   if (pools.size === 0) {
-    return { kind: 'error', message: 'None of today\'s target muscles have an exercise that fits your equipment and exclusions.' }
+    return { kind: 'error', message: hasPain(input.pain) ? 'With the pain you told us about, nothing in today\'s plan is a good idea. Rest or do gentle walking or stretching today. If the pain continues, please ask a qualified professional.' : 'None of today\'s target muscles have an exercise that fits your equipment and exclusions.' }
   }
 
   // Ranked picks: one best exercise per muscle first, then a second pass with a different movement pattern, and so on.
@@ -222,6 +251,12 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     const sug = noLoad
       ? { weight: undefined, note: 'No weight needed. Use a variation that lets you reach the target reps with good form.' }
       : withStart(suggestLoad(input.lastPerformance[ex.id], spec, input.weightUnit, repMin, repMax, level.effortCeiling), ex, spec)
+    const wf = weightFit(ex, input.equipment, input.weightUnit, who)
+    const fitNote = wf === 'heavy'
+      ? ' Your lightest weight is heavy for this move. Do fewer reps, stop with 2 reps left, and move slowly.'
+      : wf === 'light'
+        ? ' Your heaviest weight is light for this move. Slow the lowering to 3 seconds, pause at the hardest point and aim for the top of the rep range.'
+        : ''
     return {
       slotId: `s${slot + 1}`,
       exerciseId: ex.id,
@@ -232,7 +267,7 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
       restSeconds: rest(ex),
       suggestedWeight: sug.weight,
       loadUnit: sug.weight === undefined ? undefined : input.weightUnit,
-      loadNote: sug.note,
+      loadNote: sug.note + fitNote,
       why: why(ex),
       kind: 'strength',
       cues: ex.instructions.slice(0, level.cues),
@@ -240,9 +275,11 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
   }
   const defaultSets = (ex: Exercise) => {
     let s = setsFor(input.goal, input.experience, ex.compound)
+    s += adaptDelta(input.adapt, ex)
+    if (painTrims(input.pain, ex)) s -= 1
     if (input.age !== undefined && input.age >= 55) s = Math.min(s, 3)
     if (soreFor(ex) >= 2) s = Math.max(2, s - 1)
-    return s
+    return Math.max(2, Math.min(5, s))
   }
 
   // ---- optional 30 minute express circuit: one exercise per area, done back to back, three rounds ----
@@ -336,6 +373,7 @@ export function generateWorkout(input: GenerateInput): GenerationResult {
     notes.push(`You reported soreness in ${sorest.map((m) => MUSCLE_LABEL[m].toLowerCase()).join(', ')}, so those exercises have one fewer set. If you feel unwell or something hurts, rest or choose a lighter day.`)
   }
 
+  notes.push(...painNotes(input.pain), ...adaptNotes(input.adapt))
   notes.unshift(...designNotes(input, avail, cardioMinutes > 0))
 
   const workout: GeneratedWorkout = {
@@ -393,12 +431,12 @@ export function findAlternatives(
 export function configHash(input: Omit<GenerateInput, 'catalog'> & { catalogVersion: string; recentSessionIds: string[] }): string {
   const eq = Object.values(input.equipment)
     .filter((i) => i?.available)
-    .map((i) => `${i!.id}:${i!.minWeight ?? ''}-${i!.maxWeight ?? ''}-${i!.increment ?? ''}`)
+    .map((i) => `${i!.id}:${i!.minWeight ?? ''}-${i!.maxWeight ?? ''}-${i!.increment ?? ''}-${(i!.weights ?? []).join('/')}`)
     .sort()
   return JSON.stringify([
     input.planDay, input.minutes, input.goal, input.experience, input.cardioChoice ?? '', eq,
     [...input.excludedExerciseIds].sort(), [...input.excludedPatterns].sort(),
     input.soreness, input.weightUnit, input.catalogVersion, GENERATOR_VERSION, input.recentSessionIds,
-    input.age ?? '', input.gym ?? '',
+    input.age ?? '', input.gym ?? '', input.pain ?? {}, input.adapt ?? {},
   ])
 }

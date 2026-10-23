@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { funLine } from '../engine/humor'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { getSeen, getShareWeight, listStories, liveStory, markStorySeen, setShareWeight } from '../db/storyRepo'
@@ -8,6 +9,7 @@ import type { Profile } from '../engine/types'
 
 function StoryCard({ story, shareWeight }: { story: Story; shareWeight: boolean }) {
   const [note, setNote] = useState('')
+  const fun = funLine(story)
   const share = async () => {
     const text = storyShareText(story, shareWeight)
     try {
@@ -18,6 +20,12 @@ function StoryCard({ story, shareWeight }: { story: Story; shareWeight: boolean 
   }
   return (
     <Card className="story-card">
+      <div className="story-joke" aria-label="A little encouragement">
+        <span className="joke-emoji" aria-hidden="true">{fun.emoji}</span>
+        <p className="joke-line">{fun.line}</p>
+        <p className="joke-drink">{fun.drink}</p>
+        <span className="joke-orb o1" aria-hidden="true" /><span className="joke-orb o2" aria-hidden="true" /><span className="joke-orb o3" aria-hidden="true" />
+      </div>
       <p className="eyebrow">{story.final ? (story.kind === 'week' ? 'Weekly Body Story' : 'Monthly Body Story') : `${story.kind === 'week' ? 'This week' : 'This month'} so far`}</p>
       <h2 className="hero-title">{story.title}</h2>
       <p className="muted">{story.headline}</p>

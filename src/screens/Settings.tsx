@@ -1,4 +1,7 @@
 import { useRouter } from '../router'
+import { MUSIC_SHORTCUTS, setMusicButtons, useMusicButtons } from '../hooks/music'
+import { LANGS, setLang, useLang, useT, type Lang } from '../i18n'
+import { restAlertOn, setRestAlert } from '../hooks/alerts'
 import { InjuredAreas } from '../components/InjuredAreas'
 import { useState, type ReactNode } from 'react'
 import { CATALOG } from '../data/catalog'
@@ -41,12 +44,13 @@ const ROW_ICON: Record<string, { c: string; d: string }> = {
   'About and privacy': { c: '#566073', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v6M12 7.500v.01' },
 }
 function Section({ title, children, danger }: { title: string; children: ReactNode; danger?: boolean }) {
+  const t = useT()
   const ic = ROW_ICON[title]
   return (
     <details className={`card section${danger ? ' danger-zone' : ''}`}>
       <summary className="section-head">
         {ic && <span className="row-icon" style={{ background: ic.c }} aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ic.d} /></svg></span>}
-        <span className="card-title">{title}</span><span className="chev" aria-hidden="true" />
+        <span className="card-title">{t(title)}</span><span className="chev" aria-hidden="true" />
       </summary>
       <div className="section-body"><div className="section-fb"><FeedbackButton component={title} /></div>{children}</div>
     </details>
@@ -63,6 +67,9 @@ interface Edits {
   injured: Muscle[]
   note: string
   feedbackIcons: boolean
+  restAlert: boolean
+  music: boolean
+  lang: Lang
 }
 
 export function Settings({ profile, today, onReset }: { profile: Profile; today: string; onReset: () => void }) {
@@ -70,11 +77,14 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
   const [editLocation, setEditLocation] = useState<LocationType>(profile.preferredLocation)
   const [search, setSearch] = useState('')
   const feedbackOn = useFeedbackIcons()
+  const lang = useLang()
+  const musicOn = useMusicButtons()
+  const t = useT()
   // Nothing in these sections is applied until Save. `edits` holds only what the person changed.
   const base: Edits = {
     yogaLevel: profile.yogaLevel ?? '', nutrition: profile.nutritionGuidance, location: profile.preferredLocation, gym: profile.gymType,
     patterns: profile.excludedPatterns, excluded: profile.excludedExerciseIds, injured: profile.injuredMuscles ?? [],
-    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn,
+    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn, restAlert: restAlertOn(), music: musicOn, lang,
   }
   const [edits, setEdits] = useState<Partial<Edits>>({})
   const cur: Edits = { ...base, ...edits }
@@ -92,6 +102,9 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
     if (cur.note !== base.note) patch.limitationNote = cur.note.trim() || undefined
     if (Object.keys(patch).length > 0) await updateExclusions(patch)
     if (cur.feedbackIcons !== base.feedbackIcons) setFeedbackIcons(cur.feedbackIcons)
+    if (cur.restAlert !== base.restAlert) setRestAlert(cur.restAlert)
+    if (cur.lang !== base.lang) setLang(cur.lang)
+    if (cur.music !== base.music) setMusicButtons(cur.music)
     setEdits({})
   }
   const [levelAsk, setLevelAsk] = useState<{ proceed: (m: 'update' | 'keep') => void } | null>(null)
@@ -191,6 +204,37 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
 
       <Section title="Apple Health">
         <HealthPanel profile={profile} today={today} />
+      </Section>
+
+      <Section title="Language">
+        <div className="chips" role="radiogroup" aria-label={t('Language')}>
+          {LANGS.map((l) => (
+            <button key={l.id} type="button" role="radio" aria-checked={cur.lang === l.id} className={cur.lang === l.id ? 'chip on' : 'chip'} onClick={() => edit('lang', l.id)}>{l.native}</button>
+          ))}
+        </div>
+        <p className="hint">{t('Choose your language. Some long help text is still in English.')}</p>
+      </Section>
+
+      <Section title="Music">
+        <label className="check">
+          <input type="checkbox" checked={cur.music} onChange={(e) => edit('music', e.target.checked)} />
+          <span>Show music buttons (previous, play/pause, next) in my workout</span>
+        </label>
+        <p className="hint">Apple does not let a web app control the Music app directly, so each button runs a small Shortcut. Make these three once (about a minute):</p>
+        <ol className="plain hint">
+          <li>Open the Shortcuts app and tap +.</li>
+          <li>Tap Add Action, search "Music", and pick <strong>Play/Pause</strong>, <strong>Skip Forward</strong> or <strong>Skip Back</strong>.</li>
+          <li>Name the shortcut exactly <strong>{MUSIC_SHORTCUTS.toggle}</strong>, <strong>{MUSIC_SHORTCUTS.next}</strong> or <strong>{MUSIC_SHORTCUTS.previous}</strong>.</li>
+        </ol>
+        <p className="hint">When you tap a button, Shortcuts opens for a moment and brings you back to Lift. Your workout is saved the whole time.</p>
+      </Section>
+
+      <Section title="Rest timer">
+        <label className="check">
+          <input type="checkbox" checked={cur.restAlert} onChange={(e) => edit('restAlert', e.target.checked)} />
+          <span>Beep twice and buzz 10 seconds before a rest ends</span>
+        </label>
+        <p className="hint">Vibration works on Android. iPhone does not allow web apps to vibrate, so it beeps instead (your ringer switch must not be on silent).</p>
       </Section>
 
       <Section title="Feedback and support">

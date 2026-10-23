@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { tenSecondWarning, unlockAudio } from '../hooks/alerts'
 import { SessionRing } from '../components/Ring'
+import { MusicControls } from '../components/MusicControls'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
@@ -90,6 +92,15 @@ export function Player({ session, profile, equipment, onFinished }: {
     return () => clearTimeout(t)
   }, [rest])
 
+  // Beep-beep and a buzz 10 seconds before the rest ends (only when the rest is longer than that).
+  useEffect(() => {
+    if (!rest || isPaused(rest)) return
+    const ms = rest.endAt - Date.now() - 10_000
+    if (ms <= 0) return
+    const t = setTimeout(tenSecondWarning, ms)
+    return () => clearTimeout(t)
+  }, [rest])
+
   const finish = async (mode: 'finish' | 'abandon') => {
     setConfirm(null)
     const r = await finishSession(session.id, mode)
@@ -99,6 +110,7 @@ export function Player({ session, profile, equipment, onFinished }: {
   return (
     <>
       <ScreenHeader title={session.title} subtitle={`${clock(elapsed)} elapsed${paused ? ' (paused)' : ''} · ${done} of ${relevant.length} sets done`} />
+      <MusicControls />
       <SessionRing elapsedMs={elapsed} plannedMinutes={session.plannedMinutes || estimate} setsDone={done} setsTotal={relevant.length} paused={paused} />
       <p className="hint" aria-live="polite">Estimated session length: about {estimate} min{session.plannedMinutes ? ` (you chose ${session.plannedMinutes})` : ''}. It updates when you swap an exercise.</p>
       {swapNote && <p className="ok" role="status">{swapNote}</p>}
@@ -132,7 +144,7 @@ export function Player({ session, profile, equipment, onFinished }: {
             sessionId={session.id}
             logs={sorted.filter((l) => l.slotId === slot.slotId)}
             pageUnit={session.weightUnit}
-            onSetDone={() => setRest(startRest(Date.now(), slot.restSeconds))}
+            onSetDone={() => { unlockAudio(); setRest(startRest(Date.now(), slot.restSeconds)) }}
             onReplace={() => setReplacing(slot.slotId)}
             rules={rules}
             inSession={inSession}

@@ -73,7 +73,6 @@ function SessionBody({ session, logs, profile, editing }: { session: WorkoutSess
         {session.status !== 'abandoned' && <p className="hint">{calorieLine(session, logs, profile)}</p>}
         {!editing && <div className="inline"><SendToHealthButton build={(k) => workoutItem(session, k, k ? workoutKcal(session, logs, profile) : undefined)} /></div>}
         {session.reopenedAt && <p className="hint">Reopened and edited {new Date(session.updatedAt ?? session.reopenedAt).toLocaleString()}</p>}
-        <p className="hint">Plan v{session.planVersion} · generator {session.generatorVersion}</p>
       </Card>
       {session.plannedExercises.map((slot) => {
         const actual = session.actualExercises.find((a) => a.slotId === slot.slotId)

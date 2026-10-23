@@ -13,6 +13,9 @@ import { convertWeight, tidy } from '../engine/units'
 import { gapsMessage, requiredProfileGaps } from '../engine/levels'
 import { ageFromBirthDate } from '../engine/age'
 import { tracksOf } from '../engine/tracks'
+import { getSetting, setSetting } from './settings'
+import { painKey, type PainReport } from '../engine/pain'
+import { buildAdaptPlan } from '../engine/adapt'
 import { ALL_TRACKS, type Track } from '../engine/types'
 import type {
   ActualExercise, DayPlan, EquipmentId, EquipmentSet, GenerationResult, LocationType, Muscle, Profile, Sex, ScheduledWorkout,
@@ -338,6 +341,10 @@ export async function recentSoreness(today: string): Promise<Partial<Record<Musc
   return out
 }
 
+/** Today's pain check. null means the person has not answered yet; an empty report means "no pain". */
+export const getPain = (date: string) => getSetting<PainReport | null>(painKey(date), null)
+export const savePain = (date: string, report: PainReport) => setSetting(painKey(date), report)
+
 // ---------- generation (with cache) ----------
 /** What is missing before a personalised plan can be built, or an empty list. */
 export function profileGaps(p: Profile): string[] {
@@ -383,6 +390,8 @@ export async function generateFor(
     catalog: CATALOG, lastPerformance: buildLastPerformance(sessions, logs), lastDone: buildLastDone(sessions, logs),
     soreness, weightUnit: profile.weightUnit, cardioChoice: sched.cardioChoice, weightKg: profile.weightKg, sex: profile.sex, age: profile.age,
     gym: profile.preferredLocation === 'gym' ? profile.gymType : undefined,
+    pain: (await getSetting<PainReport | null>(painKey(opts.today), null)) ?? {},
+    adapt: buildAdaptPlan(sessions, logs, (id) => exerciseById(id)?.primaryMuscles[0]),
   }
   const { catalog: _catalog, ...rest } = input
   void _catalog

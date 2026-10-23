@@ -48,6 +48,7 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
   const healthW = useLiveQuery(() => db.healthWorkouts.toArray(), [], [] as HealthWorkoutRow[])
   const [rangeKey, setRangeKey] = useState<RangeKey>('30')
   const [shown, setShown] = useState<Category[]>(ALL_CATEGORIES)
+  const [histOpen, setHistOpen] = useState(true)
   const [exFilter, setExFilter] = useState('')
   const [month, setMonth] = useState('')
   const [trendEx, setTrendEx] = useState('')
@@ -198,7 +199,11 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
         </Card>
       )}
 
-      <Card title="History">
+      <Card>
+        <button type="button" className="collapse-head" aria-expanded={histOpen} aria-controls="history-body" onClick={() => setHistOpen((o) => !o)}>
+          <h2>History</h2><span className={`hist-chev${histOpen ? ' open' : ''}`} aria-hidden="true" />
+        </button>
+        <div id="history-body" hidden={!histOpen}>
         <div className="field"><label htmlFor="f-month">Month</label><input id="f-month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></div>
         <div className="field">
           <label htmlFor="f-ex">Exercise</label>
@@ -220,6 +225,7 @@ function ProgressResults({ profile, today }: { profile: Profile; today: string }
             </li>
           ))}
         </ul>
+        </div>
       </Card>
     </>
   )

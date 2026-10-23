@@ -1,8 +1,9 @@
 import { useLayoutEffect, useState } from 'react'
+import { PainCheck } from '../components/PainCheck'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
-import { generateFor, getEquipment, scheduledOn, setCardioChoice, startSession } from '../db/repo'
+import { generateFor, getEquipment, getPain, scheduledOn, setCardioChoice, startSession } from '../db/repo'
 import { useQuery } from '../hooks/app'
 import { ExerciseInfo, InfoButton } from '../components/ExerciseInfo'
 import { MUSCLE_CATEGORIES } from '../engine/feedback'
@@ -72,6 +73,7 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
   const equipment = useLiveQuery(() => getEquipment(profile.preferredLocation, profile.weightUnit, profile.gymType), [profile.preferredLocation, profile.weightUnit, profile.gymType])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const pain = useLiveQuery(() => getPain(today), [today])
   if (!sched?.workout) return null
   const w = sched.workout
   const cardio = w.exercises.find((e) => e.kind === 'cardio')
@@ -92,6 +94,8 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
     await regenerate(w.availableMinutes, true)
   }
   const resuming = sched.status === 'partial'
+  // The pain check comes before every fresh workout. Continuing a workout you already began does not need it again.
+  const painAnswered = pain !== undefined && pain !== null
   const startNew = async () => {
     setBusy(true)
     setError(null)
@@ -109,6 +113,7 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
   return (
     <>
       <ScreenHeader title={w.title} subtitle={w.targetMuscles.map((m) => MUSCLE_LABEL[m]).join(' · ') || 'Cardio'} />
+      {!resuming && <PainCheck today={today} onSaved={() => regenerate(w.availableMinutes, false)} />}
       <Card>
         <p className="big">About {w.estimatedMinutes} min</p>
         <p className="hint">(estimate, you chose {w.availableMinutes})</p>
@@ -192,7 +197,8 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
         </>
       ) : (
         <>
-          <ConfirmButton disabled={busy} confirm={{ title: 'Start this workout?', message: 'The timer starts now.' }} onConfirm={start}>Start workout</ConfirmButton>
+          {!painAnswered && <p className="hint">Answer the pain check above to start.</p>}
+          <ConfirmButton disabled={busy || !painAnswered} confirm={{ title: 'Start this workout?', message: 'The timer starts now.' }} onConfirm={start}>Start workout</ConfirmButton>
           <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Build a fresh version?', message: 'The exercises shown here are replaced with a new set.' }} onConfirm={() => regenerate(w.availableMinutes, true)}>Build a fresh version</ConfirmButton>
         </>
       )}

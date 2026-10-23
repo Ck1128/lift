@@ -10,7 +10,7 @@ import type { FoodItem, FoodState, PrepState, SizedUnit } from '../engine/food'
  *   id | English name | Telugu (letters) | Telugu (script) | other names | kcal | protein | carbs | fat | unit:grams | state
  * Lines with the same id become the raw / cooked versions of one food.
  */
-export const INDIAN_FOODS_VERSION = 'indian-1'
+export const INDIAN_FOODS_VERSION = 'indian-2'
 const SRC = 'Bundled Indian foods (typical home-style values, approximate)'
 
 const TABLE = `
@@ -421,6 +421,287 @@ garam-masala|Garam masala|garam masala|గరం మసాలా|masala powder|3
 salt-in|Salt|uppu|ఉప్పు|namak|0|0|0|0|tsp:6|ready
 ajwain|Ajwain (carom seeds)|vamu|వాము|ajowan,omam|305|15.4|43|25|tsp:2|ready
 poppy-seeds|Poppy seeds (khus khus)|gasagasalu|గసగసాలు|khus khus|525|18|28|42|tsp:3|ready
+# ---- more tiffins and breads ----
+rava-idli|Rava idli|rava idli|రవ్వ ఇడ్లీ|semolina idli|142|4.5|22|4|piece:60|ready
+ragi-dosa|Ragi dosa|ragi dosa|రాగి దోశ|finger millet dosa,ragi dosai|151|4|27|3|piece:80|ready
+neer-dosa|Neer dosa|neer dosa|నీర్ దోశ|rice crepe|140|2.5|28|2|piece:60|ready
+benne-dosa|Benne dosa (butter dosa)|benne dosa|బెన్నె దోశ|davangere dosa|208|4|30|8|piece:90|ready
+mysore-masala-dosa|Mysore masala dosa|mysore masala dosa|మైసూర్ మసాలా దోశ|red chutney dosa|201|4.5|30|7|piece:160|ready
+egg-dosa|Egg dosa|egg dosa|గుడ్డు దోశ|muttai dosai|171|7|20|7|piece:110|ready
+oats-dosa|Oats dosa|oats dosa|ఓట్స్ దోశ|oat dosa|147|5|25|3|piece:80|ready
+paper-dosa|Paper dosa|paper dosa|పేపర్ దోశ|crispy dosa|179|3.5|30|5|piece:100|ready
+onion-dosa|Onion dosa|onion dosa|ఉల్లిపాయ దోశ|onion uttapam dosa|160|4|27|4|piece:100|ready
+paniyaram|Paniyaram / ponganalu|ponganalu|పొంగనాలు|gunta ponganalu,kuzhi paniyaram|203|5|30|7|piece:25|ready
+idli-upma|Idli upma|idli upma|ఇడ్లీ ఉప్మా|leftover idli upma|166|4|24|6|cup:180|ready
+garelu|Garelu (vada)|garelu|గారెలు|minapa garelu,ulundu vadai|258|9|24|14|piece:45|ready
+sabudana-vada|Sabudana vada|sabudana vada|సగ్గుబియ్యం వడ|sago fritters|298|3|40|14|piece:50|ready
+akki-roti|Akki roti|akki rotti|అక్కి రొట్టె|rice flour roti|206|3|35|6|piece:80|ready
+jonna-rotte|Jonna rotte (jowar roti, plain)|jonna rotte|జొన్న రొట్టె|jowar bhakri|335|10|70|1.7|piece:60|ready
+sarva-pindi|Sarva pindi|sarva pindi|సర్వ పిండి|rice flour pancake,thapala chekka|241|5|35|9|piece:90|ready
+dibba-rotte|Dibba rotte|dibba rotte|దిబ్బ రొట్టె|thick black gram dosa|215|8|30|7|piece:120|ready
+pulka|Pulka / phulka (no ghee)|pulka|పుల్కా|phulka,roti without oil|243|9|45|3|piece:35|ready
+tandoori-roti|Tandoori roti|tandoori roti|తందూరి రోటీ|tandoor roti|254|9|50|2|piece:60|ready
+butter-naan|Butter naan|butter naan|బటర్ నాన్|butter naan|303|8.5|47|9|piece:90|ready
+kulcha|Kulcha (plain)|kulcha|కుల్చా|amritsari kulcha|286|8|50|6|piece:80|ready
+makki-roti|Makki di roti|makki roti|మక్కి రోటీ|corn roti|300|6|60|4|piece:70|ready
+gobi-paratha|Gobi paratha|gobi paratha|గోబీ పరాఠా|cauliflower paratha|245|6|35|9|piece:90|ready
+methi-paratha|Methi paratha|methi paratha|మెంతి పరాఠా|fenugreek paratha|261|7|38|9|piece:70|ready
+mooli-paratha|Mooli paratha|mooli paratha|ముల్లంగి పరాఠా|radish paratha|249|6|36|9|piece:90|ready
+poori-bhaji|Poori with potato bhaji|poori bhaji|పూరీ భాజీ|puri aloo|248|5|30|12|serving:200|ready
+chole-bhature|Chole bhature|chole bhature|ఛోలే భటూరే|chana bhatura|269|8|30|13|serving:300|ready
+misal-pav|Misal pav|misal pav|మిసల్ పావ్|usal pav|200|7|25|8|serving:300|ready
+thalipeeth|Thalipeeth|thalipeeth|తాలిపీఠ్|multigrain flatbread|264|8|40|8|piece:80|ready
+dalia|Dalia (broken wheat porridge)|godhuma ravva ganji|గోధుమ రవ్వ గంజి|daliya,cracked wheat porridge|104|3.5|18|2|cup:200|ready
+dalia-raw|Dalia (broken wheat), dry|godhuma ravva|గోధుమ రవ్వ|cracked wheat,lapsi|350|12|72|1.5|cup:160|raw
+veg-sandwich|Vegetable sandwich|veg sandwich|వెజ్ శాండ్‌విచ్|bread sandwich|236|7|34|8|piece:140|ready
+bread-omelette|Bread omelette|bread omelette|బ్రెడ్ ఆమ్లెట్|egg sandwich|236|10|22|12|serving:150|ready
+brown-bread|Brown bread slice|brown bread|బ్రౌన్ బ్రెడ్|whole wheat bread|248|11|43|3.5|piece:30|ready
+white-bread|White bread slice|white bread|వైట్ బ్రెడ్|milk bread|264|9|49|3.5|piece:25|ready
+bun-plain|Bun (plain)|bun|బన్|burger bun,dinner roll|272|9|50|4|piece:60|ready
+muesli|Muesli|muesli|ముస్లీ|granola|367|10|66|7|cup:60|ready
+vangi-bath|Vangi bath|vangi bath|వంకాయ అన్నం|brinjal rice|183|3|27|7|cup:200|ready
+kesari-bath|Kesari bath|kesari bath|కేసరి బాత్|rava kesari|310|3|52|10|cup:150|ready
+# ---- more rice dishes ----
+brown-rice|Brown rice|brown rice|దంపుడు బియ్యం|red rice,hand pounded rice|362|7.5|77|2.7|cup:190|raw
+brown-rice-cooked|Brown rice, cooked|brown rice annam|దంపుడు బియ్యం అన్నం|brown rice cooked|110|2.6|23|0.9|cup:195|ready
+white-rice-cooked|Rice, cooked (white)|annam|అన్నం|cooked rice,sadam,steamed rice|126|2.7|28|0.3|cup:160|ready
+bagara-annam|Bagara annam|bagara annam|బగారా అన్నం|bagara rice|186|3|30|6|cup:180|ready
+pappu-annam|Pappu annam (dal rice)|pappu annam|పప్పు అన్నం|dal chawal|149|4.5|26|3|cup:220|ready
+rajma-chawal|Rajma chawal|rajma chawal|రాజ్మా చావల్|rajma rice|151|5|26|3|serving:350|ready
+mushroom-biryani|Mushroom biryani|mushroom biryani|మష్రూమ్ బిర్యానీ|mushroom dum biryani|178|4|27|6|cup:250|ready
+kheema-pulao|Kheema pulao|kheema pulao|కీమా పులావ్|mutton mince rice|204|8|25|8|cup:250|ready
+matar-pulao|Matar pulao|matar pulao|బఠాణీ పులావ్|peas pulao|171|3.5|28|5|cup:200|ready
+haleem|Haleem|haleem|హలీమ్|hyderabadi haleem|148|9|10|8|cup:250|ready
+millet-pongal|Millet pongal|millet pongal|చిరుధాన్యాల పొంగలి|korra pongal,foxtail pongal|161|5|24|5|cup:200|ready
+daddojanam|Daddojanam|daddojanam|దద్దోజనం|temple curd rice|144|3|24|4|cup:220|ready
+chitrannam|Chitrannam (mixed rice)|chitrannam|చిత్రాన్నం|lemon tamarind rice|186|3|30|6|cup:200|ready
+egg-fried-rice|Egg fried rice|egg fried rice|ఎగ్ ఫ్రైడ్ రైస్|egg rice|199|6|28|7|cup:200|ready
+schezwan-fried-rice|Schezwan fried rice|schezwan rice|షెజ్వాన్ రైస్|szechuan rice|199|4|30|7|cup:200|ready
+veg-hakka-noodles|Veg hakka noodles|hakka noodles|హక్కా నూడుల్స్|chow mein,chowmein|182|4|28|6|cup:180|ready
+noodles-instant-cooked|Instant noodles, cooked|instant noodles|ఇన్‌స్టంట్ నూడుల్స్|ramen|152|4.5|20|6|cup:200|ready
+pasta-cooked|Pasta, cooked|pasta|పాస్తా|macaroni,spaghetti|155|5.8|31|0.9|cup:140|ready
+# ---- more dals and curries ----
+chana-dal-fry|Chana dal fry|chana dal fry|సెనగపప్పు ఫ్రై|bengal gram dal curry|128|7|16|4|cup:200|ready
+dal-palak|Dal palak (spinach dal)|palakura pappu|పాలకూర పప్పు|spinach dal|87|5|10|3|cup:200|ready
+mixed-dal|Mixed dal|mixed dal|మిక్స్డ్ పప్పు|panchmel dal|111|6|15|3|cup:200|ready
+moong-dal-tadka|Moong dal tadka|pesara pappu|పెసర పప్పు|yellow moong dal|101|5.5|13|3|cup:200|ready
+masoor-dal-curry|Masoor dal curry|masoor dal|మసూర్ పప్పు|red lentil curry|101|5.5|13|3|cup:200|ready
+kandi-pappu|Pappu (toor dal curry)|kandi pappu|కందిపప్పు|plain dal,arhar dal|107|6|14|3|cup:200|ready
+pappu-charu|Pappu charu|pappu charu|పప్పుచారు|dal rasam|46|2|6|1.5|cup:200|ready
+pachi-pulusu|Pachi pulusu|pachi pulusu|పచ్చి పులుసు|raw tamarind rasam|27|0.5|4|1|cup:200|ready
+tomato-curry|Tomato curry|tomato kura|టమాటా కూర|tomato gravy|83|1.5|8|5|cup:200|ready
+baingan-masala|Baingan masala|vankaya masala|వంకాయ మసాలా|brinjal masala|103|2|8|7|cup:200|ready
+bhindi-masala|Bhindi masala|bendakaya masala|బెండకాయ మసాలా|okra masala|105|2.5|8|7|cup:150|ready
+dum-aloo|Dum aloo|dum aloo|దమ్ ఆలూ|kashmiri dum aloo|138|2.5|14|8|cup:200|ready
+aloo-matar|Aloo matar|aloo matar|ఆలూ బఠాణీ|potato peas curry|120|3.5|13|6|cup:200|ready
+aloo-methi|Aloo methi|aloo menthi|ఆలూ మెంతి|potato fenugreek|122|3|14|6|cup:150|ready
+aloo-capsicum|Aloo capsicum|aloo capsicum|ఆలూ క్యాప్సికమ్|potato capsicum fry|114|2|13|6|cup:150|ready
+veg-korma|Vegetable korma|veg kurma|వెజ్ కుర్మా|mixed veg kurma|142|3|10|10|cup:200|ready
+malai-kofta|Malai kofta|malai kofta|మలై కోఫ్తా|paneer kofta|212|5|12|16|serving:200|ready
+shahi-paneer|Shahi paneer|shahi paneer|షాహీ పనీర్|paneer in cream gravy|221|9|8|17|cup:200|ready
+paneer-korma|Paneer korma|paneer kurma|పనీర్ కుర్మా|paneer in korma|199|9|7|15|cup:200|ready
+mushroom-masala|Mushroom masala|mushroom masala|మష్రూమ్ మసాలా|mushroom curry|116|4|7|8|cup:200|ready
+sarson-saag|Sarson ka saag|sarson ka saag|సర్సోన్ కా సాగ్|mustard greens curry|94|3|7|6|cup:200|ready
+lauki-kofta|Lauki kofta|sorakaya kofta|సొరకాయ కోఫ్తా|bottle gourd kofta|133|3|10|9|serving:200|ready
+tindora-fry|Tindora fry|dondakaya fry|దొండకాయ ఫ్రై|ivy gourd fry|101|1.5|8|7|cup:100|ready
+cabbage-poriyal|Cabbage poriyal|cabbage kura|క్యాబేజీ కూర|cabbage stir fry|72|2|7|4|cup:100|ready
+beans-poriyal|Beans poriyal|beans kura|బీన్స్ కూర|french beans stir fry|78|2.5|8|4|cup:100|ready
+carrot-poriyal|Carrot poriyal|carrot kura|క్యారెట్ కూర|carrot stir fry|82|1.5|10|4|cup:100|ready
+gummadikaya-kura|Pumpkin curry|gummadikaya kura|గుమ్మడికాయ కూర|kaddu sabzi|73|1.2|8|4|cup:150|ready
+aratikaya-fry|Raw banana fry|aratikaya fry|అరటికాయ వేపుడు|kela fry,vazhakkai fry|158|1.5|20|8|cup:100|ready
+chintakaya-pachadi|Tamarind chutney (chintapandu pachadi)|chintapandu pachadi|చింతపండు పచ్చడి|imli chutney|202|1|45|2|tbsp:15|ready
+kobbari-pachadi|Coconut chutney, thick|kobbari pachadi|కొబ్బరి పచ్చడి|nariyal chutney|228|3|9|20|tbsp:15|ready
+perugu-pachadi|Perugu pachadi (curd chutney)|perugu pachadi|పెరుగు పచ్చడి|curd salad|57|2.5|5|3|cup:150|ready
+nalla-karam|Nalla karam / karivepaku podi|karivepaku karam|కరివేపాకు కారం|curry leaf podi|433|12|40|25|tsp:4|ready
+nuvvula-podi|Nuvvula podi (sesame podi)|nuvvula karam|నువ్వుల కారం|til podi|488|14|18|40|tsp:4|ready
+kandi-podi|Kandi podi|kandi podi|కంది పొడి|toor dal podi|395|20|45|15|tsp:4|ready
+# ---- non-vegetarian, more ----
+chicken-korma|Chicken korma|chicken kurma|చికెన్ కుర్మా|chicken in korma|176|12|5|12|cup:200|ready
+chicken-masala|Chicken masala|chicken masala|చికెన్ మసాలా|chicken tikka masala|162|14|4|10|cup:200|ready
+chicken-do-pyaza|Chicken do pyaza|chicken do pyaza|చికెన్ దో ప్యాజా|onion chicken curry|153|13|5|9|cup:200|ready
+pepper-chicken|Pepper chicken|pepper chicken|పెప్పర్ చికెన్|chicken pepper fry|182|20|3|10|serving:150|ready
+chettinad-chicken|Chettinad chicken|chettinad chicken|చెట్టినాడ్ చికెన్|spicy chicken curry|175|15|4|11|cup:200|ready
+chicken-breast-raw|Chicken breast, raw|chicken breast|చికెన్ బ్రెస్ట్|chicken boneless,skinless|113|22.5|0|2.6|serving:100|raw
+chicken-breast-cooked|Chicken breast, cooked (plain)|chicken breast cooked|ఉడికించిన చికెన్ బ్రెస్ట్|grilled chicken breast|156|31|0|3.6|serving:100|cooked
+chicken-thigh-raw|Chicken thigh, raw (skinless)|chicken thigh|చికెన్ తొడ|chicken leg boneless|152|20|0|8|serving:100|raw
+chicken-liver|Chicken liver, cooked|chicken liver|చికెన్ లివర్|liver fry|158|24|1|6.5|serving:100|cooked
+chicken-soup|Chicken soup|chicken soup|చికెన్ సూప్|clear chicken soup|29|3|2|1|cup:240|ready
+chicken-pakora|Chicken pakora|chicken pakora|చికెన్ పకోడీ|chicken pakoda|252|17|10|16|serving:100|ready
+chilli-chicken|Chilli chicken|chilli chicken|చిల్లీ చికెన్|dry chilli chicken|221|16|10|13|serving:150|ready
+chicken-manchurian|Chicken manchurian|chicken manchurian|చికెన్ మంచూరియా|manchurian|173|11|12|9|serving:150|ready
+rogan-josh|Mutton rogan josh|rogan josh|రోగన్ జోష్|kashmiri mutton curry|190|13|3|14|cup:200|ready
+mutton-korma|Mutton korma|mutton kurma|మటన్ కుర్మా|goat korma|212|13|4|16|cup:200|ready
+mutton-pepper-fry|Mutton pepper fry|mutton pepper fry|మటన్ పెప్పర్ ఫ్రై|goat pepper fry|230|22|4|14|serving:150|ready
+mutton-liver|Mutton liver fry|mutton liver|మటన్ లివర్|goat liver fry,boti|193|23|5|9|serving:100|ready
+mutton-paya|Paya (trotters soup)|paya|పాయా|goat trotter soup|85|8|2|5|cup:240|ready
+seekh-kebab|Seekh kebab|seekh kebab|సీక్ కబాబ్|mutton seekh|241|18|4|17|piece:50|ready
+shami-kebab|Shami kebab|shami kebab|షామీ కబాబ్|mutton shami|204|14|10|12|piece:40|ready
+chicken-kebab|Chicken kebab|chicken kebab|చికెన్ కబాబ్|reshmi kebab|164|20|3|8|piece:40|ready
+tuna-canned|Tuna, canned in water|tuna|ట్యూనా|canned tuna|109|25|0|1|serving:100|ready
+salmon-cooked|Salmon, cooked|salmon|సాల్మన్|salmon fish|196|22|0|12|serving:100|cooked
+seer-fish|Seer fish (vanjaram), raw|vanjaram|వంజరం|king fish,surmai,neymeen|98|20|0|2|serving:100|raw
+catla|Catla fish, raw|bochcha|బొచ్చె|katla|86|17|0|2|serving:100|raw
+mackerel|Mackerel (bangda), raw|kanagalu|కనగలు|bangda,ayala|139|19|0|7|serving:100|raw
+tilapia|Tilapia, raw|tilapia|టిలాపియా|chitralada,jalebi fish|98|20|0|2|serving:100|raw
+prawns-raw|Prawns, raw|royyalu|రొయ్యలు|shrimp,jhinga|89|20|0|1|serving:100|raw
+prawn-masala|Prawn masala|royyala kura|రొయ్యల కూర|prawn curry thick|153|13|5|9|cup:200|ready
+tawa-fish|Tawa fish fry|chepa vepudu|చేప వేపుడు|fish tawa fry,fish fry masala|199|20|5|11|serving:100|ready
+fish-pulusu|Fish pulusu|chepala pulusu|చేపల పులుసు|tamarind fish curry,meen kuzhambu|110|11|3|6|cup:200|ready
+apollo-fish|Apollo fish|apollo fish|అపోలో ఫిష్|fish fry hyderabadi|230|16|10|14|serving:120|ready
+squid|Squid / calamari, raw|squid|స్క్విడ్|calamari,kanava|89|16|3|1.4|serving:100|raw
+egg-raw|Egg, whole raw|kodi guddu|కోడి గుడ్డు|egg,anda|139|12.6|0.7|9.5|piece:50|raw
+egg-white|Egg white|guddu tella sua|గుడ్డు తెల్లసొన|egg white boiled|49|11|0.7|0.2|piece:33|ready
+omelette-plain|Omelette (2 eggs)|omelette|ఆమ్లెట్|egg omelet|172|10.5|1|14|piece:110|ready
+egg-roll|Egg roll (kathi roll)|egg roll|ఎగ్ రోల్|egg kathi roll|234|8|28|10|piece:180|ready
+quail-egg|Quail egg, boiled|pitta guddu|పిట్ట గుడ్డు|kaada egg|153|13|0.4|11|piece:10|ready
+# ---- more snacks and street food ----
+bonda-mysore|Mysore bonda|mysore bonda|మైసూర్ బజ్జీ|goli baje,urad bonda|324|6|30|20|piece:30|ready
+aloo-bajji|Aloo bajji|aloo bajji|ఆలూ బజ్జీ|potato bajji|275|5|30|15|piece:40|ready
+vankaya-bajji|Brinjal bajji|vankaya bajji|వంకాయ బజ్జీ|eggplant fritter|255|5|25|15|piece:40|ready
+veg-cutlet|Vegetable cutlet|veg cutlet|వెజ్ కట్లెట్|veg patty|214|5|26|10|piece:60|ready
+veg-spring-roll|Veg spring roll|spring roll|స్ప్రింగ్ రోల్|veg roll|239|5|30|11|piece:70|ready
+aloo-tikki|Aloo tikki|aloo tikki|ఆలూ టిక్కీ|potato patty|202|4|24|10|piece:60|ready
+ragda-pattice|Ragda pattice|ragda pattice|రగడా ప్యాటీస్|ragda patties|183|6|24|7|serving:250|ready
+sev-puri|Sev puri|sev puri|సేవ్ పూరి|papdi chaat|290|6|35|14|serving:150|ready
+dabeli|Dabeli|dabeli|డబేలి|kutchi dabeli|263|6|35|11|piece:120|ready
+kathi-roll|Paneer kathi roll|paneer roll|పనీర్ రోల్|paneer frankie|256|9|28|12|piece:200|ready
+chakli|Chakli / murukku (rice)|chakralu|చక్రాలు|chakli|446|7|55|22|piece:20|ready
+ribbon-pakoda|Ribbon pakoda|ribbon pakodi|రిబ్బన్ పకోడీ|ola pakoda|510|10|50|30|serving:30|ready
+kara-boondi|Kara boondi|kara boondi|కారబూంది|boondi,khara boondi|521|11|45|33|serving:30|ready
+banana-chips|Banana chips|arati chips|అరటి చిప్స్|kerala banana chips|539|2.5|58|33|serving:30|ready
+gavvalu|Gavvalu|gavvalu|గవ్వలు|sweet shells|458|5|60|22|serving:30|ready
+janthikalu|Janthikalu|janthikalu|జంతికలు|jantikalu,murukulu|470|9|50|26|serving:30|ready
+nippattu|Nippattu / thattai|nippattu|నిప్పట్టు|thattai,rice chips|473|7|55|25|piece:20|ready
+khakhra|Khakhra|khakhra|ఖాఖ్రా|gujarati crackers|402|13|65|10|piece:20|ready
+fafda|Fafda|fafda|ఫాఫ్డా|gathiya|502|13|45|30|serving:40|ready
+bhakarwadi|Bhakarwadi|bhakarwadi|భాకర్‌వడి|bakarwadi|518|7|55|30|piece:20|ready
+gobi-manchurian|Gobi manchurian|gobi manchurian|గోబీ మంచూరియా|cauliflower manchurian|186|4|20|10|serving:150|ready
+paneer-65|Paneer 65|paneer 65|పనీర్ 65|paneer fry|264|11|10|20|serving:120|ready
+chilli-paneer|Chilli paneer|chilli paneer|చిల్లీ పనీర్|paneer chilli dry|229|11|8|17|serving:150|ready
+baby-corn-manchurian|Baby corn manchurian|baby corn manchurian|బేబీ కార్న్ మంచూరియా|baby corn fry|182|3|20|10|serving:150|ready
+pizza-slice|Pizza, cheese (1 slice)|pizza|పిజ్జా|margherita pizza|266|11|33|10|piece:100|ready
+burger-veg|Veg burger|veg burger|వెజ్ బర్గర్|aloo tikki burger|242|8|30|10|piece:150|ready
+burger-chicken|Chicken burger|chicken burger|చికెన్ బర్గర్|zinger burger|260|13|25|12|piece:180|ready
+momos-chicken|Chicken momos|chicken momos|చికెన్ మోమోస్|steamed chicken dumplings|152|9|20|4|piece:30|ready
+white-sauce-pasta|White sauce pasta|white sauce pasta|వైట్ సాస్ పాస్తా|alfredo pasta|193|6|22|9|cup:200|ready
+cake-plain|Cake, sponge (plain)|cake|కేక్|vanilla cake|379|5|56|15|piece:60|ready
+cookies|Cookies / biscuits (butter)|cookies|కుకీస్|butter biscuit,osmania biscuit|464|6|65|20|piece:12|ready
+digestive-biscuit|Digestive biscuit|digestive biscuit|డైజెస్టివ్ బిస్కెట్|wheat biscuit|468|7|65|20|piece:15|ready
+donut|Doughnut|donut|డోనట్|doughnut|398|5|45|22|piece:60|ready
+chocolate-dark|Dark chocolate|dark chocolate|డార్క్ చాక్లెట్|70 percent chocolate|590|8|45|42|piece:10|ready
+chocolate-milk-bar|Milk chocolate|milk chocolate|మిల్క్ చాక్లెట్|dairy milk,chocolate bar|530|7|58|30|piece:10|ready
+# ---- more sweets ----
+boondi-laddu|Boondi laddu|boondi laddu|బూందీ లడ్డూ|motichoor ladoo,tirupati laddu|458|7|58|22|piece:40|ready
+nuvvula-laddu|Nuvvula laddu (sesame)|nuvvula laddu|నువ్వుల లడ్డు|til ladoo|506|11|48|30|piece:30|ready
+kajjikayalu|Kajjikayalu|kajjikayalu|కజ్జికాయలు|karjikai,gujiya|444|5|52|24|piece:40|ready
+malpua|Malpua|malpua|మాల్పువా|sweet pancake|396|4|50|20|piece:50|ready
+paramannam|Paramannam / rice kheer|paramannam|పరమాన్నం|payasam,payasa|161|3|26|5|cup:150|ready
+pala-payasam|Pal payasam|pala payasam|పాలపాయసం|milk payasam|153|3|24|5|cup:150|ready
+kalakand|Kalakand|kalakand|కలాకండ్|milk cake|331|9|40|15|piece:30|ready
+peda|Peda|peda|పేడా|milk peda,doodh peda|404|10|55|16|piece:20|ready
+imarti|Imarti|imarti|ఇమర్తి|jangiri|410|4|58|18|piece:40|ready
+balushahi|Balushahi|balushahi|బాలుషాహి|badusha|450|5|58|22|piece:50|ready
+soan-papdi|Soan papdi|soan papdi|సోన్ పాపిడి|patisa|436|6|58|20|piece:25|ready
+rabri|Rabri|rabri|రబ్డీ|rabdi|236|7|25|12|cup:100|ready
+shrikhand|Shrikhand|shrikhand|శ్రీఖండ్|sweet hung curd|220|5|32|8|cup:100|ready
+basundi|Basundi|basundi|బాసుంది|sweetened thick milk|189|5|22|9|cup:150|ready
+phirni|Phirni|phirni|ఫిర్నీ|rice pudding|149|4|22|5|cup:120|ready
+moong-dal-halwa|Moong dal halwa|pesara pappu halwa|పెసరపప్పు హల్వా|moong halwa|366|7|35|22|cup:100|ready
+badam-halwa|Badam halwa|badam halwa|బాదం హల్వా|almond halwa|444|8|40|28|cup:80|ready
+pumpkin-halwa|Pumpkin halwa|gummadikaya halwa|గుమ్మడికాయ హల్వా|kaddu halwa|222|3|30|10|cup:100|ready
+poornalu|Poornalu / boorelu|poornalu|పూర్ణాలు|burelu|366|5|55|14|piece:40|ready
+pootharekulu|Pootharekulu|pootharekulu|పూతరేకులు|paper sweet|398|3|65|14|piece:40|ready
+dry-fruit-laddu|Dry fruit laddu|dry fruit laddu|డ్రై ఫ్రూట్ లడ్డు|dates nut ladoo|430|8|50|22|piece:30|ready
+til-chikki|Til chikki|nuvvula chikki|నువ్వుల చిక్కీ|sesame brittle|513|12|60|25|piece:25|ready
+kozhukattai|Kozhukattai / modak|kudumulu|కుడుములు|modak,ukdiche modak|176|3|32|4|piece:40|ready
+mishti-doi|Mishti doi|mishti doi|మిష్టి దోయ్|sweet curd|138|3.5|22|4|cup:100|ready
+chamcham|Cham cham|cham cham|చమ్ చమ్|chum chum|249|6|45|5|piece:50|ready
+ice-cream|Ice cream (vanilla)|ice cream|ఐస్ క్రీమ్|vanilla ice cream|209|3.5|24|11|cup:100|ready
+# ---- more drinks ----
+lassi-salted|Salted lassi|uppu lassi|ఉప్పు లస్సీ|namkeen lassi,chaas thick|58|3.3|4.5|3|cup:250|ready
+nannari|Nannari sharbat|nannari sharbat|నన్నారి షర్బత్|sarsaparilla drink|80|0.1|20|0|cup:200|ready
+rose-milk|Rose milk|rose milk|రోజ్ మిల్క్|rose flavoured milk|87|3|12|3|cup:250|ready
+mango-shake|Mango shake|mango shake|మామిడి షేక్|mango milkshake|101|2.5|16|3|cup:250|ready
+banana-shake|Banana shake|banana shake|అరటి షేక్|banana milkshake|95|3|14|3|cup:250|ready
+orange-juice|Orange juice|orange juice|నారింజ రసం|fresh juice,mosambi juice|45|0.7|10|0.2|cup:240|ready
+apple-juice|Apple juice|apple juice|ఆపిల్ రసం|fruit juice|47|0.1|11.5|0.1|cup:240|ready
+coffee-milk-sugar|Coffee with milk and sugar|coffee|కాఫీ|tea coffee with sugar,kaapi|59|1.8|9|1.8|cup:150|ready
+black-coffee|Black coffee (no sugar)|black coffee|బ్లాక్ కాఫీ|americano|0|0.1|0|0|cup:240|ready
+green-tea|Green tea|green tea|గ్రీన్ టీ|tea without milk|0|0|0|0|cup:240|ready
+chai-sugar|Tea with milk and sugar (chai)|chai|చాయ్|tea|60|1.5|10|1.5|cup:150|ready
+horlicks|Horlicks / Bournvita drink (with milk)|horlicks|హార్లిక్స్|malt drink,boost|88|3.5|13|2.5|cup:250|ready
+soy-milk|Soy milk|soya milk|సోయా పాలు|soya milk unsweetened|35|3.3|1.5|1.8|cup:240|ready
+almond-milk|Almond milk (unsweetened)|badam paalu|బాదం పాలు|almond beverage|13|0.5|0.3|1.1|cup:240|ready
+coconut-milk|Coconut milk|kobbari paalu|కొబ్బరి పాలు|thengai paal|249|2.3|6|24|cup:240|ready
+sattu-drink|Sattu drink|sattu|సత్తు|roasted gram drink|105|6|18|1|cup:250|ready
+sattu-flour|Sattu flour|sattu pindi|సత్తు పిండి|roasted gram flour|394|20|65|6|tbsp:15|ready
+panakam|Panakam|panakam|పానకం|jaggery ginger drink|60|0.1|15|0|cup:200|ready
+kokum-sherbet|Kokum sharbat|kokum sharbat|కోకుమ్ షర్బత్|kokam juice|60|0.1|15|0|cup:200|ready
+whey-protein|Whey protein powder|whey protein|వే ప్రోటీన్|protein powder,protein shake|398|78|8|6|piece:30|ready
+cola|Cola / soft drink|cold drink|కూల్ డ్రింక్|coke,pepsi,thums up|42|0|10.6|0|cup:250|ready
+# ---- more fruits ----
+banana-yelakki|Banana, yelakki (small)|yelakki arati pandu|యాలకి అరటి పండు|elaichi banana|100|1.3|23|0.3|piece:60|raw
+banana-red|Banana, red|erra arati pandu|ఎర్ర అరటి పండు|red banana|96|1.3|22|0.3|piece:100|raw
+pear|Pear|pear|బేరి పండు|nashpati|62|0.4|15|0.1|piece:170|raw
+plum|Plum|plum|ప్లం|aloo bukhara|50|0.7|11|0.3|piece:65|raw
+peach|Peach|peach|పీచ్|aadu|46|0.9|10|0.3|piece:150|raw
+cherry|Cherries|cherry|చెర్రీ|cherry fruit|70|1|16|0.2|cup:140|raw
+strawberry|Strawberries|strawberry|స్ట్రాబెర్రీ|strawberry fruit|36|0.7|7.7|0.3|cup:150|raw
+blueberry|Blueberries|blueberry|బ్లూబెర్రీ|blueberry fruit|62|0.7|14|0.3|cup:150|raw
+dragon-fruit|Dragon fruit|dragon fruit|డ్రాగన్ ఫ్రూట్|kamalam|52|1.2|11|0.4|piece:200|raw
+avocado|Avocado|avocado|అవకాడో|butter fruit|177|2|8.5|15|piece:150|raw
+star-fruit|Star fruit|star fruit|స్టార్ ఫ్రూట్|kamrakh|35|1|7|0.3|piece:90|raw
+ber|Ber (Indian jujube)|regu pandu|రేగు పండు|regi pallu,jujube|72|0.8|17|0.1|piece:15|raw
+taati-munjalu|Ice apple (palmyra fruit)|taati munjalu|తాటి ముంజలు|nungu,palm fruit|40|0.8|9|0.1|piece:40|raw
+pomelo|Pomelo|pomelo|పెద్ద బత్తాయి|chakotra|43|0.8|10|0|cup:190|raw
+mosambi|Mosambi (sweet lime)|batayi|బత్తాయి|musambi|45|0.8|10|0.2|piece:120|raw
+mixed-fruit-bowl|Mixed fruit bowl|fruit salad|ఫ్రూట్ సలాడ్|fruit chaat|54|0.8|12|0.3|cup:150|ready
+dried-apricot|Dried apricot|dried apricot|ఎండిన ఆప్రికాట్|khubani dry|270|3.4|63|0.5|piece:8|ready
+prunes|Prunes|prunes|ప్రూన్స్|dried plum|268|2.2|64|0.4|piece:9|ready
+# ---- more vegetables ----
+broccoli|Broccoli|broccoli|బ్రోకలీ|broccoli florets|43|2.8|7|0.4|cup:90|raw
+zucchini|Zucchini|zucchini|జుకినీ|courgette|20|1.2|3.1|0.3|piece:190|raw
+parwal|Pointed gourd (parwal)|parwal|పర్వల్|potol,kommu dondakaya|20|2|2.2|0.3|cup:100|raw
+turai|Ridge gourd curry (turai sabzi)|beerakaya kura|బీరకాయ కూర|turai sabzi|66|1.5|6|4|cup:150|ready
+kohlrabi|Kohlrabi|knol khol|నోల్ ఖోల్|navilkosu|32|1.7|6.2|0.1|piece:130|raw
+raw-papaya|Raw papaya|papaya kaya|బొప్పాయి కాయ|green papaya|39|0.6|9|0.1|cup:140|raw
+baby-corn|Baby corn|baby corn|బేబీ కార్న్|young corn|36|2.2|6|0.4|piece:15|raw
+jackfruit-seeds|Jackfruit seeds, boiled|panasa pottu|పనస గింజలు|halasina beeja|182|6.6|38|0.4|piece:10|cooked
+lettuce|Lettuce|lettuce|లెట్యూస్|salad leaves|19|1.4|2.9|0.2|cup:50|raw
+shallots|Small onions (sambar onion)|chinna ullipaya|చిన్న ఉల్లిపాయలు|shallots,pearl onion|79|2.5|17|0.1|piece:20|raw
+onion-white|Onion, white|vellulli|తెల్ల ఉల్లి|white onion|41|1.1|9|0.1|piece:110|raw
+garlic-raw|Garlic|vellulli pothulu|వెల్లుల్లి|lahsun|162|6.4|33|0.5|piece:3|raw
+ginger-garlic-paste|Ginger garlic paste|allam vellulli paste|అల్లం వెల్లుల్లి పేస్ట్|ginger garlic masala|76|3|15|0.5|tsp:6|ready
+olives|Olives|olives|ఆలివ్స్|green olives|117|0.8|3.8|11|piece:4|ready
+tofu|Tofu|tofu|టోఫు|soya paneer,bean curd|83|8|2|4.8|piece:100|ready
+# ---- more dairy, nuts and pantry ----
+cheese-slice|Cheese slice (processed)|cheese slice|చీజ్ స్లైస్|amul cheese|299|18|5|23|piece:20|ready
+mozzarella|Mozzarella cheese|mozzarella|మోజరెల్లా|pizza cheese|295|22|2.2|22|piece:28|ready
+cream|Fresh cream (malai)|malai|మీగడ|cream,fresh cream|245|2|3|25|tbsp:15|ready
+condensed-milk|Condensed milk (sweetened)|condensed milk|కండెన్స్డ్ మిల్క్|milkmaid|333|8|55|9|tbsp:20|ready
+skim-milk|Skimmed milk|skim milk|స్కిమ్డ్ మిల్క్|fat free milk|34|3.4|5|0.1|cup:245|ready
+toned-milk|Toned milk|toned milk|టోన్డ్ మిల్క్|packet milk|59|3.1|4.8|3|cup:245|ready
+greek-yogurt|Greek yogurt (plain)|greek yogurt|గ్రీక్ యోగర్ట్|hung curd|70|9|4|2|cup:200|ready
+curd-low-fat|Curd, low fat|low fat curd|తక్కువ కొవ్వు పెరుగు|skim curd|50|4|5|1.5|cup:245|ready
+peanut-butter|Peanut butter|peanut butter|పీనట్ బటర్|groundnut butter|630|25|20|50|tbsp:16|ready
+pumpkin-seeds|Pumpkin seeds|gummadi ginjalu|గుమ్మడి గింజలు|pepitas|605|30|11|49|tbsp:9|ready
+sunflower-seeds|Sunflower seeds|pottu tirugudu ginjalu|పొద్దుతిరుగుడు గింజలు|surajmukhi seeds|623|21|20|51|tbsp:9|ready
+chia-seeds|Chia seeds|chia ginjalu|చియా గింజలు|chia|515|17|42|31|tbsp:12|ready
+watermelon-seeds|Watermelon seeds (magaz)|puchakaya ginjalu|పుచ్చకాయ గింజలు|char magaz|595|28|15|47|tbsp:9|ready
+mixed-dry-fruits|Mixed dry fruits and nuts|dry fruits|డ్రై ఫ్రూట్స్|trail mix|555|15|45|35|serving:30|ready
+protein-bar|Protein bar|protein bar|ప్రోటీన్ బార్|energy bar|400|33|40|12|piece:50|ready
+makhana-roasted|Makhana, roasted|makhana roasted|వేయించిన మఖానా|phool makhana roasted,fox nuts|356|9.7|77|1|cup:30|ready
+moth-beans|Moth beans (matki), dry|matki|మటికి|matki,moth dal|354|23|62|1.6|cup:190|raw
+soybean|Soybeans, dry|soya ginjalu|సోయా గింజలు|soya bean|444|36|30|20|cup:180|raw
+white-peas|White peas, dry|safed matar|తెల్ల బఠాణీ|dried white peas|341|20|62|1.4|cup:200|raw
+field-beans|Field beans (chikkudu), cooked|chikkudu ginjalu|చిక్కుడు గింజలు|val beans,avarekalu|116|8|20|0.5|cup:170|cooked
+tomato-ketchup|Tomato ketchup|tomato ketchup|టమాటా కెచప్|tomato sauce|115|1.2|27|0.2|tbsp:17|ready
+mayonnaise|Mayonnaise|mayonnaise|మయోనైస్|mayo|691|1.1|3|75|tbsp:14|ready
+soy-sauce|Soy sauce|soy sauce|సోయా సాస్|soya sauce|53|8|5|0.1|tbsp:16|ready
+green-chutney|Green chutney (mint coriander)|green chutney|పచ్చి చట్నీ|hari chutney|63|2|7|3|tbsp:15|ready
+sambar-powder|Sambar powder|sambar podi|సాంబార్ పొడి|sambar masala|342|13|50|10|tsp:3|ready
+sugar-brown|Brown sugar / jaggery powder|bellam podi|బెల్లం పొడి|gur powder,cane sugar|390|0.5|97|0|tsp:5|ready
+mango-pickle|Mango pickle (avakaya, oily)|mamidikaya pickle|మామిడికాయ పచ్చడి|aam ka achar,mango achar|300|2|10|28|tsp:8|ready
 `
 
 type Row = { id: string; name: string; te: string; teScript: string; aliases: string[]; kcal: number; p: number; c: number; f: number; unit: SizedUnit; grams: number; state: PrepState }

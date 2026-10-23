@@ -86,8 +86,13 @@ export function equipmentSummary(set: EquipmentSet, labels: Record<EquipmentId, 
   return [...availableIds(set)].map((id) => labels[id]).join(', ')
 }
 
-export function loadSpec(set: EquipmentSet, id: EquipmentId): { min: number; max: number; increment: number; unit: WeightUnit } | null {
+export function loadSpec(set: EquipmentSet, id: EquipmentId): { min: number; max: number; increment: number; unit: WeightUnit; weights?: number[] } | null {
   const it = set[id]
+  const w = it?.available && it.unit && it.weights ? [...new Set(it.weights.filter((x) => x > 0))].sort((a, b) => a - b) : []
+  if (it && w.length > 0 && it.unit) {
+    const gaps = w.slice(1).map((x, i) => x - w[i])
+    return { min: w[0], max: w[w.length - 1], increment: gaps.length ? Math.min(...gaps) : w[0], unit: it.unit, weights: w }
+  }
   if (!it?.available || it.minWeight === undefined || it.maxWeight === undefined || !it.increment || !it.unit) return null
   return { min: it.minWeight, max: it.maxWeight, increment: it.increment, unit: it.unit }
 }

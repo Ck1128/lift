@@ -3,7 +3,7 @@ import { matchLocal } from './providers'
 
 describe('Indian foods with Telugu names', () => {
   it('has a large list, every item with a Telugu name and unique ids', () => {
-    expect(INDIAN_FOODS.length).toBeGreaterThan(350)
+    expect(INDIAN_FOODS.length).toBeGreaterThan(600)
     const ids = INDIAN_FOODS.map((f) => f.providerId)
     expect(new Set(ids).size).toBe(ids.length)
     for (const f of INDIAN_FOODS) {

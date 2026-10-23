@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useT } from '../i18n'
+import { TrackSwitch } from '../components/TrackSwitch'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import {
   addSoreness, changeTrainingLevel, clearSoreness, ensureScheduled, getActiveSession, profileGaps,
-  recentSoreness, scheduledOn, setTrack,
+  recentSoreness, scheduledOn,
 } from '../db/repo'
 import { formatDay, startOfWeek } from '../engine/dates'
 import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type Muscle, type Profile } from '../engine/types'
@@ -19,6 +21,7 @@ import { ensureStories, getSeen, listStories } from '../db/storyRepo'
 
 export function Home({ profile, today }: { profile: Profile; today: string }) {
   const { navigate } = useRouter()
+  const t = useT()
   const tracks = tracksOf(profile)
   const [minutes, setMinutes] = useState<number | null>(profile.preferredDurationMinutes)
   const [levelOpen, setLevelOpen] = useState(false)
@@ -48,10 +51,11 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
   const yogaDone = yogaSessions.filter((y) => (y.status === 'completed' || y.status === 'partial') && startOfWeek(y.date) === week)
   const yogaMinutes = Math.round(yogaDone.reduce((a, y) => a + y.durationSeconds, 0) / 60)
   const yogaActive = yogaSessions.find((y) => y.status === 'in_progress')
-  const greeting = profile.displayName ? `Hi, ${profile.displayName}` : 'Today'
+  const greeting = profile.displayName ? `${t('Hi')}, ${profile.displayName}` : 'Today'
 
   const yogaCard = (primary: boolean) => (
     <Card title="Yoga" className={primary ? 'hero' : ''}>
+      <TrackSwitch track="yoga" on label="Yoga" offNote="" />
       {yogaActive ? (
         <>
           <p className="muted">{yogaActive.styleName} is in progress.</p>
@@ -90,9 +94,9 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
 
       {tracks.workout && !loading && !active && sched?.status === 'completed' && (
         <Card className="hero">
-          <p className="eyebrow">Today's focus</p>
+          <p className="eyebrow">{t("Today's focus")}</p>
           <p className="hero-title">{sched.focus}</p>
-          <p className="ok">Done today. Nice work.</p>
+          <p className="ok">{t('Done today. Nice work.')}</p>
           <Button variant="ghost" onClick={() => navigate('/workout')}>View today's workout</Button>
         </Card>
       )}
@@ -100,10 +104,10 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
       {tracks.workout && tracks.yoga && yogaCard(false)}
 
       {!tracks.yoga && (
-        <p className="quiet-row">Yoga is off. Your history is kept. <button type="button" className="link-btn" aria-label="Turn on Yoga" onClick={() => void setTrack('yoga', true)}>Turn on</button></p>
+        <TrackSwitch track="yoga" on={false} label="Yoga" offNote="Off. Your history is kept." />
       )}
       {!tracks.workout && (
-        <p className="quiet-row">Workouts are off. Your history is kept. <button type="button" className="link-btn" aria-label="Turn on Workouts" onClick={() => void setTrack('workout', true)}>Turn on</button></p>
+        <TrackSwitch track="workout" on={false} label="Workouts" offNote="Off. Your history is kept." />
       )}
 
       {/* ---- progress ---- */}

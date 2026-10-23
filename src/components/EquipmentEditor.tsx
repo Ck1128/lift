@@ -103,7 +103,22 @@ export function EquipmentEditor({ location, gymType, unit, instant }: { location
               <input type="checkbox" checked={checked} onChange={(e) => set(id, { available: e.target.checked })} />
               <span>{EQUIPMENT_LABEL[id]}</span>
             </label>
-            {it.available && LOADABLE.includes(id) && (
+            {it.available && (id === 'dumbbell' || id === 'kettlebell') && (
+              <label className="mini own-weights">
+                <span>Exactly which weights do you own? ({unit})</span>
+                <input
+                  type="text" inputMode="decimal" placeholder="For example: 12  or  10, 12, 20"
+                  defaultValue={it.weights?.join(', ') ?? ''} key={`${id}-w-${it.weights?.join(',') ?? ''}`}
+                  onBlur={(e) => {
+                    const w = [...new Set(e.target.value.split(/[ ,;]+/).map(Number).filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b)
+                    if (w.length === 0) set(id, { weights: undefined })
+                    else set(id, { weights: w, minWeight: w[0], maxWeight: w[w.length - 1], unit })
+                  }}
+                />
+                <small className="hint">Workouts will only use these weights. Leave empty if you have a full rack and fill in the range below.</small>
+              </label>
+            )}
+            {it.available && LOADABLE.includes(id) && !(it.weights?.length) && (
               <div className="load-row">
                 {(['minWeight', 'maxWeight', 'increment'] as const).map((k) => (
                   <label key={k} className="mini">

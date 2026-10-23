@@ -1,14 +1,16 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useT } from '../i18n'
 import { createPortal } from 'react-dom'
 import { useRouter } from '../router'
 import { FeedbackButton, type FeedbackOptions } from './Feedback'
 
 export function Card({ title, children, className, feedback }: { title?: string; children: ReactNode; className?: string; feedback?: false | FeedbackOptions }) {
+  const t = useT()
   return (
     <section className={`card ${className ?? ''}`}>
       {title && (
         <div className="card-head">
-          <h2 className="card-title">{title}</h2>
+          <h2 className="card-title">{t(title)}</h2>
           {feedback !== false && <FeedbackButton component={title} options={feedback || undefined} />}
         </div>
       )}
@@ -22,7 +24,9 @@ export function Button({
   className,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' | 'small' }) {
-  return <button type="button" {...props} className={`btn btn-${variant} ${className ?? ''}`} />
+  const t = useT()
+  const { children, ...rest } = props
+  return <button type="button" {...rest} className={`btn btn-${variant} ${className ?? ''}`}>{typeof children === 'string' ? t(children) : children}</button>
 }
 
 /** A calm placeholder while something loads. It announces itself to screen readers and does not animate for people who ask for less motion. */
@@ -68,18 +72,19 @@ export function EmptyState({ title, hint, children }: { title: string; hint: str
 
 /** A page title. Every page that is not a main tab shows a Back control above it. */
 export function ScreenHeader({ title, subtitle, back }: { title: string; subtitle?: string; back?: boolean }) {
+  const t = useT()
   const { path, back: goBack } = useRouter()
   // Every page has Back except Home, where there is nowhere to go back to.
   const showBack = back ?? path.split('?')[0] !== '/home'
   return (
     <header className="screen-header">
       {showBack && (
-        <button type="button" className="back-btn" onClick={goBack} aria-label="Back">
-          <span aria-hidden="true">‹</span> Back
+        <button type="button" className="back-btn" onClick={goBack} aria-label={t('Back')}>
+          <span aria-hidden="true">‹</span> {t('Back')}
         </button>
       )}
-      <h1>{title}</h1>
-      {subtitle && <p className="muted">{subtitle}</p>}
+      <h1>{t(title)}</h1>
+      {subtitle && <p className="muted">{t(subtitle)}</p>}
     </header>
   )
 }
@@ -128,7 +133,8 @@ export function Field({
 }
 
 /** Simple modal. Closes on Escape and when the backdrop is tapped. */
-export function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+export function Dialog({ title: rawTitle, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const title = useT()(rawTitle)
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   useEffect(() => { closeRef.current = onClose })

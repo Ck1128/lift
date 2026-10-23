@@ -1,8 +1,9 @@
 import { useProfile } from '../hooks/app'
+import { useT } from '../i18n'
 import { tracksOf } from '../engine/tracks'
 import { useRouter } from '../router'
 
-export type ScreenId = 'home' | 'plan' | 'workout' | 'yoga' | 'food' | 'progress' | 'settings'
+export type ScreenId = 'home' | 'plan' | 'workout' | 'yoga' | 'food' | 'activity' | 'progress' | 'settings'
 
 export const SCREENS: { id: ScreenId; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: '🏠' },
@@ -10,6 +11,7 @@ export const SCREENS: { id: ScreenId; label: string; icon: string }[] = [
   { id: 'workout', label: 'Workout', icon: '🏋️' },
   { id: 'yoga', label: 'Yoga', icon: '🧘' },
   { id: 'food', label: 'Food', icon: '🍽️' },
+  { id: 'activity', label: 'Activity', icon: '🔥' },
   { id: 'progress', label: 'Progress', icon: '📈' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
@@ -25,6 +27,7 @@ const ICON: Record<ScreenId, { line: string; spark: string }> = {
   workout: { line: 'M12 3.500a8.500 8.500 0 1 0 0 17 8.500 8.500 0 0 0 0-17Z', spark: 'M13.200 7 8.800 13h3l-.9 4 4.300-6h-3Z' },
   yoga: { line: 'M5 13c3 .2 5 1.200 7 3.200 2-2 4-3 7-3.200M12 9v7.200M8.200 20.500 12 16.200l3.800 4.300', spark: 'M12 7.200a2.100 2.100 0 1 0 0-4.200 2.100 2.100 0 0 0 0 4.200Z' },
   food: { line: 'M12 3.500a8.500 8.500 0 1 0 0 17 8.500 8.500 0 0 0 0-17Z', spark: 'M8.200 15.800c0-4 2.800-6.600 7.200-7 0 4.200-2.600 7-7.200 7ZM8.200 15.800l3.800-3.800' },
+  activity: { line: 'M12 3.500c.600 3.200 4.500 5 4.500 9.300a4.500 4.500 0 0 1-9 0c0-1.800.800-3 1.800-4 .200 1.300.900 2 1.700 2.300C11 8.500 10.800 6 12 3.500Z', spark: 'M12 19.300a2.200 2.200 0 0 1-2.200-2.200c0-1.300 1.200-2.300 2.200-3.500 1 1.200 2.200 2.200 2.200 3.500a2.200 2.200 0 0 1-2.200 2.200Z' },
   progress: { line: 'M20.200 12A8.200 8.200 0 1 1 12 3.800', spark: 'M8.300 12.500l2.700 2.700 4.700-5.400' },
   settings: { line: 'M4 7.500h9M18 7.500h2M4 16.500h2M11 16.500h9', spark: 'M15.500 9.800a2.300 2.300 0 1 0 0-4.600 2.300 2.300 0 0 0 0 4.600ZM8.500 18.800a2.300 2.300 0 1 0 0-4.600 2.300 2.300 0 0 0 0 4.600Z' },
 }
@@ -47,6 +50,7 @@ export function tabOf(path: string): ScreenId {
 }
 
 export function BottomNav() {
+  const t = useT()
   const { path, navigate } = useRouter()
   const current = tabOf(path)
   const profile = useProfile()
@@ -65,7 +69,7 @@ export function BottomNav() {
           onClick={() => navigate(`/${s.id}`)}
         >
           <Icon id={s.id} />
-          <span>{s.label}</span>
+          <span>{t(s.label)}</span>
         </button>
       ))}
     </nav>

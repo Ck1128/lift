@@ -55,6 +55,13 @@ export function FeedbackButton({ component, element, options }: { component: str
   )
 }
 
+const CHANNEL_ICONS: { id: Channel; label: string; icon: ReactNode }[] = [
+  { id: 'sms', label: 'Message', icon: <path d="M21 12a8 8 0 0 1-11.500 7.200L4 20.500l1.400-4.800A8 8 0 1 1 21 12Z" /> },
+  { id: 'whatsapp', label: 'WhatsApp', icon: <><path d="M4 20l1.200-4A8.500 8.500 0 1 1 8.200 18.900L4 20Z" /><path d="M9 9c0 3 3 6 6 6l1-1.500-2-1-1 .8c-.8-.4-1.600-1.200-2-2l.8-1-1-2L9 9Z" /></> },
+  { id: 'email', label: 'Email', icon: <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m4 7 8 6 8-6" /></> },
+  { id: 'copy', label: 'Copy', icon: <><rect x="8" y="8" width="12" height="12" rx="3" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></> },
+]
+
 /* ---------- the form (used in the dialog and in Settings) ---------- */
 export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach, onDone, defaultCategory }: {
   context: FeedbackContext
@@ -71,8 +78,8 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
   const [diag, setDiag] = useState(false)
   const [attachOn, setAttachOn] = useState(false)
   const [shot, setShot] = useState<File | null>(null)
-  const [channel, setChannel] = useState<Channel>('share')
-  const [dest, setDest] = useState(cfg.email)
+  const [channel, setChannel] = useState<Channel>('sms')
+  const [dest, setDest] = useState(cfg.phone || '+1 ')
   const [step, setStep] = useState<'edit' | 'preview'>('edit')
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
@@ -172,10 +179,15 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
         {shot && <p className="hint">{shot.name} ({Math.round(shot.size / 1024)} KB) <button type="button" className="link-btn" onClick={() => setShot(null)}>Remove</button></p>}
       </div>
       <div className="field">
-        <label htmlFor={id('chan')}>How do you want to share it?</label>
-        <select id={id('chan')} value={channel} onChange={(e) => pickChannel(e.target.value as Channel)}>
-          {(Object.keys(CHANNEL_LABEL) as Channel[]).map((c) => <option key={c} value={c}>{CHANNEL_LABEL[c]}</option>)}
-        </select>
+        <span className="label-like" id={id('chan')}>How do you want to send it?</span>
+        <div className="channel-icons" role="radiogroup" aria-labelledby={id('chan')}>
+          {CHANNEL_ICONS.map((c) => (
+            <button key={c.id} type="button" role="radio" aria-checked={channel === c.id} aria-label={c.label} className={`channel-icon${channel === c.id ? ' on' : ''}`} onClick={() => pickChannel(c.id)}>
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{c.icon}</svg>
+              <span>{c.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
       {needsDest && (
         <div className="field">
@@ -184,7 +196,7 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
           <p className="hint">You choose where it goes. This app has no built-in address.</p>
         </div>
       )}
-      <p className="hint">To attach the file or a screenshot, choose Share, then pick Messages, WhatsApp or Mail in the sheet. The Email, SMS and WhatsApp options open the app with the message text only.</p>
+      <p className="hint">Message, WhatsApp and Email open that app with your text ready to send. A screenshot cannot ride along; attach it yourself in the app.</p>
       <button type="submit" className="btn">Preview</button>
     </form>
   )

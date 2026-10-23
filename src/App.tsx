@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
+import { Activity } from './screens/Activity'
 import { BottomNav, tabOf } from './components/BottomNav'
 import { FeedbackHost } from './components/Feedback'
 import { DbGate } from './components/DbGate'
@@ -39,6 +40,7 @@ function Routes({ profile, today, onReset }: { profile: Profile; today: string; 
   if (p === '/food') return <Food profile={profile} today={today} />
   if (p === '/plan') return <WeeklyPlan profile={profile} today={today} />
   if (p === '/workout') return <Workout profile={profile} today={today} />
+  if (p === '/activity') return <Activity profile={profile} today={today} />
   if (p === '/progress') return <Progress profile={profile} today={today} />
   if (p === '/settings') return <Settings profile={profile} today={today} onReset={onReset} />
   return <Home profile={profile} today={today} />

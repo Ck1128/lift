@@ -8,7 +8,7 @@ import {
  * and moving between pages never reloads the document.
  */
 
-export const TAB_PATHS = ['/home', '/plan', '/workout', '/food', '/progress', '/settings'] as const
+export const TAB_PATHS = ['/home', '/plan', '/workout', '/food', '/activity', '/progress', '/settings'] as const
 export const DEFAULT_PATH = '/home'
 
 const EVENT = 'lift:navigate'

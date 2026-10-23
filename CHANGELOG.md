@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.16.0 - Equipment fixes, Activity, pain check, languages (branch feature/v2-complete)
+**Bug fixes (from your reports)**
+- Workouts now use only the dumbbell weights you own. In Settings, type exactly which weights you have (for example `12`, or `10, 12, 20`).
+- No bench ticked means no bench exercises (lying triceps extensions, bench presses, incline work and so on).
+- Light beginners with only heavy dumbbells no longer get small isolation moves (raises, curls) that would be too heavy. They get moves that suit the weight, or a note that a lighter pair or a band would unlock a muscle. Strong lifters with only light weights are steered to moves where light weights still work, with tempo advice.
+
+**New**
+- **Pain check** before every workout: tap where it hurts and how much. Moderate or severe pain removes exercises that load that area; mild pain trims a set. Starting a workout needs the answer.
+- **The next workout adapts** after each session: very hard sessions (effort 9+) or unfinished sets mean one set fewer; two easy sessions in a row mean one more; three hard sessions in a row trigger a lighter session. Weights jump two steps after an easy session and drop a step after a very hard, unfinished one.
+- **Activity tab**: approximate calories burned from your workouts and yoga, using your height, weight, age and sex (Mifflin-St Jeor resting burn x activity). Small print says it is an estimate.
+- **Languages**: English, Hindi and Telugu in Settings. Titles, buttons, menus and main screens are translated; some long help paragraphs are still English.
+- **Rest timer alert**: two beeps and a buzz 10 seconds before a rest ends (iPhone cannot vibrate in web apps, so it beeps).
+- **Music buttons** (previous, play/pause, next) in the workout screen, using three small Shortcuts. Off by default.
+- Body Story gets a light-hearted, animated encouragement card (with a reminder to have a drink of water).
+- Feedback is sent by icon: Message, WhatsApp, Email or Copy.
+- Yoga and Workouts are now a bar with a sliding switch on Home. Turning one off asks first.
+- Progress history can be collapsed.
+- 270 more Indian foods (about 640 in all). The Telugu hint is gone from the search box; Telugu names show only when the app is in Telugu.
+- Removed the "Plan v1 - generator" line from saved workouts.
+- Home and the base colours are warm now (coral and amber) instead of blue.
+
 ## 2.15.0 - Aurora look (branch feature/v2-complete)
 A design-only change in its own commit (`src/theme-aurora.css`, `Ring.tsx`, new nav icons). Revert that commit to get the 2.14.1 look back.
 - **Workout disk.** When a workout starts, a round disk closes clockwise as the planned time runs out. An inner ring fills as sets are done. The middle shows time left, "Paused", or "Over plan".

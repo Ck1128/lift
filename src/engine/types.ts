@@ -92,6 +92,8 @@ export interface EquipmentItem {
   minWeight?: number
   maxWeight?: number
   increment?: number
+  /** The exact weights the person owns (for example 12 only, or 10, 12, 20). Takes priority over the range. */
+  weights?: number[]
   unit?: WeightUnit
 }
 
