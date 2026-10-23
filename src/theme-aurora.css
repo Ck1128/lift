@@ -297,7 +297,7 @@ html[data-tab="home"] .nav-item::before { background: linear-gradient(145deg, #c
 .switch-text small { color: var(--mu); font-size: 13px; }
 
 /* ---- Workout preview: short list, Start always in reach ---- */
-.preview { padding-bottom: 92px; }
+.workout-preview { padding-bottom: 92px; }
 .start-bar { position: fixed; left: 12px; right: 12px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 6; display: flex; gap: 8px; padding: 8px; border-radius: 26px; background: color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 16px 34px -14px rgb(0 0 0 / .45); }
 .start-bar .btn { margin: 0; flex: 1; }
 .start-bar .btn.ghost { flex: 0 0 auto; }

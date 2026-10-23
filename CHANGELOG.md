@@ -6,7 +6,7 @@
 - Recovery: the body is now a shaded figure you can drag to turn. Tap a muscle to light it up and see its details in a pop-up, right where you are.
 - Feedback: Preview opens a pop-up over the form with Back and Confirm and share.
 - Workout tab: areas marked injured in Settings now show under the pain check every day, with a tap to mark them healed.
-- Workout preview is a short list, and Start workout stays in reach above the tab bar.
+- Workout preview is a short list, and Start workout stays in reach above the tab bar. (Fixed a style clash that squashed this tab.)
 
 ## 2.19.0 - Built from your body (branch feature/v2-complete)
 - Height and body weight are now required for the workout track. Starting weights and calories are built from them.

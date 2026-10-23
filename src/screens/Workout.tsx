@@ -111,7 +111,7 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
   }
 
   return (
-    <div className="preview">
+    <div className="workout-preview">
       <ScreenHeader title={w.title} subtitle={w.targetMuscles.map((m) => MUSCLE_LABEL[m]).join(' · ') || 'Cardio'} />
       {!resuming && <PainCheck today={today} profile={profile} onSaved={() => regenerate(w.availableMinutes, false)} />}
       <Card>
