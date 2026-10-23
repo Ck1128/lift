@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ActivityView } from './Activity'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { exerciseById } from '../data/catalog'
@@ -24,16 +25,17 @@ const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`
 
 /** Results (charts and history) and Recovery (muscle map) share one tab. */
 export function Progress({ profile, today }: { profile: Profile; today: string }) {
-  const [tab, setTab] = useState<'results' | 'recovery'>('results')
+  const [tab, setTab] = useState<'results' | 'recovery' | 'activity'>('results')
   const { navigate } = useRouter()
   return (
     <>
-      <ScreenHeader title="Health & Fitness Progress" subtitle={tab === 'results' ? 'History and charts' : 'Which muscles are ready to train'} />
+      <ScreenHeader title="Health & Fitness Progress" subtitle={tab === 'results' ? 'History and charts' : tab === 'activity' ? 'Approximate calories burned' : 'Which muscles are ready to train'} />
       <div className="seg" role="group" aria-label="Progress view">
         <button type="button" aria-pressed={tab === 'results'} onClick={() => setTab('results')}>Results</button>
         <button type="button" aria-pressed={tab === 'recovery'} onClick={() => setTab('recovery')}>Recovery</button>
+        <button type="button" aria-pressed={tab === 'activity'} onClick={() => setTab('activity')}>Activity</button>
       </div>
-      {tab === 'results' ? <ProgressResults profile={profile} today={today} /> : <RecoveryView onGoToWorkouts={() => navigate('/home')} />}
+      {tab === 'results' ? <ProgressResults profile={profile} today={today} /> : tab === 'activity' ? <ActivityView profile={profile} today={today} /> : <RecoveryView onGoToWorkouts={() => navigate('/home')} />}
     </>
   )
 }

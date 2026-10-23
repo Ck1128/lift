@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.17.0 - Fewer tabs, lime Home, LIFT opening (branch feature/v2-complete)
+- Activity moved into Progress, as a third view next to Results and Recovery. The bottom bar is back to six tabs.
+- Home is light and fresh: white with a lime glow, lime buttons with dark text. Food now uses warm orange so it no longer shares green with Home.
+- A LIFT opening screen each time the app is opened: the name, "Train. Restore. Nourish. Repeat." and "All the pieces of a healthier body, connected in one place." Tap to skip.
+
 ## 2.16.0 - Equipment fixes, Activity, pain check, languages (branch feature/v2-complete)
 **Bug fixes (from your reports)**
 - Workouts now use only the dumbbell weights you own. In Settings, type exactly which weights you have (for example `12`, or `10, 12, 20`).

@@ -3,14 +3,14 @@ import { db } from '../db/schema'
 import { burnByDay, restingKcal, workoutBurn, yogaBurn } from '../engine/activity'
 import { addDays, formatDay } from '../engine/dates'
 import type { Profile } from '../engine/types'
-import { Card, ScreenHeader } from '../components/ui'
+import { Card } from '../components/ui'
 import { useRouter } from '../router'
 import { useT } from '../i18n'
 
 const counted = (s: string) => s === 'completed' || s === 'partial'
 const dayName = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })
 
-export function Activity({ profile, today }: { profile: Profile; today: string }) {
+export function ActivityView({ profile, today }: { profile: Profile; today: string }) {
   const t = useT()
   const { navigate } = useRouter()
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
@@ -29,7 +29,6 @@ export function Activity({ profile, today }: { profile: Profile; today: string }
 
   return (
     <>
-      <ScreenHeader title={t('Activity')} subtitle={t('Approximate calories burned')} />
       {missing && (
         <Card>
           <p>{t('Add your height, weight and age in Settings so the estimate fits your body.')}</p>

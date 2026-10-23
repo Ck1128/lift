@@ -11,7 +11,6 @@ export const SCREENS: { id: ScreenId; label: string; icon: string }[] = [
   { id: 'workout', label: 'Workout', icon: '🏋️' },
   { id: 'yoga', label: 'Yoga', icon: '🧘' },
   { id: 'food', label: 'Food', icon: '🍽️' },
-  { id: 'activity', label: 'Activity', icon: '🔥' },
   { id: 'progress', label: 'Progress', icon: '📈' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]

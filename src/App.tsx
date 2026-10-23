@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { Activity } from './screens/Activity'
+import { Splash } from './components/Splash'
 import { BottomNav, tabOf } from './components/BottomNav'
 import { FeedbackHost } from './components/Feedback'
 import { DbGate } from './components/DbGate'
@@ -40,7 +40,6 @@ function Routes({ profile, today, onReset }: { profile: Profile; today: string; 
   if (p === '/food') return <Food profile={profile} today={today} />
   if (p === '/plan') return <WeeklyPlan profile={profile} today={today} />
   if (p === '/workout') return <Workout profile={profile} today={today} />
-  if (p === '/activity') return <Activity profile={profile} today={today} />
   if (p === '/progress') return <Progress profile={profile} today={today} />
   if (p === '/settings') return <Settings profile={profile} today={today} onReset={onReset} />
   return <Home profile={profile} today={today} />
@@ -75,11 +74,12 @@ function Shell() {
     return () => clearTimeout(t)
   }, [offlineReady])
 
-  if (profile === undefined) return <div className="app"><main className="content"><p className="muted">Loading...</p></main></div>
+  if (profile === undefined) return <div className="app"><Splash /><main className="content"><p className="muted">Loading...</p></main></div>
 
   if (profile === null || onboarding) {
     return (
       <div className="app">
+        <Splash />
         <OfflineBanner online={online} />
         <main className="content">
           <Onboarding deletedNotice={deletedNotice} onDismissNotice={() => setDeletedNotice(false)} onBegin={() => setOnboarding(true)} onDone={() => { setOnboarding(false); replace('/home') }} />
@@ -98,6 +98,7 @@ function Shell() {
           <Routes profile={profile} today={today} onReset={() => { setDeletedNotice(true); navigate('/home') }} />
         </main>
       </FeedbackHost>
+      <Splash />
       <WeighInPrompt profile={profile} today={today} />
       <BottomNav />
     </div>
