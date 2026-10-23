@@ -348,7 +348,7 @@ export const savePain = (date: string, report: PainReport) => setSetting(painKey
 // ---------- generation (with cache) ----------
 /** What is missing before a personalised plan can be built, or an empty list. */
 export function profileGaps(p: Profile): string[] {
-  // Date of birth and sex are required for everyone. Height and weight are a workout requirement for beginners.
+  // Date of birth and sex are required for everyone. Height and weight are required too.
   const gaps: string[] = []
   if (!p.birthDate) gaps.push('date of birth')
   if (!p.sex) gaps.push('sex')

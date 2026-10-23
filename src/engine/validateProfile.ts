@@ -114,18 +114,20 @@ export function validateProfileForm(f: ProfileForm): FormErrors {
   if (dobError) e.birthDate = dobError
   if (f.sex === '') e.sex = 'Choose Female or Male. It sets your starting weights, calorie estimate and recovery times.'
   const h = num(f.heightCm)
+  if (h === undefined && f.tracks.includes('workout')) e.heightCm = 'Height is needed. Your workouts, weights and calories are built from it, and it stays on this phone.'
   if (h !== undefined) {
     const [lo, hi] = HEIGHT_CM_RANGE
     if (Number.isNaN(h) || h < lo || h > hi) {
       e.heightCm = f.heightUnit === 'cm'
-        ? `Enter a height between ${lo} and ${hi} cm, or leave it blank.`
-        : `Enter a height between ${cmToFtIn(lo).ft} ft ${cmToFtIn(lo).inch} in and ${cmToFtIn(hi).ft} ft ${cmToFtIn(hi).inch} in, or leave it blank.`
+        ? `Enter a height between ${lo} and ${hi} cm.`
+        : `Enter a height between ${cmToFtIn(lo).ft} ft ${cmToFtIn(lo).inch} in and ${cmToFtIn(hi).ft} ft ${cmToFtIn(hi).inch} in.`
     }
   }
   const w = num(f.weightValue)
+  if (w === undefined && f.tracks.includes('workout')) e.weightValue = 'Body weight is needed. Your starting weights and calories are built from it, and it stays on this phone.'
   if (w !== undefined) {
     const [lo, hi] = weightRange(f.weightFieldUnit)
-    if (Number.isNaN(w) || w < lo || w > hi) e.weightValue = `Enter a weight between ${lo} and ${hi} ${f.weightFieldUnit}, or leave it blank.`
+    if (Number.isNaN(w) || w < lo || w > hi) e.weightValue = `Enter a weight between ${lo} and ${hi} ${f.weightFieldUnit}.`
   }
   if (f.tracks.length < 1) e.tracks = TRACKS_ERROR
   // Workout questions only matter when Workout is switched on.

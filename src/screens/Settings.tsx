@@ -1,6 +1,6 @@
 import { useRouter } from '../router'
 import { LANGS, setLang, useLang, useT, type Lang } from '../i18n'
-import { restAlertOn, setRestAlert } from '../hooks/alerts'
+import { restAlertOn, restBeepOn, setRestAlert, setRestBeep } from '../hooks/alerts'
 import { InjuredAreas } from '../components/InjuredAreas'
 import { useState, type ReactNode } from 'react'
 import { CATALOG } from '../data/catalog'
@@ -11,7 +11,7 @@ import { BackupPanel } from '../components/BackupPanel'
 import { DeleteAllData, DELETE_CATEGORIES } from '../components/DeleteAllData'
 import { EquipmentEditor } from '../components/EquipmentEditor'
 import { ProfileFormView } from '../components/ProfileFormView'
-import { Button, Chips, Dialog, ScreenHeader } from '../components/ui'
+import { Button, Chips, Dialog, ScreenHeader, SwitchRow } from '../components/ui'
 import { ConfirmButton, SaveBar } from '../components/confirm'
 import { LEVEL_LABEL, type LocationType, type Muscle, type Pattern, type Profile, type TrainingLevel } from '../engine/types'
 import { HealthPanel } from '../components/HealthPanel'
@@ -34,7 +34,7 @@ const ROW_ICON: Record<string, { c: string; d: string }> = {
   'Equipment': { c: '#d62f35', d: 'M2.500 9.500v5M5.500 7v10M18.500 7v10M21.500 9.500v5M5.500 12h13' },
   'Exercises to avoid': { c: '#b45309', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM5.600 5.600l12.800 12.800' },
   'Weekly schedule': { c: '#2b63d9', d: 'M4 6.500h16v13H4zM4 10.500h16M8.500 3.500v5M15.500 3.500v5' },
-  'Apple Health': { c: '#d6336c', d: 'M12 20s-7.500-4.500-7.500-10A4.200 4.200 0 0 1 12 7.600 4.200 4.200 0 0 1 19.500 10c0 5.500-7.500 10-7.500 10Z' },
+  'Apple Health': { c: '#b91c1c', d: 'M12 20s-7.500-4.500-7.500-10A4.200 4.200 0 0 1 12 7.600 4.200 4.200 0 0 1 19.500 10c0 5.500-7.500 10-7.500 10Z' },
   'Feedback and support': { c: '#25813a', d: 'M20 12a7.500 7.500 0 0 1-10.800 6.700L4 20l1.400-4.300A7.500 7.500 0 1 1 20 12Z' },
   'Rest timer': { c: '#0e7490', d: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM12 9v4l2.500 1.500M9 2.500h6' },
   'Help': { c: '#566073', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 .9-1 1.700M12 16.800v.01' },
@@ -68,6 +68,7 @@ interface Edits {
   note: string
   feedbackIcons: boolean
   restAlert: boolean
+  restBeep: boolean
   lang: Lang
 }
 
@@ -82,7 +83,7 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
   const base: Edits = {
     yogaLevel: profile.yogaLevel ?? '', nutrition: profile.nutritionGuidance, location: profile.preferredLocation, gym: profile.gymType,
     patterns: profile.excludedPatterns, excluded: profile.excludedExerciseIds, injured: profile.injuredMuscles ?? [],
-    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn, restAlert: restAlertOn(), lang,
+    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn, restAlert: restAlertOn(), restBeep: restBeepOn(), lang,
   }
   const [edits, setEdits] = useState<Partial<Edits>>({})
   const cur: Edits = { ...base, ...edits }
@@ -101,6 +102,7 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
     if (Object.keys(patch).length > 0) await updateExclusions(patch)
     if (cur.feedbackIcons !== base.feedbackIcons) setFeedbackIcons(cur.feedbackIcons)
     if (cur.restAlert !== base.restAlert) setRestAlert(cur.restAlert)
+    if (cur.restBeep !== base.restBeep) setRestBeep(cur.restBeep)
     if (cur.lang !== base.lang) setLang(cur.lang)
     setEdits({})
   }
@@ -211,11 +213,9 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
       </Section>
 
       <Section title="Rest timer">
-        <label className="check">
-          <input type="checkbox" checked={cur.restAlert} onChange={(e) => edit('restAlert', e.target.checked)} />
-          <span>Vibrate for 2 seconds, 10 seconds before a rest ends</span>
-        </label>
-        <p className="hint">No sound. Vibration works on Android phones. Apple does not let web apps vibrate on iPhone, so there it only shows 'Rest is over' on screen.</p>
+        <SwitchRow label="Vibrate for 2 seconds, 10 seconds before a rest ends" checked={cur.restAlert} onChange={(v) => edit('restAlert', v)} />
+        <SwitchRow label="Beep for 1 second, 10 seconds before a rest ends" checked={cur.restBeep} onChange={(v) => edit('restBeep', v)} />
+        <p className="hint">Vibration works on Android phones. Apple does not let web apps vibrate on iPhone, so keep the beep on there. The beep follows your phone's ringer switch.</p>
       </Section>
 
       <Section title="Feedback and support">

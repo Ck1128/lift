@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { restEndBuzz } from '../hooks/alerts'
+import { restWarning, unlockAudio } from '../hooks/alerts'
 import { SessionRing } from '../components/Ring'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -90,12 +90,12 @@ export function Player({ session, profile, equipment, onFinished }: {
     return () => clearTimeout(t)
   }, [rest])
 
-  // A 2 second buzz 10 seconds before the rest ends (only when the rest is longer than that). No sound.
+  // A 2 second buzz and a 1 second beep 10 seconds before the rest ends (only when the rest is longer than that).
   useEffect(() => {
     if (!rest || isPaused(rest)) return
     const ms = rest.endAt - Date.now() - 10_000
     if (ms <= 0) return
-    const t = setTimeout(restEndBuzz, ms)
+    const t = setTimeout(restWarning, ms)
     return () => clearTimeout(t)
   }, [rest])
 
@@ -141,7 +141,7 @@ export function Player({ session, profile, equipment, onFinished }: {
             sessionId={session.id}
             logs={sorted.filter((l) => l.slotId === slot.slotId)}
             pageUnit={session.weightUnit}
-            onSetDone={() => setRest(startRest(Date.now(), slot.restSeconds))}
+            onSetDone={() => { unlockAudio(); setRest(startRest(Date.now(), slot.restSeconds)) }}
             onReplace={() => setReplacing(slot.slotId)}
             rules={rules}
             inSession={inSession}

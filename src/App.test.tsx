@@ -39,6 +39,12 @@ afterEach(async () => {
 async function fillAbout(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Date of birth'), '1990-05-15')
   await user.click(within(screen.getByRole('group', { name: 'Sex' })).getByRole('button', { name: 'Male' }))
+  const ft = screen.queryByLabelText('Height, feet')
+  if (ft) {
+    await user.type(ft, '5')
+    await user.type(screen.getByLabelText('Height, inches'), '10')
+    await user.type(screen.getByLabelText('Body weight'), '170')
+  }
 }
 
 /** Presses a Save button that appears once something in Settings is changed. */
@@ -105,14 +111,14 @@ describe('onboarding', () => {
     expect(await db.profile.count()).toBe(0)
   })
 
-  it('a beginner must give height and weight before continuing', async () => {
+  it('everyone must give height and weight before continuing', async () => {
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Welcome' })
     await user.click(screen.getByRole('button', { name: 'Workout' }))
     await user.click(screen.getByRole('button', { name: 'Continue' }))
-    expect(await screen.findByText(/need your height/i)).toBeInTheDocument()
-    expect(screen.getByText(/need your body weight/i)).toBeInTheDocument()
+    expect(await screen.findByText(/height is needed/i)).toBeInTheDocument()
+    expect(screen.getByText(/body weight is needed/i)).toBeInTheDocument()
     expect(await db.profile.count()).toBe(0)
   })
 

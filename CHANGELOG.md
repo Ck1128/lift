@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.19.0 - Built from your body (branch feature/v2-complete)
+- Height and body weight are now required for the workout track. Starting weights and calories are built from them.
+- Rest timer: separate switches for a 2-second vibration and a 1-second beep, both 10 seconds before a rest ends. iPhone web apps cannot vibrate, so the beep covers it (it follows the ringer switch).
+- The LIFT opening animation plays again whenever you come back after being away 30 seconds or more.
+- Workout is now burnt orange, Yoga deep violet, and the red accents are a harder red. No pink left.
+
 ## 2.18.0 - Tidy-ups (branch feature/v2-complete)
 - Language now lives inside Profile and goals in Settings.
 - The rest timer has no sound. It vibrates for 2 seconds, 10 seconds before the rest ends (Android; iPhone web apps cannot vibrate). It has its own icon in Settings.

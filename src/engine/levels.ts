@@ -42,9 +42,8 @@ export function setsFor(goal: Goal, level: TrainingLevel, compound: boolean): nu
   return 3
 }
 
-/** Height and weight are required before a beginner plan is generated. Other levels can add them later. */
-export function requiredProfileGaps(level: TrainingLevel, heightCm: number | undefined, weightKg: number | undefined): string[] {
-  if (level !== 'beginner') return []
+/** Height and weight are required for everyone: starting weights, set counts and calories are all built from them. */
+export function requiredProfileGaps(_level: TrainingLevel, heightCm: number | undefined, weightKg: number | undefined): string[] {
   const gaps: string[] = []
   if (!heightCm) gaps.push('height')
   if (!weightKg) gaps.push('weight')

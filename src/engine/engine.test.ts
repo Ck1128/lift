@@ -314,8 +314,13 @@ describe('rescheduling', () => {
 })
 
 describe('validation, units and dates', () => {
-  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), tracks: ['workout', 'yoga'], birthDate: '1990-05-15', sex: 'male', ...o })
+  const form = (o: Partial<ProfileForm> = {}): ProfileForm => ({ ...profileFormFrom(), tracks: ['workout', 'yoga'], birthDate: '1990-05-15', sex: 'male', heightCm: '178', weightValue: '80', ...o })
   it('accepts a minimal profile', () => expect(validateProfileForm(form())).toEqual({}))
+  it('height and body weight are required for a workout track', () => {
+    const e = validateProfileForm(form({ heightCm: '', weightValue: '' }))
+    expect(e.heightCm).toMatch(/height is needed/i)
+    expect(e.weightValue).toMatch(/body weight is needed/i)
+  })
   it('requires at least one track, and only asks workout questions when workout is on', () => {
     expect(validateProfileForm(form({ tracks: [] })).tracks).toMatch(/workout, yoga, or both/i)
     const yogaOnly = validateProfileForm(form({ tracks: ['yoga'], trainingDays: [], preferredDurationMinutes: 'abc', trainingLevel: 'beginner', heightCm: '', weightValue: '' }))

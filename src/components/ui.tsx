@@ -132,6 +132,17 @@ export function Field({
   )
 }
 
+/** A labelled sliding switch for a yes/no setting. */
+export function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (on: boolean) => void }) {
+  const t = useT()
+  return (
+    <div className="switch-row">
+      <span className="switch-text"><strong>{t(label)}</strong>{hint && <small>{t(hint)}</small>}</span>
+      <button type="button" role="switch" aria-checked={checked} aria-label={t(label)} className="switch" onClick={() => onChange(!checked)}><span className="knob" /></button>
+    </div>
+  )
+}
+
 /** Simple modal. Closes on Escape and when the backdrop is tapped. */
 export function Dialog({ title: rawTitle, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const title = useT()(rawTitle)

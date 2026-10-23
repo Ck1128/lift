@@ -52,7 +52,6 @@ export function ProfileFormView({
   useEffect(() => { if (draftKey && dirty) saveDraft(draftKey, { f, extra }) }, [draftKey, dirty, f, extra])
   const startOver = () => { setF(initial); setExtra(initialExtra); setErrors({}); setDirty(false); setRestored(false); if (draftKey) clearDraft(draftKey) }
   const workoutOn = f.tracks.includes('workout')
-  const beginner = workoutOn && f.trainingLevel === 'beginner'
   const age = ageFromBirthDate(f.birthDate)
   const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) => { setF((p) => ({ ...p, [k]: v })); setSaved(false); setDirty(true) }
   const update = (fn: (p: ProfileForm) => ProfileForm) => { setF(fn); setSaved(false); setDirty(true) }
@@ -72,11 +71,6 @@ export function ProfileFormView({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const errs = validateProfileForm(f)
-    // A beginner needs both measurements.
-    if (beginner) {
-      if (f.heightCm.trim() === '') errs.heightCm = 'Beginner plans need your height. It stays on this phone.'
-      if (f.weightValue.trim() === '') errs.weightValue = 'Beginner plans need your body weight. It stays on this phone.'
-    }
     setErrors(errs)
     if (Object.keys(errs).length > 0) {
       if (stepped) {
@@ -169,8 +163,8 @@ export function ProfileFormView({
         <p className="hint">Needed for starting weights, calorie estimates and recovery times, which differ on average. It stays on this phone.</p>
         {errors.sex && <p className="error" role="alert">{errors.sex}</p>}
       </fieldset>
-      <div className={beginner ? 'required-block' : ''}>
-        <p className="label-like">{beginner ? 'Your height and weight (needed for beginners)' : 'Height and weight (optional)'}</p>
+      <div className="required-block">
+        <p className="label-like">Your height and weight (required)</p>
         <HeightField form={f} update={update} error={errors.heightCm} />
         <WeightField
           label="Body weight"
