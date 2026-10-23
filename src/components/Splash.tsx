@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 
 /**
  * The opening screen: LIFT, the tagline, and what it stands for.
- * It shows every time the app starts. An iPhone often keeps a closed web app asleep instead of restarting it, so it also
- * shows again whenever the app comes back after being away for 30 seconds or more.
+ * It shows every time the app is launched, and again every 2 hours while the app stays open.
+ * Switching away and back quickly does not replay it.
  */
-const AWAY_MS = 30_000
+const EVERY_MS = 2 * 60 * 60 * 1000
 
 export function Splash() {
   const [phase, setPhase] = useState<'show' | 'out' | 'gone'>(import.meta.env.MODE === 'test' ? 'gone' : 'show')
@@ -13,17 +13,16 @@ export function Splash() {
 
   useEffect(() => {
     if (import.meta.env.MODE === 'test') return
-    let hiddenAt = 0
-    const onVis = () => {
-      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return }
-      if (hiddenAt && Date.now() - hiddenAt >= AWAY_MS) { setRun((n) => n + 1); setPhase('show') }
-      hiddenAt = 0
-    }
-    // Coming back from the page cache (back-forward cache) counts as a reopen too.
-    const onShow = (e: PageTransitionEvent) => { if (e.persisted) { setRun((n) => n + 1); setPhase('show') } }
-    document.addEventListener('visibilitychange', onVis)
+    let lastShown = Date.now()
+    const replay = () => { lastShown = Date.now(); setRun((n) => n + 1); setPhase('show') }
+    // Every 2 hours, even if the phone slept in between (timers pause while asleep, so check on return too).
+    const check = () => { if (document.visibilityState === 'visible' && Date.now() - lastShown >= EVERY_MS) replay() }
+    const timer = setInterval(check, 60_000)
+    document.addEventListener('visibilitychange', check)
+    // Coming back from the page cache is a real relaunch.
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) replay() }
     window.addEventListener('pageshow', onShow)
-    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pageshow', onShow) }
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', check); window.removeEventListener('pageshow', onShow) }
   }, [])
 
   useEffect(() => {
