@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.20.0 - The timer keeps going (branch feature/v2-complete)
+- The rest timer now lives outside the workout screen. It stays on every tab, is saved on the phone, and is still right after you minimise the app or lock the screen. Finishing or discarding a workout ends it.
+- While a rest runs, a quiet audio track with the 1 second beep inside plays, so the beep can sound with the screen locked. It mixes with music you already have playing. iPhone web apps still cannot vibrate.
+- Recovery: the body is now a shaded figure you can drag to turn. Tap a muscle to light it up and see its details in a pop-up, right where you are.
+- Feedback: Preview opens a pop-up over the form with Back and Confirm and share.
+- Workout tab: areas marked injured in Settings now show under the pain check every day, with a tap to mark them healed.
+- Workout preview is a short list, and Start workout stays in reach above the tab bar.
+
 ## 2.19.0 - Built from your body (branch feature/v2-complete)
 - Height and body weight are now required for the workout track. Starting weights and calories are built from them.
 - Rest timer: separate switches for a 2-second vibration and a 1-second beep, both 10 seconds before a rest ends. iPhone web apps cannot vibrate, so the beep covers it (it follows the ringer switch).

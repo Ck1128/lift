@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
+import { RestBar } from './components/RestBar'
 import { Splash } from './components/Splash'
 import { BottomNav, tabOf } from './components/BottomNav'
 import { FeedbackHost } from './components/Feedback'
@@ -100,6 +101,7 @@ function Shell() {
       </FeedbackHost>
       <Splash />
       <WeighInPrompt profile={profile} today={today} />
+      <RestBar />
       <BottomNav />
     </div>
   )

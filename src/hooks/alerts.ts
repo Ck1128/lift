@@ -19,7 +19,7 @@ export function unlockAudio() {
 }
 
 /** One 1 second beep. */
-function beep() {
+export function beepNow() {
   try {
     if (!ctx) return
     const t0 = ctx.currentTime
@@ -34,8 +34,7 @@ function beep() {
   } catch { /* sound is a bonus */ }
 }
 
-/** Vibrates for 2 seconds where the phone allows it (Android; iPhone web apps cannot) and beeps for 1 second. */
-export function restWarning() {
+/** Vibrates for 2 seconds where the phone allows it (Android; iPhone web apps cannot). */
+export function restVibrate() {
   if (restAlertOn()) { try { navigator.vibrate?.(2000) } catch { /* not supported */ } }
-  if (restBeepOn()) beep()
 }

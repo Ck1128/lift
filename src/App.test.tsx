@@ -69,6 +69,7 @@ async function startWorkout(user: ReturnType<typeof userEvent.setup>, minutes = 
   await user.click(screen.getByRole('button', { name: `${minutes} min` }))
   await generateAndOpen(user, minutes)
   await user.click(await screen.findByRole('button', { name: /no pain, i feel good/i }))
+  await screen.findByText(/no pain today/i)
   await user.click(await screen.findByRole('button', { name: /start workout/i }))
   await confirmOk(user)
   await screen.findAllByLabelText('Set 1 weight')
@@ -338,6 +339,24 @@ describe('home: level, duration, beginner gate', () => {
 })
 
 describe('workout flow', () => {
+  it('areas marked injured stay on the Workout tab until they are marked healed', async () => {
+    await seed()
+    await db.profile.toCollection().modify({ injuredMuscles: ['quads'] })
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/today's focus/i)
+    await user.click(screen.getByRole('button', { name: '30 min' }))
+    await generateAndOpen(user, 30)
+    expect(await screen.findByText(/still recovering/i)).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /no pain, i feel good/i }))
+    expect(await screen.findByText(/no new pain today/i)).toBeInTheDocument()
+    expect(screen.getByText(/still recovering/i)).toBeInTheDocument()
+    await user.click(within(screen.getByRole('group', { name: /injured or recovering/i })).getByRole('button', { name: /quads/i }))
+    await confirmOk(user)
+    await waitFor(() => expect(screen.queryByText(/still recovering/i)).not.toBeInTheDocument())
+    expect((await db.profile.toCollection().first())?.injuredMuscles ?? []).toEqual([])
+  })
+
   it('generates, starts, logs a set, replaces an exercise, finishes, and shows history', async () => {
     await seed()
     const user = userEvent.setup()
@@ -349,6 +368,7 @@ describe('workout flow', () => {
     expect(screen.getByText(/\(estimate, you chose 30\)/i)).toBeInTheDocument()
 
     await user.click(await screen.findByRole('button', { name: /no pain, i feel good/i }))
+    await screen.findByText(/no pain today/i)
     await user.click(await screen.findByRole('button', { name: /start workout/i }))
     await confirmOk(user)
     const first = (await screen.findAllByLabelText('Set 1 weight'))[0]
@@ -520,6 +540,7 @@ describe('workout flow', () => {
     const first = render(<App />)
     await generateAndOpen(user)
     await user.click(await screen.findByRole('button', { name: /no pain, i feel good/i }))
+    await screen.findByText(/no pain today/i)
     await user.click(await screen.findByRole('button', { name: /start workout/i }))
     await confirmOk(user)
     await user.click((await screen.findAllByRole('button', { name: /mark set 1 done/i }))[0])
@@ -1201,10 +1222,16 @@ describe('settings sections, info icons, feedback and recovery', () => {
     await user.type(within(dlg).getByLabelText('Your feedback'), 'Needs a bigger chart')
     await user.click(within(dlg).getByRole('radio', { name: 'Copy' }))
     await user.click(within(dlg).getByRole('button', { name: 'Preview' }))
-    expect(within(dlg).getByLabelText('Message preview')).toHaveTextContent('Needs a bigger chart')
-    expect(within(dlg).getByLabelText('Message preview')).toHaveTextContent('Home > This week')
-    expect(within(dlg).getByText(/Nothing has been sent/i)).toBeInTheDocument()
-    expect(within(dlg).getByText(/no workout, food or body data is included/i)).toBeInTheDocument()
+    // The review is a pop-up on top of the form, with Back and Confirm and share.
+    const rev = await screen.findByRole('dialog', { name: 'Review before sharing' })
+    expect(within(rev).getByLabelText('Message preview')).toHaveTextContent('Needs a bigger chart')
+    expect(within(rev).getByLabelText('Message preview')).toHaveTextContent('Home > This week')
+    expect(within(rev).getByText(/Nothing has been sent/i)).toBeInTheDocument()
+    expect(within(rev).getByText(/no workout, food or body data is included/i)).toBeInTheDocument()
+    expect(within(rev).getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(within(rev).getByRole('button', { name: /confirm and share|copy message/i })).toBeInTheDocument()
+    await user.click(within(rev).getByRole('button', { name: 'Back' }))
+    expect(screen.queryByRole('dialog', { name: 'Review before sharing' })).not.toBeInTheDocument()
   })
 
   it('an empty feedback message is refused with a reason', async () => {
@@ -1410,7 +1437,7 @@ describe('settings sections, info icons, feedback and recovery', () => {
     expect(dest).toHaveValue('+1 ')
     await user.type(dest, '5551234567')
     await user.click(within(dlg).getByRole('button', { name: 'Preview' }))
-    await user.click(await within(dlg).findByRole('button', { name: /confirm and share/i }))
+    await user.click(await within(await screen.findByRole('dialog', { name: 'Review before sharing' })).findByRole('button', { name: /confirm and share/i }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

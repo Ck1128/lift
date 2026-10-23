@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { restWarning, unlockAudio } from '../hooks/alerts'
+import { useMemo, useState } from 'react'
+import { unlockAudio } from '../hooks/alerts'
+import { rest } from '../hooks/restStore'
 import { SessionRing } from '../components/Ring'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -12,7 +13,7 @@ import { alternativesFor, equipmentOptions, machineTakenSwap, patternWord, SHARE
 import { getSetting, setSetting } from '../db/settings'
 import { EQUIPMENT_LABEL, type Exercise, type EquipmentSet, type PlannedExercise, type Profile, type SetLog, type WorkoutSession } from '../engine/types'
 import { useNow } from '../hooks/app'
-import { addRest, formatClock, isFinished, isPaused, pauseRest, remainingMs, resumeRest, startRest, type RestTimer } from '../engine/restTimer'
+import { formatClock } from '../engine/restTimer'
 import type { WeightUnit } from '../engine/types'
 import { FeedbackButton } from '../components/Feedback'
 import { ExerciseInfo } from '../components/ExerciseInfo'
@@ -28,7 +29,6 @@ export function Player({ session, profile, equipment, onFinished }: {
   onFinished: (id: string) => void
 }) {
   const logs = useLiveQuery(() => db.setLogs.where('sessionId').equals(session.id).toArray(), [session.id], [] as SetLog[])
-  const [rest, setRest] = useState<RestTimer | null>(null)
   const [replacing, setReplacing] = useState<string | null>(null)
   const [change, setChange] = useState<{ slotId: string; toId: string } | null>(null)
   const [swapNote, setSwapNote] = useState<string | null>(null)
@@ -36,7 +36,7 @@ export function Player({ session, profile, equipment, onFinished }: {
   const [taken, setTaken] = useState<string[]>([])
   const [confirm, setConfirm] = useState<'finish' | 'abandon' | null>(null)
   const paused = !!session.pausedAt
-  const now = useNow(rest || !paused ? 250 : 1000)
+  const now = useNow(!paused ? 250 : 1000)
   const reopened = !!session.reopenedAt
 
   const elapsed = (paused ? new Date(session.pausedAt!).getTime() : now) - new Date(session.startedAt).getTime() - session.pausedMs
@@ -81,26 +81,9 @@ export function Player({ session, profile, equipment, onFinished }: {
     requestSwap(slotId, pick.id)
   }
 
-  // The rest timer ends itself. It uses timestamps, so a locked screen or background tab cannot make it drift.
-  useEffect(() => {
-    if (!rest || isPaused(rest)) return
-    const t = setTimeout(() => {
-      setRest(null)
-    }, Math.max(0, rest.endAt - Date.now()))
-    return () => clearTimeout(t)
-  }, [rest])
-
-  // A 2 second buzz and a 1 second beep 10 seconds before the rest ends (only when the rest is longer than that).
-  useEffect(() => {
-    if (!rest || isPaused(rest)) return
-    const ms = rest.endAt - Date.now() - 10_000
-    if (ms <= 0) return
-    const t = setTimeout(restWarning, ms)
-    return () => clearTimeout(t)
-  }, [rest])
-
   const finish = async (mode: 'finish' | 'abandon') => {
     setConfirm(null)
+    rest.skip()
     const r = await finishSession(session.id, mode)
     if (r) onFinished(r.id)
   }
@@ -141,7 +124,7 @@ export function Player({ session, profile, equipment, onFinished }: {
             sessionId={session.id}
             logs={sorted.filter((l) => l.slotId === slot.slotId)}
             pageUnit={session.weightUnit}
-            onSetDone={() => { unlockAudio(); setRest(startRest(Date.now(), slot.restSeconds)) }}
+            onSetDone={() => { unlockAudio(); rest.start(slot.restSeconds) }}
             onReplace={() => setReplacing(slot.slotId)}
             rules={rules}
             inSession={inSession}
@@ -153,20 +136,6 @@ export function Player({ session, profile, equipment, onFinished }: {
 
       <Button className="finish-bottom" onClick={() => setConfirm('finish')}>Finish workout</Button>
       {!reopened && <Button variant="ghost" onClick={() => setConfirm('abandon')}>Discard workout</Button>}
-
-      {rest && (
-        <div className="rest-bar" role="timer" aria-label="Rest timer">
-          <span>{isPaused(rest) ? 'Rest paused' : 'Rest'} {clock(remainingMs(rest, now))}</span>
-          <span>
-            {isPaused(rest)
-              ? <button type="button" onClick={() => setRest(resumeRest(rest, Date.now()))}>Resume</button>
-              : <button type="button" onClick={() => setRest(pauseRest(rest, Date.now()))}>Pause</button>}
-            <button type="button" onClick={() => setRest(addRest(rest, 15, Date.now()))}>+15s</button>
-            <button type="button" onClick={() => setRest(null)}>Skip</button>
-          </span>
-        </div>
-      )}
-      {rest && isFinished(rest, now) && <p className="sr-only" role="status">Rest is over.</p>}
 
       {replacing && (
         <ReplaceDialog

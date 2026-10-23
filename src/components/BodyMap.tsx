@@ -56,44 +56,59 @@ export interface BodyMapProps {
  * and colour is never the only signal: the status is in each button's name.
  */
 export function BodyMap({ states, onSelect, selected, label, defaultView = 'front' }: BodyMapProps) {
-  const [view, setView] = useState<View>(defaultView)
-  const regions = view === 'front' ? FRONT : BACK
+  // The body is a turnable 3D figure: drag it, or use Front/Back. 0 degrees shows the front, 180 the back.
+  const [angle, setAngle] = useState(defaultView === 'front' ? 0 : 180)
+  const [drag, setDrag] = useState<{ x: number; base: number } | null>(null)
+  const [seen, setSeen] = useState(selected)
+  const view: View = angle >= 90 ? 'back' : 'front'
+  // A muscle picked from the list that is on the other side turns the body to it.
+  if (selected !== seen) {
+    setSeen(selected)
+    if (selected && !VIEW_OF[selected].includes(view)) setAngle(view === 'front' ? 180 : 0)
+  }
   const interactive = !!onSelect
-  const shown = (m: FineMuscle) => VIEW_OF[m].includes(view)
 
-  const region = (r: Region, side: 'l' | 'r') => {
+  const region = (r: Region, side: 'l' | 'r', face: View) => {
     const st = states[r.muscle] ?? 'none'
+    const live = interactive && side === 'l' && face === view
     const cls = `muscle m-${st}${selected === r.muscle ? ' sel' : ''}`
     const name = `${FINE_LABEL[r.muscle]}${STATE_TEXT[st] ? `, ${STATE_TEXT[st]}` : ''}`
-    const props = interactive && side === 'l'
+    const props = live
       ? { role: 'button', tabIndex: 0, 'aria-label': name, 'aria-pressed': selected === r.muscle,
-          onClick: () => onSelect?.(r.muscle),
           onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(r.muscle) } } }
       : { 'aria-hidden': true as const }
     return (
-      <g key={`${view}-${r.muscle}-${side}`} className={cls} {...props}
-         onClick={interactive ? () => onSelect?.(r.muscle) : undefined}
+      <g key={`${face}-${r.muscle}-${side}`} className={cls} {...props}
+         onClick={interactive && face === view ? () => onSelect?.(r.muscle) : undefined}
          transform={side === 'r' ? 'translate(200 0) scale(-1 1)' : undefined}>
         <path d={r.d} />
+        <path d={r.d} className="shade" fill="url(#bm-shade)" />
       </g>
     )
   }
 
-  return (
-    <div className="bodymap">
-      <div className="bodymap-toggle" role="group" aria-label="Body view">
-        {(['front', 'back'] as const).map((v) => (
-          <button key={v} type="button" className={view === v ? 'chip on' : 'chip'} aria-pressed={view === v} onClick={() => setView(v)}>{v === 'front' ? 'Front' : 'Back'}</button>
-        ))}
-      </div>
-      <svg viewBox="0 0 200 400" role="group" aria-label={`${label}, ${view} view`} className="bodymap-svg">
-        <defs>
-          <pattern id="bm-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="6" height="6" fill="var(--bm-base)" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--bm-hatch)" strokeWidth="2" />
-          </pattern>
-        </defs>
-        {/* neutral silhouette: head, neck, torso, hips, hands, feet */}
+  const face = (f: View) => (
+    <div className={`bm-face ${f}`} aria-hidden={f !== view || undefined}>
+      <svg viewBox="0 0 200 400" role="group" aria-label={`${label}, ${f} view`} className="bodymap-svg">
+        {f === 'front' && (
+          <defs>
+            <pattern id="bm-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="6" height="6" fill="var(--bm-base)" />
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--bm-hatch)" strokeWidth="2" />
+            </pattern>
+            <radialGradient id="bm-shade" cx=".38" cy=".3" r=".85">
+              <stop offset="0" stopColor="#fff" stopOpacity=".6" />
+              <stop offset=".55" stopColor="#fff" stopOpacity="0" />
+              <stop offset="1" stopColor="#000" stopOpacity=".5" />
+            </radialGradient>
+            <linearGradient id="bm-skin" x1="0" x2="1">
+              <stop offset="0" stopColor="#000" stopOpacity=".28" />
+              <stop offset=".35" stopColor="#fff" stopOpacity=".10" />
+              <stop offset=".65" stopColor="#fff" stopOpacity=".10" />
+              <stop offset="1" stopColor="#000" stopOpacity=".28" />
+            </linearGradient>
+          </defs>
+        )}
         <g className="bm-body" aria-hidden="true">
           <circle cx="100" cy="42" r="21" />
           <rect x="91" y="60" width="18" height="20" rx="6" />
@@ -103,13 +118,44 @@ export function BodyMap({ states, onSelect, selected, label, defaultView = 'fron
           <ellipse cx="82" cy="392" rx="11" ry="5" /><ellipse cx="118" cy="392" rx="11" ry="5" />
           <rect x="68" y="296" width="28" height="22" rx="8" /><rect x="104" y="296" width="28" height="22" rx="8" />
         </g>
-        {regions.filter((r) => shown(r.muscle)).map((r) => (
+        <g className="bm-body-shade" aria-hidden="true" fill="url(#bm-skin)">
+          <circle cx="100" cy="42" r="21" />
+          <path d="M66 84 Q100 72 134 84 L128 196 Q100 206 72 196Z" />
+          <path d="M72 190 Q100 200 128 190 L130 224 Q100 232 70 224Z" />
+        </g>
+        {(f === 'front' ? FRONT : BACK).filter((r) => VIEW_OF[r.muscle].includes(f)).map((r) => (
           <g key={`${r.muscle}-grp`}>
-            {region(r, 'l')}
-            {r.mirror && region(r, 'r')}
+            {region(r, 'l', f)}
+            {r.mirror && region(r, 'r', f)}
           </g>
         ))}
       </svg>
+    </div>
+  )
+
+  const turn = (to: number) => setAngle(to)
+  const down = (e: React.PointerEvent) => { setDrag({ x: e.clientX, base: angle }) }
+  const move = (e: React.PointerEvent) => {
+    if (!drag) return
+    setAngle(Math.max(0, Math.min(180, drag.base + (e.clientX - drag.x) * 0.9)))
+  }
+  const up = () => { if (drag) { setAngle(angle >= 90 ? 180 : 0); setDrag(null) } }
+
+  return (
+    <div className={`bodymap${selected ? ' has-sel' : ''}`}>
+      <div className="bodymap-toggle" role="group" aria-label="Body view">
+        {(['front', 'back'] as const).map((v) => (
+          <button key={v} type="button" className={view === v ? 'chip on' : 'chip'} aria-pressed={view === v} onClick={() => turn(v === 'front' ? 0 : 180)}>{v === 'front' ? 'Front' : 'Back'}</button>
+        ))}
+      </div>
+      <div className="bm-stage" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+        <div className={`bm-rotor${drag ? ' dragging' : ''}`} style={{ transform: `rotateY(${angle}deg)` }}>
+          {face('front')}
+          {face('back')}
+        </div>
+        <span className="bm-floor" aria-hidden="true" />
+      </div>
+      <p className="hint bm-tip">Drag the body to turn it.</p>
     </div>
   )
 }

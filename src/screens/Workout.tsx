@@ -111,9 +111,9 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
   }
 
   return (
-    <>
+    <div className="preview">
       <ScreenHeader title={w.title} subtitle={w.targetMuscles.map((m) => MUSCLE_LABEL[m]).join(' · ') || 'Cardio'} />
-      {!resuming && <PainCheck today={today} onSaved={() => regenerate(w.availableMinutes, false)} />}
+      {!resuming && <PainCheck today={today} profile={profile} onSaved={() => regenerate(w.availableMinutes, false)} />}
       <Card>
         <p className="big">About {w.estimatedMinutes} min</p>
         <p className="hint">(estimate, you chose {w.availableMinutes})</p>
@@ -134,35 +134,37 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
       </Card>
 
       <Card title="Muscles" feedback={{ categories: MUSCLE_CATEGORIES, attach: { label: 'The names of the exercises in this workout', data: { exercises: w.exercises.map((e) => e.name) } } }}>
+        <details><summary>Show the muscles this works</summary>
         <WorkoutMuscles exerciseIds={w.exercises.filter((e) => e.kind !== 'cardio').map((e) => e.exerciseId)} onChangePlan={() => navigate('/home')} />
+        </details>
       </Card>
 
-      {w.exercises.map((e, i) => {
-        const isCardio = e.kind === 'cardio'
-        const act = isCardio ? cardioById(e.exerciseId) : undefined
-        const kcal = isCardio && act ? cardioCalories(act, e.durationMinutes ?? 0, profile.weightKg) : null
-        return (
-          <Card key={e.slotId}>
-            <div className="title-row">
-              <p className="big">{i + 1}. {e.name}</p>
-              {!isCardio && <ExerciseInfo exerciseId={e.exerciseId} name={e.name} cues={e.cues} note={e.loadNote} why={e.why} />}
-              {isCardio && act && <CardioInfo name={e.name} steps={act.instructions} />}
-            </div>
-            {isCardio ? (
-              <>
-                <p className="muted">{e.durationMinutes} min{e.intensityCue ? ` · ${e.intensityCue}` : ''}</p>
-                {kcal && <p className="hint">Roughly {kcal.low} to {kcal.high} calories (an estimate, not a measurement).</p>}
-              </>
-            ) : (
-              <>
-                <p className="muted">{e.sets} sets × {e.repMin}-{e.repMax} reps · rest {e.restSeconds}s</p>
-                <p>{e.suggestedWeight !== undefined ? <strong>Suggested: {formatWeight(e.suggestedWeight, e.loadUnit ?? profile.weightUnit)}</strong> : <span className="muted">Pick your own starting weight</span>}</p>
-                <p className="hint">{e.loadNote}</p>
-              </>
-            )}
-          </Card>
-        )
-      })}
+      <Card title="Your exercises">
+        <ol className="ex-list">
+          {w.exercises.map((e, i) => {
+            const isCardio = e.kind === 'cardio'
+            const act = isCardio ? cardioById(e.exerciseId) : undefined
+            const kcal = isCardio && act ? cardioCalories(act, e.durationMinutes ?? 0, profile.weightKg) : null
+            return (
+              <li key={e.slotId} className="ex-row">
+                <div className="title-row">
+                  <p className="big"><span className="ex-n">{i + 1}</span> {e.name}</p>
+                  {!isCardio && <ExerciseInfo exerciseId={e.exerciseId} name={e.name} cues={e.cues} note={e.loadNote} why={e.why} />}
+                  {isCardio && act && <CardioInfo name={e.name} steps={act.instructions} />}
+                </div>
+                {isCardio ? (
+                  <p className="muted">{e.durationMinutes} min{e.intensityCue ? ` · ${e.intensityCue}` : ''}{kcal ? ` · roughly ${kcal.low} to ${kcal.high} calories (an estimate)` : ''}</p>
+                ) : (
+                  <>
+                    <p className="muted">{e.sets} × {e.repMin}-{e.repMax} · rest {e.restSeconds}s · {e.suggestedWeight !== undefined ? <strong>Suggested: {formatWeight(e.suggestedWeight, e.loadUnit ?? profile.weightUnit)}</strong> : 'Pick your own starting weight'}</p>
+                    {e.loadNote && <details className="ex-more"><summary>Why this weight</summary><p className="hint">{e.loadNote}</p></details>}
+                  </>
+                )}
+              </li>
+            )
+          })}
+        </ol>
+      </Card>
 
       {!sched.cardioOnly && (
         <Card title="Cardio">
@@ -190,19 +192,22 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
 
       {error && <p className="error" role="alert">{error}</p>}
       {resuming ? (
-        <>
-          <p className="hint">You already did part of this workout today. Continue it, or start a new one with every set blank.</p>
+        <div className="start-bar" role="region" aria-label="Start">
           <ConfirmButton disabled={busy} confirm={{ title: 'Continue your workout?', message: 'It reopens with the sets you already did.' }} onConfirm={start}>Continue my workout</ConfirmButton>
-          <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Start a new workout?', message: 'Every set starts blank. The workout you did stays in your history.' }} onConfirm={startNew}>Start a new workout</ConfirmButton>
-        </>
+          <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Start a new workout?', message: 'Every set starts blank. The workout you did stays in your history.' }} onConfirm={startNew}>New</ConfirmButton>
+        </div>
       ) : (
         <>
-          {!painAnswered && <p className="hint">Answer the pain check above to start.</p>}
-          <ConfirmButton disabled={busy || !painAnswered} confirm={{ title: 'Start this workout?', message: 'The timer starts now.' }} onConfirm={start}>Start workout</ConfirmButton>
           <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Build a fresh version?', message: 'The exercises shown here are replaced with a new set.' }} onConfirm={() => regenerate(w.availableMinutes, true)}>Build a fresh version</ConfirmButton>
+          <div className="start-bar" role="region" aria-label="Start">
+            {painAnswered
+              ? <ConfirmButton disabled={busy} confirm={{ title: 'Start this workout?', message: 'The timer starts now.' }} onConfirm={start}>Start workout</ConfirmButton>
+              : <Button onClick={() => document.querySelector('.pain-check')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Start workout</Button>}
+            {!painAnswered && <p className="start-hint" role="status">Answer the pain check first</p>}
+          </div>
         </>
       )}
-    </>
+    </div>
   )
 }
 

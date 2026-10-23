@@ -118,11 +118,10 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
     }
   }
 
-  if (step === 'preview') {
+  const previewDialog = step === 'preview' && (() => {
     const rep = report()
     return (
-      <div>
-        <p className="label-like">Review before sharing</p>
+      <Dialog title="Review before sharing" onClose={() => setStep('edit')}>
         <p className="hint">This is exactly what will be put in the message and the file. Nothing has been sent.</p>
         <pre className="preview" aria-label="Message preview">{rep.text}</pre>
         <details>
@@ -141,12 +140,14 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
           <button type="button" className="btn" disabled={busy} onClick={() => void share()}>{channel === 'file' ? 'Save file' : channel === 'copy' ? 'Copy message' : 'Confirm and share'}</button>
         </div>
         {result?.ok && onDone && <button type="button" className="btn btn-ghost" onClick={onDone}>Close</button>}
-      </div>
+      </Dialog>
     )
-  }
+  })()
 
   const id = (s: string) => `fb-${context.component ?? 'g'}-${s}`.replace(/\s+/g, '-')
   return (
+    <>
+    {previewDialog}
     <form onSubmit={(e) => { e.preventDefault(); preview() }} noValidate>
       {sentNote && <p className="notice" role="status">{sentNote}</p>}
       {(context.component || context.element) && (
@@ -199,5 +200,6 @@ export function FeedbackForm({ context, categories = SETTINGS_CATEGORIES, attach
       <p className="hint">Message, WhatsApp and Email open that app with your text ready to send. A screenshot cannot ride along; attach it yourself in the app.</p>
       <button type="submit" className="btn">Preview</button>
     </form>
+    </>
   )
 }

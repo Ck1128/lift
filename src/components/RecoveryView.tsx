@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BodyMap, MapLegend, type MapState } from './BodyMap'
-import { Card, EmptyState, Loading } from './ui'
+import { Card, Dialog, EmptyState, Loading } from './ui'
 import { ALL_FINE, FINE_LABEL, type FineMuscle } from '../engine/muscleMap'
 import { STATUS_LABEL } from '../engine/recovery'
 import { formatDay } from '../engine/dates'
@@ -14,6 +14,9 @@ const readyIn = (h: number) => (h < 1 ? 'less than an hour' : h < 36 ? `about ${
 export function RecoveryView({ onGoToWorkouts }: { onGoToWorkouts?: () => void }) {
   const { report, loading } = useRecovery()
   const [picked, setPicked] = useState<FineMuscle | null>(null)
+  // The pop-up can be closed while the muscle stays lit on the body.
+  const [sheet, setSheet] = useState(false)
+  const choose = (m: FineMuscle | null) => { setPicked(m); setSheet(m !== null) }
   if (loading) return <Loading label="Loading recovery" />
 
   if (!report.hasHistory) {
@@ -56,12 +59,12 @@ export function RecoveryView({ onGoToWorkouts }: { onGoToWorkouts?: () => void }
       </Card>
 
       <Card title="Muscle recovery" feedback={{ categories: MUSCLE_CATEGORIES, attach: { label: 'The recovery status of each muscle group (no workout details)', data: Object.fromEntries(ALL_FINE.map((m) => [m, report.muscles[m].status])) } }}>
-        <BodyMap states={states} label="Muscle recovery" selected={picked} onSelect={(m) => setPicked((p) => (p === m ? null : m))} />
+        <BodyMap states={states} label="Muscle recovery" selected={picked} onSelect={(m) => choose(picked === m && sheet ? null : m)} />
         <MapLegend kind="recovery" />
-        <p className="hint">Tap a muscle for details. The list below does the same.</p>
+        <p className="hint">Tap a muscle to see its details. Drag the body to turn it.</p>
         <div className="muscle-list" role="group" aria-label="Muscle groups">
           {ALL_FINE.map((m) => (
-            <button key={m} type="button" className={picked === m ? 'chip on' : 'chip'} aria-pressed={picked === m} onClick={() => setPicked((p) => (p === m ? null : m))}>
+            <button key={m} type="button" className={picked === m ? 'chip on' : 'chip'} aria-pressed={picked === m} onClick={() => choose(picked === m && sheet ? null : m)}>
               {FINE_LABEL[m]}: {STATUS_LABEL[report.muscles[m].status]}
             </button>
           ))}
@@ -73,7 +76,7 @@ export function RecoveryView({ onGoToWorkouts }: { onGoToWorkouts?: () => void }
           <ul className="rec-list">
             {resting.map((r) => (
               <li key={r.muscle}>
-                <button type="button" className="rec-row" onClick={() => setPicked(r.muscle)} aria-label={`${FINE_LABEL[r.muscle]}, ${STATUS_LABEL[r.status]}, ${r.readiness}% recovered`}>
+                <button type="button" className="rec-row" onClick={() => choose(r.muscle)} aria-label={`${FINE_LABEL[r.muscle]}, ${STATUS_LABEL[r.status]}, ${r.readiness}% recovered`}>
                   <span className="rec-name">{FINE_LABEL[r.muscle]}</span>
                   <span className={`pill m-${r.status}`}>{STATUS_LABEL[r.status]}</span>
                   <span className="rec-bar" aria-hidden="true"><span className={`rec-fill f-${r.status}`} style={{ width: `${r.readiness ?? 0}%` }} /></span>
@@ -85,8 +88,8 @@ export function RecoveryView({ onGoToWorkouts }: { onGoToWorkouts?: () => void }
         </Card>
       )}
 
-      {sel && picked && (
-        <Card title={FINE_LABEL[picked]}>
+      {sel && picked && sheet && (
+        <Dialog title={FINE_LABEL[picked]} onClose={() => setSheet(false)}>
           <p className="big">{STATUS_LABEL[sel.status]}</p>
           {sel.status === 'no_data' && <p className="muted">No logged sets have used this muscle yet.</p>}
           {sel.status !== 'no_data' && sel.lastTrained && <p className="muted">Last trained {formatDay(sel.lastTrained)}.</p>}
@@ -102,7 +105,8 @@ export function RecoveryView({ onGoToWorkouts }: { onGoToWorkouts?: () => void }
               </ul>
             </>
           )}
-        </Card>
+          <div className="dialog-actions"><button type="button" className="btn" onClick={() => setSheet(false)}>Close</button></div>
+        </Dialog>
       )}
 
       <p className="hint">
