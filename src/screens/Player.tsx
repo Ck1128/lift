@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { tenSecondWarning, unlockAudio } from '../hooks/alerts'
+import { restEndBuzz } from '../hooks/alerts'
 import { SessionRing } from '../components/Ring'
-import { MusicControls } from '../components/MusicControls'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
@@ -86,18 +85,17 @@ export function Player({ session, profile, equipment, onFinished }: {
   useEffect(() => {
     if (!rest || isPaused(rest)) return
     const t = setTimeout(() => {
-      try { navigator.vibrate?.(250) } catch { /* not supported on iPhone Safari */ }
       setRest(null)
     }, Math.max(0, rest.endAt - Date.now()))
     return () => clearTimeout(t)
   }, [rest])
 
-  // Beep-beep and a buzz 10 seconds before the rest ends (only when the rest is longer than that).
+  // A 2 second buzz 10 seconds before the rest ends (only when the rest is longer than that). No sound.
   useEffect(() => {
     if (!rest || isPaused(rest)) return
     const ms = rest.endAt - Date.now() - 10_000
     if (ms <= 0) return
-    const t = setTimeout(tenSecondWarning, ms)
+    const t = setTimeout(restEndBuzz, ms)
     return () => clearTimeout(t)
   }, [rest])
 
@@ -110,7 +108,6 @@ export function Player({ session, profile, equipment, onFinished }: {
   return (
     <>
       <ScreenHeader title={session.title} subtitle={`${clock(elapsed)} elapsed${paused ? ' (paused)' : ''} · ${done} of ${relevant.length} sets done`} />
-      <MusicControls />
       <SessionRing elapsedMs={elapsed} plannedMinutes={session.plannedMinutes || estimate} setsDone={done} setsTotal={relevant.length} paused={paused} />
       <p className="hint" aria-live="polite">Estimated session length: about {estimate} min{session.plannedMinutes ? ` (you chose ${session.plannedMinutes})` : ''}. It updates when you swap an exercise.</p>
       {swapNote && <p className="ok" role="status">{swapNote}</p>}
@@ -144,7 +141,7 @@ export function Player({ session, profile, equipment, onFinished }: {
             sessionId={session.id}
             logs={sorted.filter((l) => l.slotId === slot.slotId)}
             pageUnit={session.weightUnit}
-            onSetDone={() => { unlockAudio(); setRest(startRest(Date.now(), slot.restSeconds)) }}
+            onSetDone={() => setRest(startRest(Date.now(), slot.restSeconds))}
             onReplace={() => setReplacing(slot.slotId)}
             rules={rules}
             inSession={inSession}

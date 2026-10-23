@@ -1,5 +1,4 @@
 import { useRouter } from '../router'
-import { MUSIC_SHORTCUTS, setMusicButtons, useMusicButtons } from '../hooks/music'
 import { LANGS, setLang, useLang, useT, type Lang } from '../i18n'
 import { restAlertOn, setRestAlert } from '../hooks/alerts'
 import { InjuredAreas } from '../components/InjuredAreas'
@@ -37,6 +36,7 @@ const ROW_ICON: Record<string, { c: string; d: string }> = {
   'Weekly schedule': { c: '#2b63d9', d: 'M4 6.500h16v13H4zM4 10.500h16M8.500 3.500v5M15.500 3.500v5' },
   'Apple Health': { c: '#d6336c', d: 'M12 20s-7.500-4.500-7.500-10A4.200 4.200 0 0 1 12 7.600 4.200 4.200 0 0 1 19.500 10c0 5.500-7.500 10-7.500 10Z' },
   'Feedback and support': { c: '#25813a', d: 'M20 12a7.500 7.500 0 0 1-10.800 6.700L4 20l1.400-4.300A7.500 7.500 0 1 1 20 12Z' },
+  'Rest timer': { c: '#0e7490', d: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM12 9v4l2.500 1.500M9 2.500h6' },
   'Help': { c: '#566073', d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 .9-1 1.700M12 16.800v.01' },
   'Export your data': { c: '#2b63d9', d: 'M12 15V4M8 8l4-4 4 4M5 14v5.500h14V14' },
   'Backup and restore': { c: '#0b7f8a', d: 'M4 7h16v4H4zM5.500 11v8h13v-8M10 15h4' },
@@ -68,7 +68,6 @@ interface Edits {
   note: string
   feedbackIcons: boolean
   restAlert: boolean
-  music: boolean
   lang: Lang
 }
 
@@ -78,13 +77,12 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
   const [search, setSearch] = useState('')
   const feedbackOn = useFeedbackIcons()
   const lang = useLang()
-  const musicOn = useMusicButtons()
   const t = useT()
   // Nothing in these sections is applied until Save. `edits` holds only what the person changed.
   const base: Edits = {
     yogaLevel: profile.yogaLevel ?? '', nutrition: profile.nutritionGuidance, location: profile.preferredLocation, gym: profile.gymType,
     patterns: profile.excludedPatterns, excluded: profile.excludedExerciseIds, injured: profile.injuredMuscles ?? [],
-    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn, restAlert: restAlertOn(), music: musicOn, lang,
+    note: profile.limitationNote ?? '', feedbackIcons: feedbackOn, restAlert: restAlertOn(), lang,
   }
   const [edits, setEdits] = useState<Partial<Edits>>({})
   const cur: Edits = { ...base, ...edits }
@@ -104,7 +102,6 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
     if (cur.feedbackIcons !== base.feedbackIcons) setFeedbackIcons(cur.feedbackIcons)
     if (cur.restAlert !== base.restAlert) setRestAlert(cur.restAlert)
     if (cur.lang !== base.lang) setLang(cur.lang)
-    if (cur.music !== base.music) setMusicButtons(cur.music)
     setEdits({})
   }
   const [levelAsk, setLevelAsk] = useState<{ proceed: (m: 'update' | 'keep') => void } | null>(null)
@@ -132,6 +129,13 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
             onSubmit={async (form, _extra, opts) => { await saveProfile(form, { preferredLocation: profile.preferredLocation, gymType: profile.gymType }, new Date(), { levelChange: opts?.levelChange }) }}
           />
         </div>
+        <p className="label-like">{t('Language')}</p>
+        <div className="chips" role="radiogroup" aria-label={t('Language')}>
+          {LANGS.map((l) => (
+            <button key={l.id} type="button" role="radio" aria-checked={cur.lang === l.id} className={cur.lang === l.id ? 'chip on' : 'chip'} onClick={() => edit('lang', l.id)}>{l.native}</button>
+          ))}
+        </div>
+        <p className="hint">{t('Choose your language. Some long help text is still in English.')}</p>
       </Section>
 
       <Section title="Yoga and food">
@@ -206,35 +210,12 @@ export function Settings({ profile, today, onReset }: { profile: Profile; today:
         <HealthPanel profile={profile} today={today} />
       </Section>
 
-      <Section title="Language">
-        <div className="chips" role="radiogroup" aria-label={t('Language')}>
-          {LANGS.map((l) => (
-            <button key={l.id} type="button" role="radio" aria-checked={cur.lang === l.id} className={cur.lang === l.id ? 'chip on' : 'chip'} onClick={() => edit('lang', l.id)}>{l.native}</button>
-          ))}
-        </div>
-        <p className="hint">{t('Choose your language. Some long help text is still in English.')}</p>
-      </Section>
-
-      <Section title="Music">
-        <label className="check">
-          <input type="checkbox" checked={cur.music} onChange={(e) => edit('music', e.target.checked)} />
-          <span>Show music buttons (previous, play/pause, next) in my workout</span>
-        </label>
-        <p className="hint">Apple does not let a web app control the Music app directly, so each button runs a small Shortcut. Make these three once (about a minute):</p>
-        <ol className="plain hint">
-          <li>Open the Shortcuts app and tap +.</li>
-          <li>Tap Add Action, search "Music", and pick <strong>Play/Pause</strong>, <strong>Skip Forward</strong> or <strong>Skip Back</strong>.</li>
-          <li>Name the shortcut exactly <strong>{MUSIC_SHORTCUTS.toggle}</strong>, <strong>{MUSIC_SHORTCUTS.next}</strong> or <strong>{MUSIC_SHORTCUTS.previous}</strong>.</li>
-        </ol>
-        <p className="hint">When you tap a button, Shortcuts opens for a moment and brings you back to Lift. Your workout is saved the whole time.</p>
-      </Section>
-
       <Section title="Rest timer">
         <label className="check">
           <input type="checkbox" checked={cur.restAlert} onChange={(e) => edit('restAlert', e.target.checked)} />
-          <span>Beep twice and buzz 10 seconds before a rest ends</span>
+          <span>Vibrate for 2 seconds, 10 seconds before a rest ends</span>
         </label>
-        <p className="hint">Vibration works on Android. iPhone does not allow web apps to vibrate, so it beeps instead (your ringer switch must not be on silent).</p>
+        <p className="hint">No sound. Vibration works on Android phones. Apple does not let web apps vibrate on iPhone, so there it only shows 'Rest is over' on screen.</p>
       </Section>
 
       <Section title="Feedback and support">

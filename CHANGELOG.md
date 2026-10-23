@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.18.0 - Tidy-ups (branch feature/v2-complete)
+- Language now lives inside Profile and goals in Settings.
+- The rest timer has no sound. It vibrates for 2 seconds, 10 seconds before the rest ends (Android; iPhone web apps cannot vibrate). It has its own icon in Settings.
+- Home icons and labels are darker and easier to see on the green.
+- Activity (inside Progress) is orange. Food is sky blue and Progress is indigo, so no two tabs share a colour.
+- Removed the music buttons completely.
+
 ## 2.17.0 - Fewer tabs, lime Home, LIFT opening (branch feature/v2-complete)
 - Activity moved into Progress, as a third view next to Results and Recovery. The bottom bar is back to six tabs.
 - Home is light and fresh: white with a lime glow, lime buttons with dark text. Food now uses warm orange so it no longer shares green with Home.

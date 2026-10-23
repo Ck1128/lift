@@ -28,7 +28,7 @@ export function ActivityView({ profile, today }: { profile: Profile; today: stri
   const missing = !profile.weightKg || !profile.heightCm || profile.age === undefined
 
   return (
-    <>
+    <div className="activity-view">
       {missing && (
         <Card>
           <p>{t('Add your height, weight and age in Settings so the estimate fits your body.')}</p>
@@ -70,6 +70,6 @@ export function ActivityView({ profile, today }: { profile: Profile; today: stri
       </Card>
 
       <p className="fine-print">{t('Approximate. Worked out from your workouts, height, weight, age and sex. It is not a measurement and real burn can differ a lot.')}</p>
-    </>
+    </div>
   )
 }
