@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.23.0 - A cleaner Food tab (branch feature/v2-complete)
+- Food now opens to one summary and one "Log food" button. Tap it, pick the meal, and log. Meals appear only once they have something in them, as closed rows that open when tapped, and the Nutrition card sits in its own closed row.
+- The online-search switch moved off the Food page; it is on the search screen where it matters.
+- Quieter Reset-today area on the Plan tab.
+
 ## 2.22.0 - Indian foods and new food icons (branch feature/v2-complete)
 - Plain Indian foods (dals, vegetables, greens, fruits, millets, nuts, seeds, milk, curd, eggs, salt and spices) now have sodium, fibre, sugars and saturated fat, taken from the USDA record of the same food. A pairing is only used when the calories and macros are close; ten that were not were left out. Indian dishes such as dosa or biryani have no such values, because their salt and oil cannot be known, so they are not counted.
 - The Indian Food Composition Tables could not be used: they have no reuse licence for the data.

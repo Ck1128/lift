@@ -361,3 +361,22 @@ body:has(.start-bar) .rest-bar { bottom: calc(168px + env(safe-area-inset-bottom
 .grp-tile:not(.has) .grp-val { color: var(--text-2); }
 .g-vegetables { --g: #15803d; } .g-fruit { --g: #c2410c; } .g-whole_grains { --g: #a16207; } .g-healthy_oils { --g: #4d7c0f; }
 .g-nuts_legumes { --g: #92400e; } .g-fish { --g: #0e7490; } .g-red_meat { --g: #b91c1c; } .g-processed_meat { --g: #7c2d12; } .g-alcohol { --g: #6d28d9; }
+
+/* v2.23 premium-clean food tab */
+.food-hero .big { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+.food-hero .big .muted { font-size: 0.95rem; font-weight: 500; letter-spacing: 0; }
+.food-hero .hint { margin: 0 0 14px; }
+.meal-pick { display: grid; gap: 10px; }
+.fold-list { display: grid; gap: 10px; margin-top: 12px; }
+.fold { background: var(--card, #fff); border-radius: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05); overflow: hidden; }
+.fold-head { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 16px 18px; cursor: pointer; }
+.fold-head:focus-visible { outline: 2px solid var(--ac); outline-offset: -2px; border-radius: 20px; }
+.fold-title { font-weight: 650; flex: 1; }
+.fold-meta { color: var(--muted, #6b7280); font-size: 0.9rem; }
+.fold-chev { width: 8px; height: 8px; border-right: 2px solid var(--ac); border-bottom: 2px solid var(--ac); transform: rotate(45deg); transition: transform .2s; margin-left: 4px; }
+.fold.open .fold-chev { transform: rotate(-135deg); }
+.fold-body { padding: 0 14px 14px; }
+.fold-body .card { box-shadow: none; padding: 0; background: transparent; }
+.danger-zone { background: transparent; box-shadow: none; border: 0; border-top: 1px solid rgba(0,0,0,.08); border-radius: 0; padding: 12px 0 0; margin-top: 10px; }
+.danger-zone .card-title { font-size: 0.8rem; font-weight: 600; color: var(--muted, #6b7280); text-transform: uppercase; letter-spacing: .06em; }
+.card .hint + .muted { margin-top: 2px; }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { deleteFoodEntry, duplicateFoodEntry, foodOnDate } from '../db/foodRepo'
@@ -7,11 +7,26 @@ import { MEAL_CATEGORIES, MEAL_LABEL, PORTION_LABEL, PREP_SHORT, summarizeDay, t
 import { energyEstimate, nextDayGuidance } from '../engine/guidance'
 import type { Profile } from '../engine/types'
 import { NutritionCard } from '../components/NutritionCard'
-import { OnlineSearchSwitch } from '../components/OnlineSearchSwitch'
 import { Button, Card, ConfirmDialog, Dialog, EmptyState, ScreenHeader } from '../components/ui'
 import { queryOf, useRouter } from '../router'
+import { useT } from '../i18n'
 
 const INTRO_KEY = 'food.intro'
+
+function Fold({ id, title, meta, children }: { id: string; title: string; meta: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const t = useT()
+  return (
+    <section className={`fold${open ? ' open' : ''}`}>
+      <button type="button" className="fold-head" aria-expanded={open} aria-controls={`fold-${id}`} onClick={() => setOpen(!open)}>
+        <span className="fold-title">{t(title)}</span>
+        <span className="fold-meta">{t(meta)}</span>
+        <span className="fold-chev" aria-hidden="true" />
+      </button>
+      {open && <div id={`fold-${id}`} className="fold-body">{children}</div>}
+    </section>
+  )
+}
 
 export function Food({ profile, today }: { profile: Profile; today: string }) {
   const { navigate, path } = useRouter()
@@ -20,6 +35,7 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
   const prev = useLiveQuery(() => foodOnDate(addDays(date, -1)), [date], [] as FoodLogEntry[])
   const sessions = useLiveQuery(() => db.sessions.where('date').equals(addDays(date, -1)).toArray(), [date], [])
   const started = useLiveQuery(async () => (await db.settings.get(INTRO_KEY))?.value === true, [], undefined)
+  const [pick, setPick] = useState(false)
   const [del, setDel] = useState<FoodLogEntry | null>(null)
   const [copy, setCopy] = useState<FoodLogEntry | null>(null)
   const [copyDate, setCopyDate] = useState(date)
@@ -56,23 +72,15 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
         <Button variant="small" onClick={() => goDate(addDays(date, 1))} disabled={date >= today} aria-label="Next day">Next ›</Button>
       </div>
 
-      <Card className="switch-card"><OnlineSearchSwitch /></Card>
-
-      <Card title="Daily summary">
+      <Card className="food-hero">
         {summary.count === 0 ? (
-          <p className="muted">Nothing logged for this day. That is different from zero calories: it just means no entries.</p>
+          <p className="muted">Nothing logged this day.</p>
         ) : (
-          <>
-            <p className="big">{Math.round(summary.kcal)} kcal <span className="muted">logged</span></p>
-            <p className="muted">{summary.count} entr{summary.count === 1 ? 'y' : 'ies'}</p>
-          </>
+          <p className="big">{Math.round(summary.kcal)} <span className="muted">kcal · {summary.count} entr{summary.count === 1 ? 'y' : 'ies'}</span></p>
         )}
-        {energy
-          ? <p className="hint">A rough range for a day with light to moderate activity is {energy.low} to {energy.high} kcal (Mifflin-St Jeor estimate). It is not a target.</p>
-          : <p className="hint">Add your height, weight, age and sex in Settings (all optional) to see a rough daily energy range.</p>}
+        {energy && <p className="hint">Typical day for you: {energy.low}–{energy.high} kcal. Not a target.</p>}
+        <Button onClick={() => setPick(true)}>Log food</Button>
       </Card>
-
-      <NutritionCard entries={entries} />
 
       {guidance && !guidance.empty && date === today && (
         <Card title="Gentle note for today">
@@ -81,31 +89,46 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
         </Card>
       )}
 
-      {MEAL_CATEGORIES.map((meal) => {
-        const rows = entries.filter((e) => e.mealCategory === meal)
-        const kcal = rows.reduce((a, e) => a + e.kcal, 0)
-        return (
-          <Card key={meal} title={`${MEAL_LABEL[meal]}${rows.length ? ` · ${Math.round(kcal)} kcal` : ''}`}>
-            {rows.length === 0 && <p className="hint">Nothing here yet.</p>}
-            <ul className="history">
-              {rows.map((e) => (
-                <li key={e.id} className="food-row">
-                  <button type="button" className="alt" onClick={() => navigate(`/food/edit/${e.id}`)}>
-                    <strong>{e.name}{e.brand ? ` · ${e.brand}` : ''}</strong>
-                    <span className="muted">{e.portionValue} {PORTION_LABEL[e.portionUnit]} · {PREP_SHORT[e.state]} · {Math.round(e.kcal)} kcal{e.approximate ? ' (approx.)' : ''}</span>
-                  </button>
-                  <div className="inline">
-                    <Button variant="small" onClick={() => { setCopy(e); setCopyDate(date); setCopyMeal(e.mealCategory) }} aria-label={`Duplicate ${e.name}`}>Duplicate</Button>
-                    <Button variant="small" onClick={() => setDel(e)} aria-label={`Delete ${e.name}`}>Delete</Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <Button variant="ghost" onClick={() => navigate(`/food/add?meal=${meal}&date=${date}`)}>Add to {MEAL_LABEL[meal].toLowerCase()}</Button>
-          </Card>
-        )
-      })}
+      {summary.count > 0 && (
+        <div className="fold-list">
+          <Fold id="nutrition" title="Nutrition today" meta="Vitamins, minerals, groups">
+            <NutritionCard entries={entries} />
+          </Fold>
+          {MEAL_CATEGORIES.map((meal) => {
+            const rows = entries.filter((e) => e.mealCategory === meal)
+            if (rows.length === 0) return null
+            const kcal = rows.reduce((a, e) => a + e.kcal, 0)
+            return (
+              <Fold key={meal} id={meal} title={MEAL_LABEL[meal]} meta={`${Math.round(kcal)} kcal`}>
+                <ul className="history">
+                  {rows.map((e) => (
+                    <li key={e.id} className="food-row">
+                      <button type="button" className="alt" onClick={() => navigate(`/food/edit/${e.id}`)}>
+                        <strong>{e.name}{e.brand ? ` · ${e.brand}` : ''}</strong>
+                        <span className="muted">{e.portionValue} {PORTION_LABEL[e.portionUnit]} · {PREP_SHORT[e.state]} · {Math.round(e.kcal)} kcal{e.approximate ? ' (approx.)' : ''}</span>
+                      </button>
+                      <div className="inline">
+                        <Button variant="small" onClick={() => { setCopy(e); setCopyDate(date); setCopyMeal(e.mealCategory) }} aria-label={`Duplicate ${e.name}`}>Duplicate</Button>
+                        <Button variant="small" onClick={() => setDel(e)} aria-label={`Delete ${e.name}`}>Delete</Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Fold>
+            )
+          })}
+        </div>
+      )}
 
+      {pick && (
+        <Dialog title="Which meal?" onClose={() => setPick(false)}>
+          <div className="meal-pick">
+            {MEAL_CATEGORIES.map((meal) => (
+              <Button key={meal} variant="ghost" onClick={() => navigate(`/food/add?meal=${meal}&date=${date}`)}>{MEAL_LABEL[meal]}</Button>
+            ))}
+          </div>
+        </Dialog>
+      )}
 
       {del && (
         <ConfirmDialog title="Delete this entry?" message={`${del.name} (${Math.round(del.kcal)} kcal) will be removed from ${formatDay(del.date)}.`} confirmLabel="Delete" danger
