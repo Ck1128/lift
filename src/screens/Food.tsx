@@ -6,6 +6,7 @@ import { addDays, formatDay } from '../engine/dates'
 import { MEAL_CATEGORIES, MEAL_LABEL, PORTION_LABEL, PREP_SHORT, summarizeDay, type FoodLogEntry, type MealCategory } from '../engine/food'
 import { energyEstimate, nextDayGuidance } from '../engine/guidance'
 import type { Profile } from '../engine/types'
+import { NutritionCard } from '../components/NutritionCard'
 import { OnlineSearchSwitch } from '../components/OnlineSearchSwitch'
 import { Button, Card, ConfirmDialog, Dialog, EmptyState, ScreenHeader } from '../components/ui'
 import { queryOf, useRouter } from '../router'
@@ -70,6 +71,8 @@ export function Food({ profile, today }: { profile: Profile; today: string }) {
           ? <p className="hint">A rough range for a day with light to moderate activity is {energy.low} to {energy.high} kcal (Mifflin-St Jeor estimate). It is not a target.</p>
           : <p className="hint">Add your height, weight, age and sex in Settings (all optional) to see a rough daily energy range.</p>}
       </Card>
+
+      <NutritionCard entries={entries} />
 
       {guidance && !guidance.empty && date === today && (
         <Card title="Gentle note for today">

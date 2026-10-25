@@ -78,3 +78,16 @@ export async function clearFoodCache(): Promise<void> {
 
 export const yesterdayOf = (date: string) => addDays(date, -1)
 export type { FoodItem }
+
+/** My Foods: foods you starred, kept on this phone. Each one keeps its numbers, so it works offline. */
+const FAVORITES_KEY = 'food.favorites'
+export interface FavoriteFood { key: string; item: FoodItem; state: FoodItem['states'][number]['state'] }
+export const favoriteKey = (item: FoodItem, state: string) => `${item.provider}|${item.providerId}|${state}`
+export const getFavorites = () => getSetting<FavoriteFood[]>(FAVORITES_KEY, [])
+export async function toggleFavorite(item: FoodItem, state: FoodItem['states'][number]): Promise<boolean> {
+  const list = await getFavorites()
+  const key = favoriteKey(item, state.state)
+  if (list.some((f) => f.key === key)) { await setSetting(FAVORITES_KEY, list.filter((f) => f.key !== key)); return false }
+  await setSetting(FAVORITES_KEY, [{ key, item: { ...item, states: [state] }, state: state.state }, ...list].slice(0, 100))
+  return true
+}

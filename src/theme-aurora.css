@@ -329,3 +329,23 @@ body:has(.start-bar) .rest-bar { bottom: calc(168px + env(safe-area-inset-bottom
 @media (prefers-reduced-motion: reduce) { .bm-rotor { transition: none; } .muscle.sel { animation: none; } }
 .start-bar { flex-wrap: wrap; }
 .start-hint { flex-basis: 100%; margin: 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--ac); }
+
+/* ---- Nutrition card ---- */
+.nut-top { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+.nut-ring { width: 108px; height: 108px; flex: none; }
+.nut-bg { fill: none; stroke: color-mix(in srgb, var(--ac) 14%, transparent); stroke-width: 11; }
+.nut-fg { fill: none; stroke: var(--ac); stroke-width: 11; stroke-linecap: round; }
+.nut-num { font-size: 40px; font-weight: 800; fill: var(--text); font-family: var(--font-display); }
+.nut-lock rect { fill: color-mix(in srgb, var(--text) 55%, transparent); }
+.nut-lock path { stroke: color-mix(in srgb, var(--text) 55%, transparent); }
+.nut-list { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 6px; }
+.nut-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--surface-2); }
+.nut-row .nut-name { font-weight: 600; grid-column: auto; }
+.nut-row .nut-val { color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; font-size: 14px; }
+.nut-icon { font-size: 20px; }
+.nut-bar { height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--ac) 14%, transparent); overflow: hidden; min-width: 40px; }
+.nut-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--ac), var(--ac-2)); border-radius: 99px; }
+.online-note { margin: 6px 0; }
+.nut-part { grid-template-columns: 1fr auto; row-gap: 8px; }
+.nut-part .nut-bar { grid-column: 1 / -1; }
+.nut-part .nut-val { white-space: nowrap; }

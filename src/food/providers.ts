@@ -1,5 +1,9 @@
 import { LOCAL_FOODS } from '../data/foods'
+import { LOCAL_MICROS } from '../data/localMicros'
+import { classifyFood } from '../engine/foodGroups'
+import { loadUsda } from './usda'
 import { INDIAN_FOODS } from '../data/indianFoods'
+import { INDIAN_GROUPS } from '../data/indianGroups'
 import type { FoodItem, FoodState } from '../engine/food'
 
 /**
@@ -26,7 +30,19 @@ export class ProviderError extends Error {
 
 // Letters in any script are kept (Telugu included). Accents on Latin letters are dropped so "cafe" finds "café".
 /** Every food bundled with the app: common foods plus Indian foods with Telugu names. */
-export const ALL_LOCAL_FOODS: FoodItem[] = [...LOCAL_FOODS, ...INDIAN_FOODS]
+/** Adds fibre, sugars, sodium, saturated fat and the food group from the USDA record each bundled food matches. */
+function withMicros(f: FoodItem): FoodItem {
+  let group = f.group
+  const states = f.states.map((s) => {
+    const m = LOCAL_MICROS[`${f.providerId}|${s.state}`]
+    if (!m) return s
+    group ??= classifyFood(m[1], m[2])
+    const n = (v: string) => (v === '' ? undefined : Number(v))
+    return { ...s, fiberPer100: n(m[3]), sugarsPer100: n(m[4]), sodiumMgPer100: n(m[5]), satFatPer100: n(m[6]) }
+  })
+  return { ...f, states, group }
+}
+export const ALL_LOCAL_FOODS: FoodItem[] = [...LOCAL_FOODS.map(withMicros), ...INDIAN_FOODS.map((f) => ({ ...f, group: INDIAN_GROUPS[f.providerId.replace(/^in-/, '')] }))]
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{M}\p{N} ]+/gu, ' ').replace(/\s+/g, ' ').trim()
 
@@ -44,7 +60,7 @@ export function matchLocal(query: string, foods: FoodItem[] = ALL_LOCAL_FOODS): 
     if (name === words.join(' ')) score -= 3
     scored.push([score, f])
   }
-  return scored.sort((a, b) => a[0] - b[0] || a[1].name.localeCompare(b[1].name)).map(([, f]) => f)
+  return scored.sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length || a[1].name.localeCompare(b[1].name)).map(([, f]) => f)
 }
 
 export const localProvider: FoodDataProvider = {
@@ -53,7 +69,11 @@ export const localProvider: FoodDataProvider = {
   attribution: 'Bundled common foods. USDA FoodData Central reference values (public domain), rounded, plus typical Indian home-style values. Estimates.',
   requiresNetwork: false,
   async search(query) {
-    return matchLocal(query)
+    const mine = matchLocal(query)
+    // The big USDA table comes after the hand-picked foods, shortest names first (plain foods before recipes).
+    const seen = new Set(mine.map((f) => norm(f.name)))
+    const usda = matchLocal(query, await loadUsda()).filter((f) => !seen.has(norm(f.name))).slice(0, 40)
+    return [...mine, ...usda]
   },
 }
 
@@ -83,6 +103,8 @@ export function offToFood(p: OffProduct, now: string): FoodItem | null {
   const state: FoodState = {
     state: 'ready', basis: liquid ? 'ml' : 'g', kcalPer100: kcal,
     proteinPer100: num(n['proteins_100g']), carbsPer100: num(n['carbohydrates_100g']), fatPer100: num(n['fat_100g']),
+    fiberPer100: num(n['fiber_100g']), sugarsPer100: num(n['sugars_100g']), satFatPer100: num(n['saturated-fat_100g']),
+    sodiumMgPer100: num(n['sodium_100g']) === undefined ? undefined : Math.round((num(n['sodium_100g']) as number) * 1000),
     unitSize: sq && sq > 0 ? { serving: sq } : {}, label: 'as packaged',
   }
   return {

@@ -1,4 +1,5 @@
 // Food logging types and pure calculations. No React and no database in this file.
+import type { FoodGroup } from './foodGroups'
 
 export const MEAL_CATEGORIES = ['breakfast', 'lunch', 'dinner', 'evening_snacks', 'other'] as const
 export type MealCategory = (typeof MEAL_CATEGORIES)[number]
@@ -29,12 +30,19 @@ export interface FoodState {
   proteinPer100?: number
   carbsPer100?: number
   fatPer100?: number
+  /** Fibre, total sugars (natural and added together), sodium in milligrams and saturated fat, all per 100. Missing means the source has no value. */
+  fiberPer100?: number
+  sugarsPer100?: number
+  sodiumMgPer100?: number
+  satFatPer100?: number
   /** Size of one cup / tbsp / tsp / piece / serving, in the basis unit (grams or ml). A missing unit is not supported. */
   unitSize: Partial<Record<SizedUnit, number>>
   /** Grams per millilitre, for liquids. Without it, ml and g cannot be converted. */
   gramsPerMl?: number
   /** Human wording that shows the state, for example "rice, white, dry". */
   label?: string
+  /** What one piece is, for example "1 medium (182 g)". */
+  pieceNote?: string
 }
 
 export type FoodKind = 'generic' | 'packaged' | 'user'
@@ -48,6 +56,8 @@ export interface FoodItem {
   /** The Telugu name (script and letters), shown under the English name. */
   nameTe?: string
   states: FoodState[]
+  /** The food group used by the Nutrition view. Absent when the food fits none. */
+  group?: FoodGroup
   kind: FoodKind
   source: string
   attribution?: string
@@ -68,6 +78,10 @@ export interface FoodBasisSnapshot {
   proteinPer100?: number
   carbsPer100?: number
   fatPer100?: number
+  fiberPer100?: number
+  sugarsPer100?: number
+  sodiumMgPer100?: number
+  satFatPer100?: number
   unitSize: FoodState['unitSize']
   gramsPerMl?: number
 }
@@ -95,6 +109,12 @@ export interface FoodLogEntry {
   protein?: number
   carbs?: number
   fat?: number
+  fiber?: number
+  sugars?: number
+  sodiumMg?: number
+  satFat?: number
+  /** The Nutrition view group, saved with the entry. */
+  group?: FoodGroup
   /** The exact numbers used, so a later provider change never alters a past log. */
   basis: FoodBasisSnapshot
   note?: string
@@ -112,11 +132,12 @@ export interface FoodCacheEntry {
 }
 
 export type PortionResult =
-  | { ok: true; baseAmount: number; baseUnit: 'g' | 'ml' | 'serving'; kcal: number; protein?: number; carbs?: number; fat?: number; basisText: string }
+  | { ok: true; baseAmount: number; baseUnit: 'g' | 'ml' | 'serving'; kcal: number; protein?: number; carbs?: number; fat?: number; fiber?: number; sugars?: number; sodiumMg?: number; satFat?: number; basisText: string }
   | { ok: false; reason: string }
 
 export const basisOf = (s: FoodState): FoodBasisSnapshot => ({
   basis: s.basis, kcalPer100: s.kcalPer100, proteinPer100: s.proteinPer100, carbsPer100: s.carbsPer100, fatPer100: s.fatPer100,
+  fiberPer100: s.fiberPer100, sugarsPer100: s.sugarsPer100, sodiumMgPer100: s.sodiumMgPer100, satFatPer100: s.satFatPer100,
   unitSize: s.unitSize, gramsPerMl: s.gramsPerMl,
 })
 
@@ -186,6 +207,10 @@ export function calcPortion(b: FoodBasisSnapshot, value: number, unit: PortionUn
     protein: b.proteinPer100 === undefined ? undefined : r1(b.proteinPer100 * f),
     carbs: b.carbsPer100 === undefined ? undefined : r1(b.carbsPer100 * f),
     fat: b.fatPer100 === undefined ? undefined : r1(b.fatPer100 * f),
+    fiber: b.fiberPer100 === undefined ? undefined : r1(b.fiberPer100 * f),
+    sugars: b.sugarsPer100 === undefined ? undefined : r1(b.sugarsPer100 * f),
+    sodiumMg: b.sodiumMgPer100 === undefined ? undefined : Math.round(b.sodiumMgPer100 * f),
+    satFat: b.satFatPer100 === undefined ? undefined : r1(b.satFatPer100 * f),
     basisText: basisText(b),
   }
 }
@@ -205,7 +230,10 @@ export function choicesOf(item: FoodItem): FoodChoice[] {
 }
 
 export function choiceTitle(c: FoodChoice): string {
-  const stateText = c.item.states.length > 1 || c.state.state !== 'ready' ? ` (${c.state.label ?? PREP_SHORT[c.state.state]})` : ''
+  const word = c.state.label ?? PREP_SHORT[c.state.state]
+  // USDA names already say "raw" or "cooked"; saying it twice would only be noise.
+  const said = c.item.provider === 'usda' || c.item.name.toLowerCase().includes(word.toLowerCase())
+  const stateText = !said && (c.item.states.length > 1 || c.state.state !== 'ready') ? ` (${word})` : ''
   return `${c.item.name}${stateText}`
 }
 
@@ -247,6 +275,7 @@ export function entryFromChoice(args: {
     userEntered: item.kind === 'user' || undefined, approximate: item.approximate,
     state: state.state, stateLabel: state.label, portionValue: args.value, portionUnit: args.unit,
     baseAmount: r.baseAmount, baseUnit: r.baseUnit, kcal: r.kcal, protein: r.protein, carbs: r.carbs, fat: r.fat,
+    fiber: r.fiber, sugars: r.sugars, sodiumMg: r.sodiumMg, satFat: r.satFat, group: item.group,
     basis: b, note: args.note, createdAt: args.now, updatedAt: args.now,
   }
 }
@@ -255,7 +284,7 @@ export function entryFromChoice(args: {
 export function recalcEntry(e: FoodLogEntry, value: number, unit: PortionUnit, now: string): FoodLogEntry | { error: string } {
   const r = calcPortion(e.basis, value, unit)
   if (!r.ok) return { error: r.reason }
-  return { ...e, portionValue: value, portionUnit: unit, baseAmount: r.baseAmount, baseUnit: r.baseUnit, kcal: r.kcal, protein: r.protein, carbs: r.carbs, fat: r.fat, updatedAt: now }
+  return { ...e, portionValue: value, portionUnit: unit, baseAmount: r.baseAmount, baseUnit: r.baseUnit, kcal: r.kcal, protein: r.protein, carbs: r.carbs, fat: r.fat, fiber: r.fiber, sugars: r.sugars, sodiumMg: r.sodiumMg, satFat: r.satFat, updatedAt: now }
 }
 
 /** A calories-per-serving food the user typed in. Clearly marked as user-entered. */

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang } from '../i18n'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addFoodEntry, changeFoodPortion, foodCacheStore, foodOnlineEnabled, getFoodEntry, recentFoods } from '../db/foodRepo'
+import { addFoodEntry, changeFoodPortion, favoriteKey, foodCacheStore, foodOnlineEnabled, getFavorites, getFoodEntry, recentFoods, toggleFavorite } from '../db/foodRepo'
 import { uid, nowIso } from '../db/schema'
 import {
   basisOf, basisText, calcPortion, choiceTitle, entryFromChoice, manualFood, MEAL_CATEGORIES, MEAL_LABEL, PORTION_LABEL, PREP_LABEL,
@@ -23,7 +23,7 @@ function choiceFromEntry(e: FoodLogEntry): FoodChoice {
   const state = { state: e.state, ...e.basis, label: e.stateLabel }
   return {
     state,
-    item: { provider: e.provider, providerId: e.providerId, name: e.name, brand: e.brand, states: [state], kind: e.userEntered ? 'user' : 'generic', source: e.source, approximate: e.approximate },
+    item: { provider: e.provider, providerId: e.providerId, name: e.name, brand: e.brand, group: e.group, states: [state], kind: e.userEntered ? 'user' : 'generic', source: e.source, approximate: e.approximate },
   }
 }
 
@@ -45,6 +45,7 @@ function PortionForm({ units, basis, value, unit, onChange }: {
         </select>
       </div>
       <p className="hint">Per {basisText(basis)}</p>
+      {unit !== 'g' && unit !== 'ml' && unit !== 'oz' && basis.basis !== 'serving' && basis.unitSize[unit as keyof typeof basis.unitSize] !== undefined && <p className="hint">1 {unit} of this food = {basis.unitSize[unit as keyof typeof basis.unitSize]} {basis.basis}</p>}
       {r && r.ok && <p className="big" role="status">{Math.round(r.kcal)} kcal{r.protein !== undefined ? ` · ${r.protein} g protein` : ''}</p>}
       {r && !r.ok && <p className="error" role="alert">{r.reason}</p>}
       {value.trim() !== '' && !(n > 0) && <p className="error" role="alert">Enter an amount greater than zero.</p>}
@@ -59,6 +60,7 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
   const online = useOnline()
   const onlineOn = useLiveQuery(() => foodOnlineEnabled(), [], false)
   const recents = useLiveQuery(() => recentFoods(10), [], [] as FoodLogEntry[])
+  const favorites = useLiveQuery(() => getFavorites(), [], [])
   const existing = useLiveQuery(() => (editId ? getFoodEntry(editId) : undefined), [editId], undefined)
 
   type Draft = { meal: MealCategory; date: string; query: string; picked: FoodChoice | null; value: string; unit: PortionUnit; note: string; manual: boolean; mName: string; mKcal: string }
@@ -69,6 +71,7 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
   const [results, setResults] = useState<FoodChoice[]>([])
   const [reports, setReports] = useState<ProviderReport[]>([])
   const [searching, setSearching] = useState(false)
+  const [goingOnline, setGoingOnline] = useState(false)
   const [picked, setPicked] = useState<FoodChoice | null>(draft?.picked ?? null)
   const [value, setValue] = useState(draft?.value ?? '100')
   const [unit, setUnit] = useState<PortionUnit>(draft?.unit ?? 'g')
@@ -104,11 +107,17 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
     const mine = ++seq.current
     const t = setTimeout(async () => {
       setSearching(true)
+      setGoingOnline(false)
+      setReports([])
       try {
-        const out = await searchFoods({ query: text, online: [off], allowNetwork: !!onlineOn, networkOffline: !online, cache: foodCacheStore })
+        const out = await searchFoods({
+          query: text, online: [off], allowNetwork: !!onlineOn, networkOffline: !online, cache: foodCacheStore,
+          onLocal: (c) => { if (mine === seq.current) setResults(c) },
+          onGoingOnline: () => { if (mine === seq.current) setGoingOnline(true) },
+        })
         if (mine === seq.current) { setResults(out.choices); setReports(out.reports) }
       } finally {
-        if (mine === seq.current) setSearching(false)
+        if (mine === seq.current) { setSearching(false); setGoingOnline(false) }
       }
     }, 250)
     return () => clearTimeout(t)
@@ -203,15 +212,16 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
               <input id="a-search" type="search" value={query} placeholder="For example: rice, idli, dal, banana" onChange={(e) => setQuery(e.target.value)} />
               <p className="hint">Pick the exact version you ate. Raw and cooked foods have very different calories per gram.</p>
             </div>
-            {searching && <p className="muted" role="status">Searching...</p>}
-            {reports.filter((r) => r.status !== 'disabled' && (r.status !== 'ok' || r.provider !== 'local')).map((r) => <p key={r.provider} className="hint" role="status">{r.name}: {r.message}</p>)}
+            {searching && !goingOnline && <p className="muted" role="status">Searching...</p>}
+            {goingOnline && <p className="notice online-note" role="status">Not found on this phone. Searching the internet (Open Food Facts)...</p>}
+            {reports.filter((r) => (r.status !== 'disabled' || shown.length === 0) && (r.status !== 'ok' || r.provider !== 'local')).map((r) => <p key={r.provider} className="hint" role="status">{r.name}: {r.message}</p>)}
             <ul className="history">
               {shown.map((c) => (
                 <li key={`${c.item.provider}-${c.item.providerId}-${c.state.state}`}>
                   <button type="button" className="alt" onClick={() => choose(c)}>
                     <strong>{choiceTitle(c)}{c.item.brand ? ` · ${c.item.brand}` : ''}</strong>
                     {lang === 'te' && c.item.nameTe && <span className="muted" lang="te">{c.item.nameTe}</span>}
-                    <span className="muted">{Math.round(c.state.kcalPer100)} kcal per {c.state.basis === 'serving' ? 'serving' : `100 ${c.state.basis}`} · {PREP_LABEL[c.state.state]}{c.item.approximate ? ' · approx.' : ''}</span>
+                    <span className="muted">{Math.round(c.state.kcalPer100)} kcal per {c.state.basis === 'serving' ? 'serving' : `100 ${c.state.basis}`} · {PREP_LABEL[c.state.state]}{c.item.approximate ? ' · approx.' : ''}{c.item.provider === 'openfoodfacts' ? ' · from the internet' : ''}</span>
                   </button>
                 </li>
               ))}
@@ -220,6 +230,21 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
             {onlineOn && shown.some((c) => c.item.provider === 'openfoodfacts') && <p className="hint">{off.attribution}</p>}
             <Button variant="ghost" onClick={() => setManual(true)}>Add my own food</Button>
           </Card>
+
+          {favorites.length > 0 && (
+            <Card title="My foods">
+              <ul className="history">
+                {favorites.map((f) => (
+                  <li key={f.key}>
+                    <button type="button" className="alt" onClick={() => choose({ item: f.item, state: f.item.states[0] })}>
+                      <strong>{choiceTitle({ item: f.item, state: f.item.states[0] })}</strong>
+                      <span className="muted">{Math.round(f.item.states[0].kcalPer100)} kcal per {f.item.states[0].basis === 'serving' ? 'serving' : `100 ${f.item.states[0].basis}`}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           {recents.length > 0 && (
             <Card title="Recent foods">
@@ -260,6 +285,9 @@ export function FoodEntry({ today, editId }: { profile: Profile; today: string; 
           <p className="hint">Source: {picked.item.source}</p>
           {err && <p className="error" role="alert">{err}</p>}
           <Button onClick={() => void save()}>Add to {MEAL_LABEL[meal].toLowerCase()}</Button>
+          <Button variant="ghost" onClick={() => void toggleFavorite(picked.item, picked.state)} aria-pressed={favorites.some((f) => f.key === favoriteKey(picked.item, picked.state.state))}>
+            {favorites.some((f) => f.key === favoriteKey(picked.item, picked.state.state)) ? '★ Saved in My foods (tap to remove)' : '☆ Save to My foods'}
+          </Button>
           <Button variant="ghost" onClick={() => { setPicked(null); setErr('') }}>Choose a different food</Button>
         </Card>
       )}

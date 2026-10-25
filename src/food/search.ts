@@ -30,6 +30,10 @@ export interface SearchOptions {
   timeoutMs?: number
   /** Cached results younger than this are used without asking the network again. */
   freshMs?: number
+  /** Called with the on-phone results as soon as they are ready, before any online search starts. */
+  onLocal?: (choices: FoodChoice[]) => void
+  /** Called just before the app goes online because nothing on this phone matched. */
+  onGoingOnline?: () => void
 }
 
 const DAY = 86_400_000
@@ -44,7 +48,12 @@ export async function searchFoods(opts: SearchOptions): Promise<SearchOutcome> {
   const items: FoodItem[] = await localProvider.search(q)
   reports.push({ provider: 'local', name: localProvider.name, status: 'ok', message: `${items.length} common food${items.length === 1 ? '' : 's'} found on this phone.` })
   const seen = new Set(items.map(dedupeKey))
+  opts.onLocal?.(items.flatMap(choicesOf))
 
+  // Everything is on the phone first. The internet is only asked when nothing here matches.
+  const goOnline = items.length === 0
+  if (!goOnline) return { choices: items.flatMap(choicesOf), reports }
+  let announced = false
   for (const p of opts.online) {
     const key = `${p.id}|${q.toLowerCase()}`
     const add = (list: FoodItem[]) => {
@@ -54,7 +63,7 @@ export async function searchFoods(opts: SearchOptions): Promise<SearchOutcome> {
       }
     }
     if (!opts.allowNetwork) {
-      reports.push({ provider: p.id, name: p.name, status: 'disabled', message: 'Online search is off. Turn it on to search packaged foods.' })
+      reports.push({ provider: p.id, name: p.name, status: 'disabled', message: 'Not found on this phone. Turn on online search to look for packaged foods on the internet.' })
       continue
     }
     const cached = await opts.cache.get(key)
@@ -73,6 +82,7 @@ export async function searchFoods(opts: SearchOptions): Promise<SearchOutcome> {
       }
       continue
     }
+    if (!announced) { announced = true; opts.onGoingOnline?.() }
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 8000)
     try {
@@ -80,7 +90,7 @@ export async function searchFoods(opts: SearchOptions): Promise<SearchOutcome> {
       const retrievedAt = now().toISOString()
       await opts.cache.put({ key, provider: p.id, query: q, results, retrievedAt, expiresAt: new Date(now().getTime() + 7 * DAY).toISOString() })
       add(results)
-      reports.push({ provider: p.id, name: p.name, status: 'ok', message: `${results.length} packaged product${results.length === 1 ? '' : 's'} found online.` })
+      reports.push({ provider: p.id, name: p.name, status: 'ok', message: `Not found on this phone, so the internet was searched: ${results.length} packaged product${results.length === 1 ? '' : 's'} found.` })
     } catch (e) {
       const stale = cached?.results
       if (stale) add(stale)

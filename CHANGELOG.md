@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.21.0 - Food data on the phone (branch feature/v2-complete)
+- About 8,000 USDA reference foods (public domain) are now stored in the app, with calories, protein, carbs, fat, fibre, sugars, sodium and saturated fat per 100 g, plus cup, spoon and piece sizes where USDA gives them. Search works fully offline.
+- The internet (Open Food Facts) is only asked when nothing on the phone matches, and only if online search is switched on. The screen says "Not found on this phone. Searching the internet" while it does, and results from the internet are labelled.
+- New Nutrition card on the Food tab: a score that unlocks after 750 kcal, built from sodium, fibre, saturated fat and fruit and vegetables against public guideline targets, plus grams eaten per food group (vegetables, fruit, whole grains, healthy oils, nuts and legumes, fish, red meat, processed meat, alcohol). Foods without values are left out, never guessed.
+- My foods: star a food to find it again quickly, kept on the phone.
+- Omega-3 and Glucose Impact are not included: the bundled data has no omega-3 values, and glucose response cannot be worked out from a food log.
+
 ## 2.20.0 - The timer keeps going (branch feature/v2-complete)
 - The rest timer now lives outside the workout screen. It stays on every tab, is saved on the phone, and is still right after you minimise the app or lock the screen. Finishing or discarding a workout ends it.
 - While a rest runs, a quiet audio track with the 1 second beep inside plays, so the beep can sound with the screen locked. It mixes with music you already have playing. iPhone web apps still cannot vibrate.
