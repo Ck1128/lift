@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.22.0 - Indian foods and new food icons (branch feature/v2-complete)
+- Plain Indian foods (dals, vegetables, greens, fruits, millets, nuts, seeds, milk, curd, eggs, salt and spices) now have sodium, fibre, sugars and saturated fat, taken from the USDA record of the same food. A pairing is only used when the calories and macros are close; ten that were not were left out. Indian dishes such as dosa or biryani have no such values, because their salt and oil cannot be known, so they are not counted.
+- The Indian Food Composition Tables could not be used: they have no reuse licence for the data.
+- New food-group icons and tiles, drawn for Lift, replacing the emoji.
+
 ## 2.21.0 - Food data on the phone (branch feature/v2-complete)
 - About 8,000 USDA reference foods (public domain) are now stored in the app, with calories, protein, carbs, fat, fibre, sugars, sodium and saturated fat per 100 g, plus cup, spoon and piece sizes where USDA gives them. Search works fully offline.
 - The internet (Open Food Facts) is only asked when nothing on the phone matches, and only if online search is switched on. The screen says "Not found on this phone. Searching the internet" while it does, and results from the internet are labelled.

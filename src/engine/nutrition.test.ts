@@ -7,6 +7,7 @@ import { LOCAL_MICROS } from '../data/localMicros'
 import { LOCAL_FOODS } from '../data/foods'
 import { INDIAN_GROUPS } from '../data/indianGroups'
 import { INDIAN_FOODS } from '../data/indianFoods'
+import { INDIAN_MICROS } from '../data/indianMicros'
 import { searchFoods } from '../food/search'
 import type { FoodDataProvider } from '../food/providers'
 
@@ -60,6 +61,20 @@ describe('bundled foods match the USDA record they take their extra numbers from
     expect(rice.states.find((s) => s.state === 'cooked')!.sodiumMgPer100).toBe(4)
     expect(rice.group).toBe('whole_grains')
     expect(ALL_LOCAL_FOODS.find((f) => f.providerId === 'spinach')!.group).toBe('vegetables')
+  })
+  it('plain Indian foods take their sodium and fibre from the USDA record of the same food, and dishes get none', async () => {
+    const usda = new Map((await loadUsda()).map((f) => [f.providerId, f.states[0]]))
+    for (const [key, m] of Object.entries(INDIAN_MICROS)) {
+      const [id, st] = key.split('|')
+      const food = INDIAN_FOODS.find((f) => f.providerId === `in-${id}`)!
+      expect(food.states.some((s) => s.state === st), key).toBe(true)
+      expect(String(usda.get(m[0])!.sodiumMgPer100 ?? ''), key).toBe(m[5] === '' ? '' : String(Number(m[5])))
+    }
+    const toorRaw = ALL_LOCAL_FOODS.find((f) => f.providerId === 'in-toor-dal')!.states.find((s) => s.state === 'raw')!
+    expect(toorRaw.fiberPer100).toBeGreaterThan(10)
+    expect(ALL_LOCAL_FOODS.find((f) => f.providerId === 'in-salt-in')!.states[0].sodiumMgPer100).toBe(38758)
+    const dosa = ALL_LOCAL_FOODS.find((f) => /dosa/i.test(f.name))!
+    expect(dosa.states[0].sodiumMgPer100).toBeUndefined()
   })
   it('every Indian food id in the group table exists', () => {
     const ids = new Set(INDIAN_FOODS.map((f) => f.providerId.replace(/^in-/, '')))

@@ -349,3 +349,15 @@ body:has(.start-bar) .rest-bar { bottom: calc(168px + env(safe-area-inset-bottom
 .nut-part { grid-template-columns: 1fr auto; row-gap: 8px; }
 .nut-part .nut-bar { grid-column: 1 / -1; }
 .nut-part .nut-val { white-space: nowrap; }
+
+/* Food-group tiles */
+.grp-grid { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grp-tile { --g: #64748b; display: grid; grid-template-columns: auto 1fr; grid-template-areas: "i i" "n n" "v v"; gap: 2px 0; padding: 12px; border-radius: 20px; background: var(--surface-2); border: 1.5px solid transparent; }
+.grp-tile.has { border-color: color-mix(in srgb, var(--g) 35%, transparent); background: color-mix(in srgb, var(--g) 9%, var(--surface-2)); }
+.grp-ico { grid-area: i; width: 38px; height: 38px; border-radius: 13px 13px 13px 5px; display: grid; place-items: center; color: var(--g); background: color-mix(in srgb, var(--g) 16%, transparent); margin-bottom: 6px; }
+.grp-name { grid-area: n; font-weight: 600; font-size: 14px; }
+.grp-val { grid-area: v; font-family: var(--font-display); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.grp-val small { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.grp-tile:not(.has) .grp-val { color: var(--text-2); }
+.g-vegetables { --g: #15803d; } .g-fruit { --g: #c2410c; } .g-whole_grains { --g: #a16207; } .g-healthy_oils { --g: #4d7c0f; }
+.g-nuts_legumes { --g: #92400e; } .g-fish { --g: #0e7490; } .g-red_meat { --g: #b91c1c; } .g-processed_meat { --g: #7c2d12; } .g-alcohol { --g: #6d28d9; }

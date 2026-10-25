@@ -3,10 +3,8 @@ import { Card, Dialog, Button } from './ui'
 import { dayNutrition, scoreDay, SCORE_UNLOCK_KCAL, SODIUM_LIMIT_MG, type Part } from '../engine/nutrition'
 import { GROUP_LABEL, type FoodGroup } from '../engine/foodGroups'
 import type { FoodLogEntry } from '../engine/food'
+import { GroupIcon } from './GroupIcons'
 
-const ICON: Record<FoodGroup, string> = {
-  vegetables: '🥬', fruit: '🍓', whole_grains: '🌾', healthy_oils: '🥑', nuts_legumes: '🥜', fish: '🐟', red_meat: '🥩', processed_meat: '🌭', alcohol: '🍷',
-}
 const GROUP_ORDER: FoodGroup[] = ['vegetables', 'fruit', 'whole_grains', 'healthy_oils', 'nuts_legumes', 'fish', 'red_meat', 'processed_meat', 'alcohol']
 
 function Ring({ value, locked }: { value: number | null; locked?: boolean }) {
@@ -54,12 +52,12 @@ export function NutritionCard({ entries }: { entries: FoodLogEntry[] }) {
       {!s.locked && <ul className="nut-list" aria-label="What the score is made of">{s.parts.map((p) => <PartRow key={p.id} p={p} />)}</ul>}
 
       <p className="label-like">Food groups today</p>
-      <ul className="nut-list" aria-label="Food groups">
+      <ul className="grp-grid" aria-label="Food groups">
         {GROUP_ORDER.map((g) => (
-          <li key={g} className="nut-row">
-            <span className="nut-icon" aria-hidden="true">{ICON[g]}</span>
-            <span className="nut-name">{GROUP_LABEL[g]}</span>
-            <span className="nut-val">{grams(g) > 0 ? `${grams(g)} g` : '0 g'}</span>
+          <li key={g} className={`grp-tile g-${g}${grams(g) > 0 ? ' has' : ''}`}>
+            <span className="grp-ico"><GroupIcon group={g} /></span>
+            <span className="grp-name">{GROUP_LABEL[g]}</span>
+            <span className="grp-val">{grams(g)} <small>g</small></span>
           </li>
         ))}
       </ul>

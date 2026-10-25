@@ -4,6 +4,7 @@ import { classifyFood } from '../engine/foodGroups'
 import { loadUsda } from './usda'
 import { INDIAN_FOODS } from '../data/indianFoods'
 import { INDIAN_GROUPS } from '../data/indianGroups'
+import { INDIAN_MICROS } from '../data/indianMicros'
 import type { FoodItem, FoodState } from '../engine/food'
 
 /**
@@ -34,7 +35,7 @@ export class ProviderError extends Error {
 function withMicros(f: FoodItem): FoodItem {
   let group = f.group
   const states = f.states.map((s) => {
-    const m = LOCAL_MICROS[`${f.providerId}|${s.state}`]
+    const m = LOCAL_MICROS[`${f.providerId}|${s.state}`] ?? INDIAN_MICROS[`${f.providerId.replace(/^in-/, '')}|${s.state}`]
     if (!m) return s
     group ??= classifyFood(m[1], m[2])
     const n = (v: string) => (v === '' ? undefined : Number(v))
@@ -42,7 +43,7 @@ function withMicros(f: FoodItem): FoodItem {
   })
   return { ...f, states, group }
 }
-export const ALL_LOCAL_FOODS: FoodItem[] = [...LOCAL_FOODS.map(withMicros), ...INDIAN_FOODS.map((f) => ({ ...f, group: INDIAN_GROUPS[f.providerId.replace(/^in-/, '')] }))]
+export const ALL_LOCAL_FOODS: FoodItem[] = [...LOCAL_FOODS.map(withMicros), ...INDIAN_FOODS.map((f) => withMicros({ ...f, group: INDIAN_GROUPS[f.providerId.replace(/^in-/, '')] }))]
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{M}\p{N} ]+/gu, ' ').replace(/\s+/g, ' ').trim()
 
