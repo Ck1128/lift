@@ -1,5 +1,6 @@
 import raw from './catalog.json'
 import { MANUAL_EXERCISES } from './manualExercises'
+import { PROGRAM_EXERCISES } from './programExercises'
 import type { EquipmentId, Exercise, ExerciseType, Level, Muscle, Pattern } from '../engine/types'
 import { validateExercise } from '../engine/validate'
 
@@ -66,7 +67,7 @@ for (const e of [...MANUAL_EXERCISES, ...(raw as RawRow[]).map(fromRaw)].map(pat
 /** Only entries that pass validation reach the engine. Invalid ones are dropped, never guessed at. */
 export const CATALOG: Exercise[] = all.filter((e) => validateExercise(e).length === 0)
 
-const byId = new Map(CATALOG.map((e) => [e.id, e]))
+const byId = new Map([...CATALOG, ...PROGRAM_EXERCISES.filter((e) => validateExercise(e).length === 0)].map((e) => [e.id, e]))
 export function exerciseById(id: string): Exercise | undefined {
   return byId.get(id)
 }

@@ -380,3 +380,9 @@ body:has(.start-bar) .rest-bar { bottom: calc(168px + env(safe-area-inset-bottom
 .danger-zone { background: transparent; box-shadow: none; border: 0; border-top: 1px solid rgba(0,0,0,.08); border-radius: 0; padding: 12px 0 0; margin-top: 10px; }
 .danger-zone .card-title { font-size: 0.8rem; font-weight: 600; color: var(--muted, #6b7280); text-transform: uppercase; letter-spacing: .06em; }
 .card .hint + .muted { margin-top: 2px; }
+.fold.next { box-shadow: 0 0 0 2px var(--ac), 0 6px 20px rgba(0,0,0,.05); }
+.prog-list li { padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,.05); }
+.prog-list li:last-child { border-bottom: 0; }
+.profile-pick { display: flex; align-items: center; gap: 10px; margin: -4px 0 12px; }
+.profile-pick label { font-size: .85rem; color: var(--muted, #6b7280); white-space: nowrap; }
+.profile-pick select { flex: 1; min-width: 0; border-radius: 999px; padding: 8px 14px; font-weight: 600; }

@@ -171,6 +171,8 @@ export interface PlannedExercise {
   intensityCue?: string
   /** Short form cues, more of them for beginners. */
   cues?: string[]
+  /** What one "rep" means when it is not a plain rep: seconds of a hold, or reps on each side or leg. */
+  repLabel?: 'sec' | 'side' | 'leg'
 }
 
 export interface GeneratedWorkout {
@@ -273,6 +275,10 @@ export interface ScheduledWorkout {
   /** The 30 minute express circuit. */
   circuit?: boolean
   workout?: GeneratedWorkout
+  /** Set when this day comes from a fixed program (for example Home) instead of being designed by Lift. */
+  programId?: string
+  /** Index of the program day (0 = Day 1). */
+  programDay?: number
   rescheduledFromId?: string
   createdAt: string
   updatedAt: string

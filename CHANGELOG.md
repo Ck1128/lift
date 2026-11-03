@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.24.0 - Home program (branch feature/v2-complete)
+- New Workout profile menu at the top of Home: Standard (Lift plans for you, exactly as before) or Home (a 10-day dumbbell program). Nothing changes unless Home is chosen, and choosing Standard brings the usual weekly plan back. Both switches ask first.
+- Home is 10 numbered days done in order, not tied to weekdays. The next day only moves on when you finish one, so rest days are simply days you skip. You can skip ahead on Home, or pick any day from the Plan tab. Switching back to Home later picks up after the last day you finished.
+- Home uses one pair of 12 lb dumbbells and floor space. The weight is filled in for every dumbbell set; holds show seconds and one-side moves show reps per side or leg. Swaps during a Home workout only offer dumbbell and bodyweight moves. Your saved location and equipment lists are not changed.
+- Changes from the written plan: a warm-up was added to the days that had none (Days 3, 5, 6, 7, 9 and a 5 minute one on Day 10); Day 7 reverse lunges go from 3 to 2 sets because Bulgarian split squats already train each leg; Day 8 is called Conditioning Circuit instead of Recovery, since four rounds is hard work; push-ups are 5-15 reps, stopping 2-4 short of failure; every triceps extension is the overhead one with one dumbbell; once sets feel easy, slow the lowering to 3 seconds instead of adding reps.
+- While Home is on, the Plan tab shows the 10 days instead of a week.
+
 ## 2.23.0 - A cleaner Food tab (branch feature/v2-complete)
 - Food now opens to one summary and one "Log food" button. Tap it, pick the meal, and log. Meals appear only once they have something in them, as closed rows that open when tapped, and the Nutrition card sits in its own closed row.
 - The online-search switch moved off the Food page; it is on the search screen where it matters.

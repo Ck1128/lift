@@ -19,6 +19,7 @@ import { FeedbackButton } from '../components/Feedback'
 import { ExerciseInfo } from '../components/ExerciseInfo'
 import { WorkoutMuscles } from '../components/WorkoutMuscles'
 import { Button, Card, Chips, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
+import { formatTarget } from '../engine/program'
 
 const clock = (ms: number) => formatClock(ms)
 
@@ -200,7 +201,7 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
   return (
     <Card className={actual.skipped ? 'skipped' : ''}>
       <div className="title-row">
-        <p className="big">{cardio ? slot.name : (ex?.name ?? slot.name)}</p>
+        <p className="big">{cardio || actual.exerciseId === slot.exerciseId ? slot.name : (ex?.name ?? slot.name)}</p>
         <FeedbackButton component="Workout exercise" element={ex?.name ?? slot.name} />
         {!cardio && !actual.skipped && <ExerciseInfo exerciseId={actual.exerciseId} name={ex?.name ?? slot.name} cues={slot.cues} note={slot.loadNote} why={slot.why} />}
       </div>
@@ -208,7 +209,7 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
       {cardio ? (
         <p className="muted">Target {slot.durationMinutes} min{slot.intensityCue ? ` · ${slot.intensityCue}` : ''}</p>
       ) : (
-        <p className="muted">Target {slot.sets} × {slot.repMin}-{slot.repMax} reps · rest {slot.restSeconds}s</p>
+        <p className="muted">Target {formatTarget(slot)} · rest {slot.restSeconds}s</p>
       )}
       {actual.skipped ? (
         <div className="inline">
@@ -241,7 +242,7 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
             </label>
             {unit !== pageUnit && <span className="hint">Different from the workout default ({pageUnit}).</span>}
           </div>
-          <div className="set-head" aria-hidden="true"><span>Set</span><span>{unit}</span><span>Reps</span><span>RPE</span><span /></div>
+          <div className="set-head" aria-hidden="true"><span>Set</span><span>{unit}</span><span>{slot.repLabel === 'sec' ? 'Sec' : 'Reps'}</span><span>RPE</span><span /></div>
           {logs.map((l) => <SetRow key={l.id} log={l} onDone={onSetDone} />)}
           <div className="set-actions">
             <Button variant="small" onClick={() => void addSet(sessionId, slot.slotId)}>Add set</Button>

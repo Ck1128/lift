@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { applyCallToToday, generateFor, recentSoreness } from '../db/repo'
+import { activeProgram, openProgramDay, setProgram } from '../db/programRepo'
+import { programMinutes } from '../engine/program'
+import { ConfirmButton } from './confirm'
 import { getSetting, setSetting, SETTING } from '../db/settings'
 import { applyYogaPairing } from '../db/yogaRepo'
 import { exerciseById } from '../data/catalog'
@@ -41,8 +44,9 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   const [focus, setFocus] = useState<FocusKey | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const prog = useLiveQuery(() => activeProgram(), [], undefined)
 
-  if (mode === undefined || loading || !tracks.workout) return null
+  if (mode === undefined || prog === undefined || loading || !tracks.workout) return null
   const doneToday = sessions.filter((s) => s.date === today && s.status === 'completed')
   if (sessions.some((s) => s.status === 'in_progress')) return null
 
@@ -68,6 +72,39 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
         <p className="hero-title">Stretch what you just worked</p>
         <p className="muted">{pairing.label}. Poses for those muscles come first.</p>
         <Button onClick={() => void pairYogaNow(pairing)}>Set up the cool-down</Button>
+      </Card>
+    )
+  }
+
+  // ---------- a fixed program (for example Home): the next numbered day, whatever the weekday ----------
+  if (prog) {
+    const { program, next } = prog
+    // A program day already opened for today wins over the computed next day.
+    const day = sched && sched.status === 'planned' && sched.programId === program.id && sched.programDay !== undefined ? sched.programDay : next
+    const d = program.days[day]
+    const muscles = [...new Set(d.exercises.flatMap((e) => exerciseById(e.exerciseId)?.primaryMuscles ?? []))]
+    const open = async () => {
+      setBusy(true)
+      setMessage(null)
+      try {
+        const row = await openProgramDay(today, day)
+        if (row) navigate('/workout')
+        else setMessage('Could not open this program day.')
+      } finally { setBusy(false) }
+    }
+    const after = (day + 1) % program.days.length
+    return (
+      <Card className="hero call">
+        <p className="eyebrow">{program.name} program · Day {day + 1} of {program.days.length}</p>
+        <p className="hero-title">{d.title}</p>
+        <p className="muted">{muscles.length > 0 ? `${muscles.map((m) => MUSCLE_LABEL[m]).join(' · ')} · ` : ''}about {programMinutes(d)} min</p>
+        <Button disabled={busy} onClick={() => void open()}>Open Day {day + 1}</Button>
+        {message && <p className="error" role="alert">{message}</p>}
+        <p className="call-alt">
+          <ConfirmButton variant="small" className="pill" confirm={{ title: `Skip to Day ${after + 1}?`, message: `Day ${day + 1} (${d.title}) is skipped and Day ${after + 1} (${program.days[after].title}) comes next. Nothing you saved changes.` }}
+            onConfirm={() => setProgram(program.id, after)}>Skip to Day {after + 1}</ConfirmButton>
+        </p>
+        <p className="hint">Resting today? That is fine. Day {day + 1} waits for you.</p>
       </Card>
     )
   }

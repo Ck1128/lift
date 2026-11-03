@@ -14,6 +14,7 @@ import { Button, Card, Loading, ScreenHeader } from '../components/ui'
 import { MiniRing } from '../components/Ring'
 import { BodyBasicsCard, LevelDialog } from '../components/HomeParts'
 import { TodaysCall } from '../components/TodaysCall'
+import { ProgramPicker } from '../components/ProgramPicker'
 import { InjuredAreas } from '../components/InjuredAreas'
 import { useQuery } from '../hooks/app'
 import { useRouter } from '../router'
@@ -73,6 +74,7 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
   return (
     <>
       <ScreenHeader title={greeting} subtitle={formatDay(today)} />
+      {tracks.workout && <ProgramPicker today={today} />}
 
       {gaps.length > 0 && <BodyBasicsCard profile={profile} />}
 

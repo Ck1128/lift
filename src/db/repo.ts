@@ -13,7 +13,9 @@ import { convertWeight, tidy } from '../engine/units'
 import { gapsMessage, requiredProfileGaps } from '../engine/levels'
 import { ageFromBirthDate } from '../engine/age'
 import { tracksOf } from '../engine/tracks'
-import { getSetting, setSetting } from './settings'
+import { getSetting, setSetting, SETTING } from './settings'
+import { programById } from '../data/programs'
+import { programWorkout, type ProgramState } from '../engine/program'
 import { painKey, type PainReport } from '../engine/pain'
 import { buildAdaptPlan } from '../engine/adapt'
 import { ALL_TRACKS, type Track } from '../engine/types'
@@ -274,6 +276,8 @@ export async function ensureScheduled(today: string, days: number, profile?: Pro
   const plan = await getPlan()
   const p = profile ?? (await getProfile())
   if (!plan || !p) return
+  // A fixed program (for example Home) is done in order, not on weekdays, so no weekday rows are made while it is on.
+  if (await getSetting<ProgramState | null>(SETTING.program, null)) return
   const now = nowIso()
   for (let i = 0; i < days; i++) {
     const date = addDays(today, i)
@@ -373,6 +377,15 @@ export async function generateFor(
   const sched = await db.scheduled.get(scheduledId)
   const profile = await getProfile()
   if (!sched || !profile) return { kind: 'error', message: 'Create your profile first.' }
+  // A program day is written out in full: it is rebuilt from the program, never designed by the engine.
+  if (sched.programId !== undefined && sched.programDay !== undefined) {
+    const program = programById(sched.programId)
+    if (!program || !program.days[sched.programDay]) return { kind: 'error', message: 'This program day no longer exists.' }
+    const workout = programWorkout(program, sched.programDay, sched.date, profile.weightUnit, (id) => exerciseById(id)?.primaryMuscles ?? [], CATALOG_VERSION)
+    const reopen = opts.force && (sched.status === 'completed' || sched.status === 'partial')
+    await db.scheduled.put({ ...sched, workout, availableMinutes: workout.availableMinutes, status: reopen ? 'planned' : sched.status, generatorVersion: workout.generatorVersion, updatedAt: nowIso() })
+    return { kind: 'workout', workout }
+  }
   const gaps = profileGaps(profile)
   if (gaps.length > 0) return { kind: 'error', message: gapsMessage(gaps) }
   const equipment = await getEquipment(profile.preferredLocation, profile.weightUnit, profile.gymType)

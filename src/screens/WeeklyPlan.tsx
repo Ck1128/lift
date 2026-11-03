@@ -9,6 +9,8 @@ import { ALL_MUSCLES, MUSCLE_LABEL, type Profile, type ScheduledWorkout } from '
 import { Button, Card, ConfirmDialog, ScreenHeader } from '../components/ui'
 import { ResetDay } from '../components/ResetDay'
 import { useRouter } from '../router'
+import { activeProgram } from '../db/programRepo'
+import { ProgramView } from '../components/ProgramView'
 
 const STATUS_LABEL = { planned: 'Planned', completed: 'Completed', partial: 'Partly done', skipped: 'Skipped' } as const
 
@@ -22,6 +24,7 @@ export function WeeklyPlan({ profile, today }: { profile: Profile; today: string
   const plan = useLiveQuery(() => getPlan(), [], undefined)
   const rows = useLiveQuery(() => db.scheduled.toArray(), [], [] as ScheduledWorkout[])
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
+  const prog = useLiveQuery(() => activeProgram(), [], undefined)
 
   const monday = addDays(startOfWeek(today), offset * 7)
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -32,6 +35,9 @@ export function WeeklyPlan({ profile, today }: { profile: Profile; today: string
     const { suggestion } = await skipScheduled(r.id, today)
     setSuggest({ id: r.id, date: suggestion })
   }
+
+  if (prog === undefined) return <p className="muted">Loading...</p>
+  if (prog) return <ProgramView program={prog.program} next={prog.next} doneCount={prog.done.length} />
 
   return (
     <>

@@ -17,7 +17,10 @@ import { availableIds } from '../engine/equipment'
 import { cardioOptions, cardioCalories } from '../engine/cardio'
 import { cardioById } from '../data/cardio'
 import { formatWeight } from '../engine/units'
+import { formatTarget } from '../engine/program'
 import { useRouter } from '../router'
+import { programEquipment } from '../db/programRepo'
+import { programById } from '../data/programs'
 
 /** The route stays /workout while the preview becomes the player, so the page must be sent back to the top by hand. */
 function useScrollTopOn(key: string) {
@@ -33,6 +36,13 @@ export function Workout({ profile, today }: { profile: Profile; today: string })
   const activeQ = useQuery(() => db.sessions.where('status').equals('in_progress').first(), [])
   const schedQ = useQuery(() => scheduledOn(today), [today])
   const equipQ = useQuery(() => getEquipment(profile.preferredLocation, profile.weightUnit, profile.gymType), [profile.preferredLocation, profile.weightUnit, profile.gymType])
+  // A program workout (for example Home) swaps only within the program's own equipment.
+  const progEqQ = useQuery(async () => {
+    const id = (await db.sessions.where('status').equals('in_progress').first())?.scheduledWorkoutId
+    const row = id ? await db.scheduled.get(id) : undefined
+    const program = row?.programId ? programById(row.programId) : undefined
+    return program ? programEquipment(program) : null
+  }, [activeQ.value?.id])
   const savedQ = useQuery(async () => {
     const s = await scheduledOn(today)
     return s ? (await db.sessions.where('scheduledWorkoutId').equals(s.id).toArray()).filter((x) => x.status !== 'abandoned' && x.status !== 'in_progress')[0] : undefined
@@ -43,11 +53,11 @@ export function Workout({ profile, today }: { profile: Profile; today: string })
   if (summaryId) {
     return <SessionSummary sessionId={summaryId} profile={profile} onClose={() => { setSummaryId(null); navigate('/home') }} />
   }
-  if (activeQ.loading || schedQ.loading || equipQ.loading || savedQ.loading) return <p className="muted">Loading...</p>
+  if (activeQ.loading || schedQ.loading || equipQ.loading || savedQ.loading || progEqQ.loading) return <p className="muted">Loading...</p>
   const active = activeQ.value
   const sched = schedQ.value
   if (active && equipQ.value) {
-    return <Player session={active} profile={profile} equipment={equipQ.value} onFinished={(id) => setSummaryId(id)} />
+    return <Player session={active} profile={profile} equipment={progEqQ.value ?? equipQ.value} onFinished={(id) => setSummaryId(id)} />
   }
   if (!sched?.workout || sched.status === 'completed' || sched.status === 'skipped') {
     const saved = savedQ.value
@@ -94,6 +104,8 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
     await regenerate(w.availableMinutes, true)
   }
   const resuming = sched.status === 'partial'
+  // A program day (for example Home, Day 3) is written out in full, so it has no time picker, rebuild or cardio swap.
+  const fixed = sched.programId !== undefined
   // The pain check comes before every fresh workout. Continuing a workout you already began does not need it again.
   const painAnswered = pain !== undefined && pain !== null
   const startNew = async () => {
@@ -116,8 +128,8 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
       {!resuming && <PainCheck today={today} profile={profile} onSaved={() => regenerate(w.availableMinutes, false)} />}
       <Card>
         <p className="big">About {w.estimatedMinutes} min</p>
-        <p className="hint">(estimate, you chose {w.availableMinutes})</p>
-        {!w.fits && <p className="error" role="alert">This is longer than the time you chose.</p>}
+        {!fixed && <p className="hint">(estimate, you chose {w.availableMinutes})</p>}
+        {!fixed && !w.fits && <p className="error" role="alert">This is longer than the time you chose.</p>}
         {w.notes[0] && <p className="lede">{w.notes[0]}</p>}
         {w.notes.length > 1 && (
           <details className="why">
@@ -129,8 +141,12 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
           <summary className="muted">How the time is estimated</summary>
           <ul className="plain">{w.assumptions.map((a, i) => <li key={i}>{a}</li>)}</ul>
         </details>
-        <p className="label-like">Change available minutes</p>
-        <DurationPicker value={w.availableMinutes} onChange={(m) => { if (m !== null && m !== w.availableMinutes) void regenerate(m, false) }} />
+        {!fixed && (
+          <>
+            <p className="label-like">Change available minutes</p>
+            <DurationPicker value={w.availableMinutes} onChange={(m) => { if (m !== null && m !== w.availableMinutes) void regenerate(m, false) }} />
+          </>
+        )}
       </Card>
 
       <Card title="Muscles" feedback={{ categories: MUSCLE_CATEGORIES, attach: { label: 'The names of the exercises in this workout', data: { exercises: w.exercises.map((e) => e.name) } } }}>
@@ -156,7 +172,7 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
                   <p className="muted">{e.durationMinutes} min{e.intensityCue ? ` · ${e.intensityCue}` : ''}{kcal ? ` · roughly ${kcal.low} to ${kcal.high} calories (an estimate)` : ''}</p>
                 ) : (
                   <>
-                    <p className="muted">{e.sets} × {e.repMin}-{e.repMax} · rest {e.restSeconds}s · {e.suggestedWeight !== undefined ? <strong>Suggested: {formatWeight(e.suggestedWeight, e.loadUnit ?? profile.weightUnit)}</strong> : 'Pick your own starting weight'}</p>
+                    <p className="muted">{formatTarget(e)} · rest {e.restSeconds}s · {e.suggestedWeight !== undefined ? <strong>Suggested: {formatWeight(e.suggestedWeight, e.loadUnit ?? profile.weightUnit)}</strong> : 'Pick your own starting weight'}</p>
                     {e.loadNote && <details className="ex-more"><summary>Why this weight</summary><p className="hint">{e.loadNote}</p></details>}
                   </>
                 )}
@@ -166,7 +182,7 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
         </ol>
       </Card>
 
-      {!sched.cardioOnly && (
+      {!sched.cardioOnly && !fixed && (
         <Card title="Cardio">
           {cardio ? (
             <>
@@ -198,7 +214,7 @@ function Preview({ scheduledId, profile, today }: { scheduledId: string; profile
         </div>
       ) : (
         <>
-          <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Build a fresh version?', message: 'The exercises shown here are replaced with a new set.' }} onConfirm={() => regenerate(w.availableMinutes, true)}>Build a fresh version</ConfirmButton>
+          {!fixed && <ConfirmButton variant="ghost" disabled={busy} confirm={{ title: 'Build a fresh version?', message: 'The exercises shown here are replaced with a new set.' }} onConfirm={() => regenerate(w.availableMinutes, true)}>Build a fresh version</ConfirmButton>}
           <div className="start-bar" role="region" aria-label="Start">
             {painAnswered
               ? <ConfirmButton disabled={busy} confirm={{ title: 'Start this workout?', message: 'The timer starts now.' }} onConfirm={start}>Start workout</ConfirmButton>

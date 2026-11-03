@@ -15,5 +15,7 @@ export const SETTING = {
   foodOnlineSearch: 'food.onlineSearch',
   yogaPrefs: 'yoga.prefs',
   callMode: 'call.mode',
+  /** The fixed program in use (for example Home), or null when Lift designs the workouts. */
+  program: 'program.active',
   pageUnit: (page: string) => `unit.${page}`,
 } as const
