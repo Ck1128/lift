@@ -30,4 +30,13 @@ export const PROGRAM_EXERCISES: Exercise[] = [
   { ...base, id: 'prog-bulgarian-split-squat', name: 'Bulgarian Split Squat', primaryMuscles: ['quads', 'glutes'],
     movementPattern: 'lunge', equipmentIds: ['dumbbell'], exerciseType: 'dumbbell', compound: true,
     instructions: ['Stand about two steps in front of a sturdy chair or couch and rest the top of your back foot on it.', 'Hold the dumbbells at your sides, or none at first if balance is shaky.', 'Lower straight down until your front thigh is about level, then push up through the front foot.', 'Do all reps on one leg, then switch.'] },
+  { ...base, id: 'prog-single-leg-rdl', name: 'Single-Leg Romanian Deadlift', primaryMuscles: ['hamstrings', 'glutes'], secondaryMuscles: ['core'],
+    movementPattern: 'hinge', equipmentIds: ['dumbbell'], exerciseType: 'dumbbell', compound: true,
+    instructions: ['Stand on one leg with a soft knee, dumbbells in the hand on the other side.', 'Hinge at the hip and let your free leg rise behind you, keeping your back flat and hips level.', 'Lower until you feel a strong hamstring stretch, then stand back up.', 'Touch a wall with your free hand if balance is shaky. Do all reps on one side, then switch.'] },
+  { ...base, id: 'prog-single-leg-bridge', name: 'Single-Leg Glute Bridge', primaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'],
+    movementPattern: 'hinge', equipmentIds: ['bodyweight'], exerciseType: 'bodyweight', compound: false,
+    instructions: ['Lie on your back, one foot flat on the floor and the other leg straight or hugged to your chest.', 'Push through the heel on the floor and lift your hips until your body is in a straight line.', 'Squeeze at the top, lower slowly. Do all reps on one side, then switch.'] },
+  { ...base, id: 'prog-single-leg-calf', name: 'Single-Leg Calf Raise off a Step', primaryMuscles: ['calves'],
+    movementPattern: 'isolation', equipmentIds: ['bodyweight'], exerciseType: 'bodyweight', compound: false,
+    instructions: ['Stand on one foot with the ball of the foot on a step and your heel hanging off. Hold a wall or rail.', 'Lower your heel slowly for a full stretch and pause at the bottom.', 'Rise as high as you can. Do all reps on one side, then switch.'] },
 ]

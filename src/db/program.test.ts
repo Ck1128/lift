@@ -24,10 +24,10 @@ describe('Home program in the database', () => {
   it('opening a day, finishing it and the next day moves on; turning it off brings the weekday plan back', async () => {
     await setProgram('home', 0, TODAY)
     const row = (await openProgramDay(TODAY, 0))!
-    expect(row.focus).toBe('Home · Day 1: Full Body A')
+    expect(row.focus).toBe('Home · Day 1: A1 · Legs + Pull (intro)')
     // Regenerating a program day gives the same written workout.
     const r = await generateFor(row.id, 20, { today: TODAY, force: true })
-    expect(r.kind === 'workout' && r.workout.exercises.length).toBe(10)
+    expect(r.kind === 'workout' && r.workout.exercises.length).toBe(8)
     const s = await startSession(row.id, 'lb')
     const logs = await db.setLogs.where('sessionId').equals(s.id).toArray()
     expect(logs.find((l) => l.exerciseId === 'prog-goblet-squat')!.actualWeight).toBe(12)

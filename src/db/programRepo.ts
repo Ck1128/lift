@@ -3,7 +3,7 @@ import { getSetting, setSetting, SETTING } from './settings'
 import { getProfile, ensureScheduled } from './repo'
 import { CATALOG_VERSION, exerciseById } from '../data/catalog'
 import { programById } from '../data/programs'
-import { nextProgramDay, programWorkout, type Program, type ProgramDone, type ProgramState } from '../engine/program'
+import { nextProgramDay, programFinished, programWorkout, type Program, type ProgramDone, type ProgramState } from '../engine/program'
 import type { EquipmentSet, ScheduledWorkout } from '../engine/types'
 
 export const PROGRAM_KEY = SETTING.program
@@ -11,12 +11,12 @@ export const PROGRAM_KEY = SETTING.program
 export const getProgramState = () => getSetting<ProgramState | null>(PROGRAM_KEY, null)
 
 /** The active program and the day to do next, or null when Lift designs the workouts. */
-export async function activeProgram(): Promise<{ program: Program; state: ProgramState; next: number; done: ProgramDone[] } | null> {
+export async function activeProgram(): Promise<{ program: Program; state: ProgramState; next: number; done: ProgramDone[]; finished: boolean } | null> {
   const state = await getProgramState()
   const program = state ? programById(state.programId) : undefined
   if (!state || !program) return null
   const done = await programHistory(program.id)
-  return { program, state, next: nextProgramDay(program, state, done), done }
+  return { program, state, next: nextProgramDay(program, state, done), done, finished: programFinished(program, state, done) }
 }
 
 /** Every finished (or partly finished) day of a program, from the saved workouts. */

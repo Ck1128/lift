@@ -17,6 +17,16 @@ export function ProgramView({ program, next, doneCount }: { program: Program; ne
       <div className="fold-list">
         {program.days.map((d, i) => <DayFold key={i} program={program} day={d} index={i} next={i === next} />)}
       </div>
+      {program.guides && program.guides.length > 0 && (
+        <Card title="About this plan">
+          {program.guides.map((g) => (
+            <details key={g.title} className="guide">
+              <summary>{g.title}</summary>
+              <ul className="plain">{g.items.map((t, k) => <li key={k}>{t}</li>)}</ul>
+            </details>
+          ))}
+        </Card>
+      )}
     </>
   )
 }
@@ -34,8 +44,9 @@ function DayFold({ program, day, index, next }: { program: Program; day: Program
         <div id={`pday-${index}`} className="fold-body">
           <ul className="plain prog-list">
             {day.warmup ? <li>Warm-up · {day.warmup} min</li> : null}
-            {day.walk ? <li>{day.walk.label} · {day.walk.minutes} min</li> : null}
-            {day.exercises.map((e, k) => <li key={k}><strong>{e.name}</strong> <span className="muted">· {formatTarget(e)}</span></li>)}
+            {day.walk ? <li>{day.walk.label} · {day.walk.cue ?? `${day.walk.minutes} min`}</li> : null}
+            {day.mobility ? <li>Mobility · {day.mobility} min</li> : null}
+            {day.exercises.map((e, k) => <li key={k}><strong>{e.name}</strong> <span className="muted">· {day.rounds ? `${e.repMin === e.repMax ? e.repMin : `${e.repMin}-${e.repMax}`}${e.repLabel === 'sec' ? ' sec' : e.repLabel ? ` per ${e.repLabel}` : ''} per round` : formatTarget(e)}</span></li>)}
             {day.finish ? <li>{day.finish.label} · {day.finish.minutes} min</li> : null}
           </ul>
           {day.notes?.map((n, k) => <p key={k} className="hint">{n}</p>)}

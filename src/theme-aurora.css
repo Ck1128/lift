@@ -386,3 +386,9 @@ body:has(.start-bar) .rest-bar { bottom: calc(168px + env(safe-area-inset-bottom
 .profile-pick { display: flex; align-items: center; gap: 10px; margin: -4px 0 12px; }
 .profile-pick label { font-size: .85rem; color: var(--muted, #6b7280); white-space: nowrap; }
 .profile-pick select { flex: 1; min-width: 0; border-radius: 999px; padding: 8px 14px; font-weight: 600; }
+.day-pick { margin: 14px 0 10px; }
+.day-pick select { width: 100%; }
+.guide { border-top: 1px solid rgba(0,0,0,.06); padding: 10px 0; }
+.guide:first-of-type { border-top: 0; }
+.guide summary { font-weight: 600; cursor: pointer; }
+.guide li { margin: 8px 0; line-height: 1.45; }

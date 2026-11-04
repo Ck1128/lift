@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.25.0 - Home program is now 15 days (branch feature/v2-complete)
+- The Home program follows the new 15-day plan: two sessions alternate (A = Legs + Pull, B = Push + Core) so the same muscles never train two days running, with 10 lifting days and 5 recovery days. It ramps from half volume, through harder single-leg variations and a peak, to a taper. No dates or weekdays: days are numbered 1 to 15.
+- Choose any of the 15 days on the Home card before you start. The card says which day is next in order and what happens if you pick another one.
+- Sore 5 out of 10 or more? Pick a recovery day instead. A recovery day done out of order does not move the plan, so the day you were due stays next.
+- Recovery days are an easy walk plus a 10 minute mobility step. The warm-up step lists the full 8-10 minute routine. Moves that hold both dumbbells together fill in 24 lb.
+- New moves for the harder days: single-leg RDL, single-leg glute bridge and single-leg calf raise off a step (written steps, no photos).
+- The Plan tab adds an About this plan section: how the plan works, Make 12 lb harder, Stop or back off, After the 15 days (back to the gym) and What to expect.
+- After Day 15, Home says all 15 days are done and offers to start again or switch to Standard.
+
 ## 2.24.0 - Home program (branch feature/v2-complete)
 - New Workout profile menu at the top of Home: Standard (Lift plans for you, exactly as before) or Home (a 10-day dumbbell program). Nothing changes unless Home is chosen, and choosing Standard brings the usual weekly plan back. Both switches ask first.
 - Home is 10 numbered days done in order, not tied to weekdays. The next day only moves on when you finish one, so rest days are simply days you skip. You can skip ahead on Home, or pick any day from the Plan tab. Switching back to Home later picks up after the last day you finished.

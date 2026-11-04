@@ -1466,17 +1466,18 @@ describe('Home program', () => {
     await waitFor(async () => expect((await db.settings.get('program.active'))?.value).toMatchObject({ programId: 'home', day: 0 }))
     // Nothing else changes: location and equipment stay as they were.
     expect((await db.profile.toArray())[0].preferredLocation).toBe('gym')
-    expect(await screen.findByText('Home program · Day 1 of 10')).toBeInTheDocument()
-    expect(screen.getByText('Full Body A')).toBeInTheDocument()
+    expect(await screen.findByText('Home program · Day 1 of 15')).toBeInTheDocument()
+    expect(screen.getByText('A1 · Legs + Pull (intro)')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Open Day 1' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Home · Day 1: Full Body A' })).toBeInTheDocument()
-    expect(screen.getByText(/3 × 12 reps per side/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home · Day 1: A1 · Legs + Pull (intro)' })).toBeInTheDocument()
+    expect(screen.getByText(/2 × 12 reps per side/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Build a fresh version' })).not.toBeInTheDocument()
     expect(screen.queryByText('Change available minutes')).not.toBeInTheDocument()
 
     await user.click(await tab('Plan'))
     expect(await screen.findByRole('heading', { level: 1, name: 'Home program' })).toBeInTheDocument()
-    expect(screen.getByText('Day 10 · Light Full Body + Mobility')).toBeInTheDocument()
+    expect(screen.getByText('Day 15 · Rest day')).toBeInTheDocument()
+    expect(screen.getByText('Make 12 lb harder')).toBeInTheDocument()
     expect(screen.queryByText(/Wednesday/)).not.toBeInTheDocument()
 
     // Standard brings the usual weekly plan back.
@@ -1488,16 +1489,22 @@ describe('Home program', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Weekly Plan' })).toBeInTheDocument()
   })
 
-  it('skipping a day on Home asks first', async () => {
+  it('any of the 15 days can be chosen on Home before starting', async () => {
     await seed()
     await db.settings.put({ key: 'program.active', value: { programId: 'home', day: 0, setAt: NOW.toISOString() } })
     const user = userEvent.setup()
     render(<App />)
-    await user.click(await screen.findByRole('button', { name: 'Skip to Day 2' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /cancel/i }))
-    expect(screen.getByText('Home program · Day 1 of 10')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Skip to Day 2' }))
-    await confirmOk(user)
-    expect(await screen.findByText('Home program · Day 2 of 10')).toBeInTheDocument()
+    const pickDay = await screen.findByLabelText('Choose a day')
+    expect(within(pickDay).getAllByRole('option')).toHaveLength(15)
+    expect(pickDay).toHaveValue('0')
+    await user.selectOptions(pickDay, '8')
+    expect(screen.getByText('A3 · Legs + Pull (harder)')).toBeInTheDocument()
+    expect(screen.getByText(/Day 1 is next in order/)).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Choose a day'), '5')
+    expect(screen.getByText(/recovery day out of order does not move the plan/i)).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Choose a day'), '8')
+    await user.click(screen.getByRole('button', { name: 'Open Day 9' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home · Day 9: A3 · Legs + Pull (harder)' })).toBeInTheDocument()
   })
+
 })

@@ -13,6 +13,8 @@ export interface ProgramExercise {
   repLabel?: 'sec' | 'side' | 'leg'
   /** Uses the program's dumbbells, so the weight is filled in. */
   loaded?: boolean
+  /** A different weight for this exercise, for example both dumbbells held together. */
+  weight?: number
   note?: string
   rest?: number
 }
@@ -28,7 +30,19 @@ export interface ProgramDay {
   notes?: string[]
   exercises: ProgramExercise[]
   /** A recovery day: walking and mobility only. */
-  walk?: { minutes: number; label: string }
+  walk?: { minutes: number; label: string; cue?: string }
+  /** Minutes of stretching and mobility (recovery days). */
+  mobility?: number
+  /**
+   * A recovery day. Doing one out of order (for example because you are sore) does not move the program on:
+   * the day you were due stays next.
+   */
+  recovery?: boolean
+}
+
+export interface ProgramGuide {
+  title: string
+  items: string[]
 }
 
 export interface Program {
@@ -39,7 +53,12 @@ export interface Program {
   /** The weight of the dumbbells, used to fill in every loaded set. */
   load?: { weight: number; unit: WeightUnit }
   rules: string[]
+  /** What the warm-up step consists of. */
+  warmupCue?: string
+  mobilityCue?: string
   days: ProgramDay[]
+  /** Background shown on the Plan tab: how the plan works, progressions, safety. */
+  guides?: ProgramGuide[]
 }
 
 export interface ProgramState {
@@ -56,13 +75,25 @@ export interface ProgramDone {
   at: string
 }
 
-/** The day to do next: one after the most recent finished program day, or the chosen starting day. */
+/**
+ * The day to do next: one after the most recent finished program day, or the chosen starting day.
+ * A recovery day done out of order (instead of the day that was due) leaves the due day next.
+ */
 export function nextProgramDay(program: Program, state: ProgramState, done: ProgramDone[]): number {
   const n = program.days.length
   const after = done.filter((d) => d.at >= state.setAt && d.day >= 0 && d.day < n).sort((a, b) => a.at.localeCompare(b.at))
-  const last = after[after.length - 1]
-  const start = ((state.day % n) + n) % n
-  return last ? (last.day + 1) % n : start
+  let cur = ((state.day % n) + n) % n
+  for (const d of after) {
+    if (program.days[d.day].recovery && d.day !== cur) continue
+    cur = (d.day + 1) % n
+  }
+  return cur
+}
+
+/** True when the last day of the program was the most recent day finished (since the starting point was chosen). */
+export function programFinished(program: Program, state: ProgramState, done: ProgramDone[]): boolean {
+  const after = done.filter((d) => d.at >= state.setAt).sort((a, b) => a.at.localeCompare(b.at))
+  return after.length > 0 && after[after.length - 1].day === program.days.length - 1
 }
 
 /** "3 × 12", "3 × 8-10 per leg", "3 × 30-45 sec". */
@@ -81,7 +112,7 @@ export function programMinutes(day: ProgramDay): number {
     s += e.sets * (work + rest)
   }
   if (day.rounds) s += (day.rounds - 1) * 75
-  s += (day.warmup ?? 0) * 60 + (day.finish?.minutes ?? 0) * 60 + (day.walk?.minutes ?? 0) * 60
+  s += ((day.warmup ?? 0) + (day.finish?.minutes ?? 0) + (day.walk?.minutes ?? 0) + (day.mobility ?? 0)) * 60
   return Math.max(5, Math.round(s / 60 / 5) * 5)
 }
 
@@ -97,19 +128,26 @@ export function programWorkout(program: Program, dayIndex: number, date: string,
     slots.push({
       slotId: `${tag}-warmup`, exerciseId: 'cardio-march', name: 'Warm-up', kind: 'cardio', durationMinutes: day.warmup,
       sets: 1, repMin: 0, repMax: 0, restSeconds: 0, loadNote: '',
-      intensityCue: 'march or walk easy, arm circles, hip hinges, a few bodyweight squats',
+      intensityCue: program.warmupCue ?? 'march or walk easy, arm circles, hip hinges, a few bodyweight squats',
       why: 'Warms up your joints and muscles before the first set.',
     })
   }
   if (day.walk) {
     slots.push({
       slotId: `${tag}-walk`, exerciseId: 'cardio-walk', name: day.walk.label, kind: 'cardio', durationMinutes: day.walk.minutes,
-      sets: 1, repMin: 0, repMax: 0, restSeconds: 0, loadNote: '', intensityCue: 'easy, you can talk in full sentences',
+      sets: 1, repMin: 0, repMax: 0, restSeconds: 0, loadNote: '', intensityCue: day.walk.cue ?? 'easy, you can talk in full sentences',
       why: 'Easy movement helps you recover without adding fatigue.',
     })
   }
+  if (day.mobility) {
+    slots.push({
+      slotId: `${tag}-mobility`, exerciseId: 'mobility', name: 'Mobility', kind: 'cardio', durationMinutes: day.mobility,
+      sets: 1, repMin: 0, repMax: 0, restSeconds: 0, loadNote: '', intensityCue: program.mobilityCue ?? 'gentle stretches, 20-30 seconds each',
+      why: 'Loosens hips, hamstrings, chest and upper back.',
+    })
+  }
   day.exercises.forEach((e, i) => {
-    const load = e.loaded && program.load ? program.load : undefined
+    const load = e.loaded && program.load ? { ...program.load, weight: e.weight ?? program.load.weight } : undefined
     const rule = day.rounds
       ? `Circuit: one set of each exercise in order, then rest. ${day.rounds} rounds.`
       : 'Keep 2-4 reps in reserve. Controlled form.'
@@ -117,7 +155,7 @@ export function programWorkout(program: Program, dayIndex: number, date: string,
       slotId: `${tag}-${i + 1}`, exerciseId: e.exerciseId, name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax,
       repLabel: e.repLabel, restSeconds: day.rounds ? 15 : (e.rest ?? 60),
       suggestedWeight: load?.weight, loadUnit: load ? load.unit : undefined,
-      loadNote: load ? `Your ${load.weight} ${load.unit} dumbbells. ${rule}` : rule,
+      loadNote: !load ? rule : load.weight === program.load?.weight ? `Your ${load.weight} ${load.unit} dumbbells. ${rule}` : `${load.weight} ${load.unit}: both dumbbells together. ${rule}`,
       why: e.note ?? `${program.name} program, Day ${dayIndex + 1}.`,
       cues: e.note ? [e.note] : undefined,
     })
