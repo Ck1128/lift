@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from './schema'
-import { finishSession, generateFor, getEquipment, getProfile, profileToForm, resetAllData, saveProfile, scheduledOn, startSession } from './repo'
+import { ensureScheduled, finishSession, generateFor, getEquipment, getProfile, profileToForm, resetAllData, saveProfile, scheduledOn, startSession } from './repo'
 import { activeProgram, openProgramDay, setProgram } from './programRepo'
 
 const TODAY = '2026-11-05'
+const FRI = '2026-11-06' // a weekday training day in the default plan (Mon, Wed, Fri)
 
 beforeEach(async () => {
   await resetAllData()
@@ -39,6 +40,25 @@ describe('Home program in the database', () => {
     await setProgram(null, 0, TODAY)
     expect(await activeProgram()).toBeNull()
     expect((await db.scheduled.toArray()).some((x) => x.programId === undefined)).toBe(true)
+  })
+
+  it('a weekday plan update running while Home is switched on never leaves a second row for today', async () => {
+    for (let i = 0; i < 20; i++) {
+      await resetAllData()
+      await saveProfile({ ...profileToForm(), weightValue: '180', heightCm: '178', trainingLevel: 'beginner', birthDate: '1990-05-15', sex: 'male' }, { preferredLocation: 'gym', gymType: 'standard' }, new Date(2026, 10, 5, 9))
+      await db.scheduled.clear()
+      await ensureScheduled(FRI, 1)
+      expect(await db.scheduled.where('date').equals(FRI).count()).toBe(1) // Friday is a training day, so the race is real
+      await db.scheduled.clear()
+      await Promise.all([ensureScheduled(FRI, 14), setProgram('home', 0, FRI), ensureScheduled(FRI, 14)])
+      await ensureScheduled(FRI, 14)
+      await openProgramDay(FRI, 0)
+      await ensureScheduled(FRI, 14)
+      const rows = (await db.scheduled.where('date').equals(FRI).toArray()).filter((r) => r.status === 'planned')
+      expect(rows).toHaveLength(1)
+      expect(rows[0].programId).toBe('home')
+      expect((await scheduledOn(FRI))!.workout).toBeDefined()
+    }
   })
 
   it('skipping ahead sets the next day', async () => {

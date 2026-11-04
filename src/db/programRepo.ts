@@ -54,8 +54,10 @@ export async function setProgram(programId: string | null, day = 0, today?: stri
   }
   const program = programById(programId)
   if (!program) return
-  await setSetting(PROGRAM_KEY, { programId, day, setAt: nowIso() } satisfies ProgramState)
-  await removeUnstarted((r) => !today || r.date >= today)
+  await db.transaction('rw', [db.settings, db.scheduled, db.sessions], async () => {
+    await setSetting(PROGRAM_KEY, { programId, day, setAt: nowIso() } satisfies ProgramState)
+    await removeUnstarted((r) => !today || r.date >= today)
+  })
 }
 
 async function removeUnstarted(match: (r: ScheduledWorkout) => boolean): Promise<void> {
@@ -80,16 +82,23 @@ export async function openProgramDay(date: string, dayIndex: number): Promise<Sc
     workout, programId: program.id, programDay: dayIndex, cardioOnly: day.exercises.length === 0 || undefined,
     circuit: undefined, cardioChoice: undefined, configHash: undefined, keepPlan: false, generatorVersion: workout.generatorVersion, updatedAt: now,
   }
-  const rows = await db.scheduled.where('date').equals(date).toArray()
-  for (const r of rows.filter((x) => x.status === 'planned')) {
-    const started = (await db.sessions.where('scheduledWorkoutId').equals(r.id).count()) > 0
-    if (!started) {
-      const next: ScheduledWorkout = { ...r, ...fields, status: 'planned' }
-      await db.scheduled.put(next)
-      return next
+  return db.transaction('rw', [db.scheduled, db.sessions], async () => {
+    // Reuse one unstarted row for the date and remove any other unstarted ones, so the day has exactly one to do.
+    const rows = (await db.scheduled.where('date').equals(date).toArray()).filter((x) => x.status === 'planned')
+    let kept: ScheduledWorkout | null = null
+    for (const r of rows) {
+      const started = (await db.sessions.where('scheduledWorkoutId').equals(r.id).count()) > 0
+      if (started) continue
+      if (!kept) {
+        kept = { ...r, ...fields, status: 'planned' }
+        await db.scheduled.put(kept)
+      } else {
+        await db.scheduled.delete(r.id)
+      }
     }
-  }
-  const row: ScheduledWorkout = { id: uid(), planId: 'program', date, status: 'planned', createdAt: now, ...fields }
-  await db.scheduled.add(row)
-  return row
+    if (kept) return kept
+    const row: ScheduledWorkout = { id: uid(), planId: 'program', date, status: 'planned', createdAt: now, ...fields }
+    await db.scheduled.add(row)
+    return row
+  })
 }

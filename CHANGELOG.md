@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.25.1 - Fix: switching to Home could leave an empty workout for today (branch feature/v2-complete)
+- If the weekly plan was being filled in at the moment Home was chosen, a blank weekday workout could be added for today after the switch. Opening the Home day then showed "No workout ready". The plan check and its updates now happen in one step, and opening a Home day removes any other unstarted workout for that date. Found by the CI test run of 2.25.0.
+
 ## 2.25.0 - Home program is now 15 days (branch feature/v2-complete)
 - The Home program follows the new 15-day plan: two sessions alternate (A = Legs + Pull, B = Push + Core) so the same muscles never train two days running, with 10 lifting days and 5 recovery days. It ramps from half volume, through harder single-leg variations and a peak, to a taper. No dates or weekdays: days are numbered 1 to 15.
 - Choose any of the 15 days on the Home card before you start. The card says which day is next in order and what happens if you pick another one.

@@ -15,7 +15,7 @@ import { ageFromBirthDate } from '../engine/age'
 import { tracksOf } from '../engine/tracks'
 import { getSetting, setSetting, SETTING } from './settings'
 import { programById } from '../data/programs'
-import { programWorkout, type ProgramState } from '../engine/program'
+import { programWorkout } from '../engine/program'
 import { painKey, type PainReport } from '../engine/pain'
 import { buildAdaptPlan } from '../engine/adapt'
 import { ALL_TRACKS, type Track } from '../engine/types'
@@ -276,20 +276,24 @@ export async function ensureScheduled(today: string, days: number, profile?: Pro
   const plan = await getPlan()
   const p = profile ?? (await getProfile())
   if (!plan || !p) return
-  // A fixed program (for example Home) is done in order, not on weekdays, so no weekday rows are made while it is on.
-  if (await getSetting<ProgramState | null>(SETTING.program, null)) return
   const now = nowIso()
-  for (let i = 0; i < days; i++) {
-    const date = addDays(today, i)
-    const day = plan.schedule[weekdayIndex(date)]
-    if (!day) continue
-    // Any row for this date (even a skipped one) means it is already handled.
-    if ((await db.scheduled.where('date').equals(date).count()) > 0) continue
-    await db.scheduled.add({
-      id: uid(), planId: plan.id, date, focus: day.focus, targetMuscles: day.muscles,
-      availableMinutes: p.preferredDurationMinutes, status: 'planned', createdAt: now, updatedAt: now,
-    })
-  }
+  // One transaction over settings and the schedule, so switching to a program part-way through can never leave a
+  // weekday row behind: the program check and the adds happen together, before or after the switch, never across it.
+  await db.transaction('rw', [db.settings, db.scheduled], async () => {
+    // A fixed program (for example Home) is done in order, not on weekdays, so no weekday rows are made while it is on.
+    if ((await db.settings.get(SETTING.program))?.value) return
+    for (let i = 0; i < days; i++) {
+      const date = addDays(today, i)
+      const day = plan.schedule[weekdayIndex(date)]
+      if (!day) continue
+      // Any row for this date (even a skipped one) means it is already handled.
+      if ((await db.scheduled.where('date').equals(date).count()) > 0) continue
+      await db.scheduled.add({
+        id: uid(), planId: plan.id, date, focus: day.focus, targetMuscles: day.muscles,
+        availableMinutes: p.preferredDurationMinutes, status: 'planned', createdAt: now, updatedAt: now,
+      })
+    }
+  })
 }
 
 export async function scheduledOn(date: string): Promise<ScheduledWorkout | undefined> {
