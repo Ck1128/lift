@@ -329,7 +329,7 @@ Use a clear bottom navigation bar on phone-sized screens where practical. Keep b
 ### Requirements
 
 - Start with a small curated catalog.
-- Do not scrape or claim to have every Planet Fitness machine.
+- Do not scrape or claim to have every machine in any gym.
 - Do not use copyrighted exercise images without permission.
 - Use text instructions or properly licensed assets initially.
 - Keep exercise definitions separate from any specific gym's equipment inventory.
@@ -387,9 +387,9 @@ Use a clear bottom navigation bar on phone-sized screens where practical. Keep b
 
 ### Requirements
 
-- Offer a generic gym profile and a Planet Fitness profile.
+- Offer a generic gym profile and a standard gym profile.
 - Start with a curated list of commonly encountered gym equipment.
-- Do not claim the catalog represents every Planet Fitness location.
+- Do not claim the catalog represents every gym.
 - Let users manually confirm available equipment.
 - Allow equipment to be marked temporarily unavailable.
 - Support alternative exercises when a machine is missing or occupied.
