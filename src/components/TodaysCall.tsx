@@ -61,7 +61,7 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   }
 
   // After a workout today: a short cool-down for what was just worked.
-  if (doneToday.length > 0) {
+  if (doneToday.length > 0 && !prog) {
     if (!tracks.yoga) return null
     const used = musclesOfMany(doneToday.flatMap((s) => s.actualExercises.filter((a) => !a.skipped).map((a) => exerciseById(a.exerciseId))))
     const pairing = pairYoga(used.primary, 'cooldown')
@@ -80,11 +80,21 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   if (prog) {
     const { program, next, finished } = prog
     const total = program.days.length
-    // A program day already opened for today counts as the one due.
-    const due = sched && sched.status === 'planned' && sched.programId === program.id && sched.programDay !== undefined ? sched.programDay : next
-    const day = pick !== null && pick >= 0 && pick < total ? pick : due
+    // `due` is the next day in order. `opened` is the day already chosen for today (it is what the Workout tab shows).
+    const due = next
+    const opened = sched && sched.status === 'planned' && sched.programId === program.id && sched.programDay !== undefined ? sched.programDay : null
+    const day = pick !== null && pick >= 0 && pick < total ? pick : (opened ?? due)
     const d = program.days[day]
     const muscles = [...new Set(d.exercises.flatMap((e) => exerciseById(e.exerciseId)?.primaryMuscles ?? []))]
+    // Choosing a day takes effect straight away, so the Workout tab always shows the day picked here.
+    const choose = async (i: number) => {
+      setPick(i)
+      setMessage(null)
+      setBusy(true)
+      try {
+        if (!(await openProgramDay(today, i))) setMessage('Could not choose this program day.')
+      } finally { setBusy(false) }
+    }
     const open = async () => {
       setBusy(true)
       setMessage(null)
@@ -94,7 +104,8 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
       } finally { setBusy(false) }
     }
     return (
-      <Card className="hero call">
+      <Card className={doneToday.length > 0 && opened === null ? 'call' : 'hero call'}>
+        {doneToday.length > 0 && opened === null && <p className="ok">Done for today. Nice work. Day {due + 1} is next, whenever you are ready.</p>}
         <p className="eyebrow">{program.name} program · {finished && day === due ? `all ${total} days done` : `Day ${day + 1} of ${total}`}</p>
         <p className="hero-title">{d.title}</p>
         <p className="muted">
@@ -102,7 +113,7 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
         </p>
         <div className="field day-pick">
           <label htmlFor="program-day">Choose a day</label>
-          <select id="program-day" value={day} onChange={(e) => { setPick(Number(e.target.value)); setMessage(null) }}>
+          <select id="program-day" value={day} onChange={(e) => void choose(Number(e.target.value))}>
             {program.days.map((x, i) => <option key={i} value={i}>Day {i + 1} · {x.title}{i === due ? ' · next' : ''}</option>)}
           </select>
         </div>

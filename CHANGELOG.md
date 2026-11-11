@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.25.2 - Fix: the day you pick on Home is the day you get (branch feature/v2-complete)
+- Picking a day on the Home program (for example Day 4) could still open the earlier day (Day 3) if that day had been started and discarded, or if you went to the Workout tab without pressing Open. A discarded start no longer holds on to the day, and choosing a day in the list now takes effect straight away, so the Workout tab always shows the day you picked.
+- On the Home program the Workout tab is never empty: with nothing chosen for today it opens the next day in order.
+- After finishing a day you can still pick another day from the Home card.
+
 ## 2.25.1 - Fix: switching to Home could leave an empty workout for today (branch feature/v2-complete)
 - If the weekly plan was being filled in at the moment Home was chosen, a blank weekday workout could be added for today after the switch. Opening the Home day then showed "No workout ready". The plan check and its updates now happen in one step, and opening a Home day removes any other unstarted workout for that date. Found by the CI test run of 2.25.0.
 

@@ -60,11 +60,15 @@ export async function setProgram(programId: string | null, day = 0, today?: stri
   })
 }
 
+/** True when the row has a session that was kept (in progress, finished or partly done). Discarded ones do not count. */
+async function hasLiveSession(scheduledId: string): Promise<boolean> {
+  return (await db.sessions.where('scheduledWorkoutId').equals(scheduledId).filter((s) => s.status !== 'abandoned').count()) > 0
+}
+
 async function removeUnstarted(match: (r: ScheduledWorkout) => boolean): Promise<void> {
   const planned = (await db.scheduled.where('status').equals('planned').toArray()).filter(match)
   for (const r of planned) {
-    const started = (await db.sessions.where('scheduledWorkoutId').equals(r.id).count()) > 0
-    if (!started) await db.scheduled.delete(r.id)
+    if (!(await hasLiveSession(r.id))) await db.scheduled.delete(r.id)
   }
 }
 
@@ -87,8 +91,8 @@ export async function openProgramDay(date: string, dayIndex: number): Promise<Sc
     const rows = (await db.scheduled.where('date').equals(date).toArray()).filter((x) => x.status === 'planned')
     let kept: ScheduledWorkout | null = null
     for (const r of rows) {
-      const started = (await db.sessions.where('scheduledWorkoutId').equals(r.id).count()) > 0
-      if (started) continue
+      // A workout that was started and then discarded does not count: its row is free to become the day picked now.
+      if (await hasLiveSession(r.id)) continue
       if (!kept) {
         kept = { ...r, ...fields, status: 'planned' }
         await db.scheduled.put(kept)

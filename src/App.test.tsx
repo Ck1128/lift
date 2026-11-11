@@ -4,7 +4,7 @@ import App from './App'
 import { db, useDatabase } from './db/schema'
 import { exportBackup } from './db/backup'
 import { encryptText } from './db/crypto'
-import { profileToForm, resetAllData, saveProfile, scheduledOn } from './db/repo'
+import { finishSession, profileToForm, resetAllData, saveProfile, scheduledOn } from './db/repo'
 
 const NOW = new Date(2026, 9, 21, 12, 0, 0) // Wednesday, a training day in the default plan
 const TODAY = '2026-10-21'
@@ -1487,6 +1487,30 @@ describe('Home program', () => {
     await waitFor(async () => expect((await db.settings.get('program.active'))?.value).toBeNull())
     await user.click(await tab('Plan'))
     expect(await screen.findByRole('heading', { level: 1, name: 'Weekly Plan' })).toBeInTheDocument()
+  })
+
+  it('the day picked on Home is the day the Workout tab shows, even after a discarded start', async () => {
+    await seed()
+    await db.settings.put({ key: 'program.active', value: { programId: 'home', day: 2, setAt: NOW.toISOString() } })
+    const user = userEvent.setup()
+    render(<App />)
+    // With nothing chosen yet, the Workout tab opens the next day in order (Day 3).
+    await user.click(await tab('Workout'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home · Day 3: Recovery' })).toBeInTheDocument()
+    // Start Day 3 and discard it.
+    await user.click(await screen.findByRole('button', { name: /no pain, i feel good/i }))
+    await screen.findByText(/no pain today/i)
+    await user.click(screen.getByRole('button', { name: 'Start workout' }))
+    await confirmOk(user)
+    await waitFor(async () => expect(await db.sessions.count()).toBe(1))
+    const s = (await db.sessions.toArray())[0]
+    await act(async () => { await finishSession(s.id, 'abandon') })
+    // Pick Day 4 on Home: no Open needed, the Workout tab follows the pick.
+    await user.click(await tab('Home'))
+    await user.selectOptions(await screen.findByLabelText('Choose a day'), '3')
+    await waitFor(async () => expect((await scheduledOn(TODAY))?.programDay).toBe(3))
+    await user.click(await tab('Workout'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home · Day 4: A2 · Legs + Pull' })).toBeInTheDocument()
   })
 
   it('any of the 15 days can be chosen on Home before starting', async () => {

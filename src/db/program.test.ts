@@ -61,6 +61,30 @@ describe('Home program in the database', () => {
     }
   })
 
+  it('picking another day after starting and discarding one opens the picked day, not the discarded one', async () => {
+    await setProgram('home', 2, TODAY)
+    const d3 = (await openProgramDay(TODAY, 2))!
+    const s = await startSession(d3.id, 'lb')
+    await finishSession(s.id, 'abandon')
+    const d4 = (await openProgramDay(TODAY, 3))!
+    expect(d4.programDay).toBe(3)
+    const shown = (await scheduledOn(TODAY))!
+    expect(shown.programDay).toBe(3)
+    expect(shown.workout!.title).toMatch(/Day 4/)
+    // Only one workout is left to do today.
+    expect((await db.scheduled.where('date').equals(TODAY).toArray()).filter((r) => r.status === 'planned')).toHaveLength(1)
+  })
+
+  it('picking another day after finishing one today opens the picked day', async () => {
+    await setProgram('home', 2, TODAY)
+    const d3 = (await openProgramDay(TODAY, 2))!
+    const s = await startSession(d3.id, 'lb')
+    for (const l of await db.setLogs.where('sessionId').equals(s.id).toArray()) await db.setLogs.update(l.id, { completed: true, actualMinutes: l.actualMinutes })
+    await finishSession(s.id, 'finish')
+    await openProgramDay(TODAY, 3)
+    expect((await scheduledOn(TODAY))!.programDay).toBe(3)
+  })
+
   it('skipping ahead sets the next day', async () => {
     await setProgram('home', 0, TODAY)
     await setProgram('home', 3, TODAY)

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { PainCheck } from '../components/PainCheck'
 import { ConfirmButton } from '../components/confirm'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -19,7 +19,7 @@ import { cardioById } from '../data/cardio'
 import { formatWeight } from '../engine/units'
 import { formatTarget } from '../engine/program'
 import { useRouter } from '../router'
-import { programEquipment } from '../db/programRepo'
+import { activeProgram, openProgramDay, programEquipment } from '../db/programRepo'
 import { programById } from '../data/programs'
 
 /** The route stays /workout while the preview becomes the player, so the page must be sent back to the top by hand. */
@@ -47,6 +47,14 @@ export function Workout({ profile, today }: { profile: Profile; today: string })
     const s = await scheduledOn(today)
     return s ? (await db.sessions.where('scheduledWorkoutId').equals(s.id).toArray()).filter((x) => x.status !== 'abandoned' && x.status !== 'in_progress')[0] : undefined
   }, [today])
+
+  // On a program (for example Home) the Workout tab never sits empty: with nothing chosen for today it opens the next day.
+  const progQ = useQuery(() => activeProgram(), [])
+  const nextDay = progQ.value ? progQ.value.next : null
+  const nothingToday = !activeQ.loading && !schedQ.loading && !activeQ.value && (!schedQ.value || (schedQ.value.status === 'planned' && !schedQ.value.workout))
+  useEffect(() => {
+    if (nextDay !== null && nothingToday) void openProgramDay(today, nextDay)
+  }, [nextDay, nothingToday, today])
 
   const view = summaryId ? `summary:${summaryId}` : activeQ.value ? `play:${activeQ.value.id}` : 'preview'
   useScrollTopOn(view)
