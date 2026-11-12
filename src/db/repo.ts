@@ -16,6 +16,7 @@ import { tracksOf } from '../engine/tracks'
 import { getSetting, setSetting, SETTING } from './settings'
 import { programById } from '../data/programs'
 import { programWorkout } from '../engine/program'
+import { levelToSore, sorenessFromRating, sorenessKey, type SorenessRating } from '../engine/soreness'
 import { painKey, type PainReport } from '../engine/pain'
 import { buildAdaptPlan } from '../engine/adapt'
 import { ALL_TRACKS, type Track } from '../engine/types'
@@ -341,6 +342,35 @@ export async function clearSoreness(muscle: Muscle, date: string): Promise<void>
   const rows = await db.soreness.where('date').equals(date).filter((s) => s.muscle === muscle).toArray()
   for (const r of rows) await db.soreness.delete(r.id)
 }
+/** Today's soreness meter reading, or null when it was not rated. */
+export const getSorenessRating = (date: string) => getSetting<SorenessRating | null>(sorenessKey(date), null)
+
+/**
+ * Saves the soreness meter for a day and turns it into per-muscle soreness for the workout engine (replacing that
+ * day's earlier soreness). A workout already built for that day and not started yet is rebuilt to match.
+ */
+export async function saveSorenessRating(date: string, rating: SorenessRating): Promise<void> {
+  const level = Math.min(10, Math.max(1, Math.round(rating.level)))
+  const clean: SorenessRating = { level, areas: [...new Set(rating.areas)] }
+  const per = levelToSore(level)
+  await db.transaction('rw', [db.settings, db.soreness], async () => {
+    await setSetting(sorenessKey(date), clean)
+    const old = await db.soreness.where('date').equals(date).toArray()
+    for (const o of old) await db.soreness.delete(o.id)
+    if (per > 0) {
+      const now = nowIso()
+      for (const m of clean.areas.length > 0 ? clean.areas : (Object.keys(sorenessFromRating({ level, areas: [] })) as Muscle[])) {
+        await db.soreness.add({ id: uid(), date, muscle: m, level: per as 1 | 2 | 3, createdAt: now })
+      }
+    }
+  })
+  for (const row of await db.scheduled.where('date').equals(date).toArray()) {
+    if (row.status !== 'planned' || !row.workout) continue
+    if ((await db.sessions.where('scheduledWorkoutId').equals(row.id).count()) > 0) continue
+    await generateFor(row.id, row.availableMinutes, { today: date })
+  }
+}
+
 export async function recentSoreness(today: string): Promise<Partial<Record<Muscle, 1 | 2 | 3>>> {
   const since = addDays(today, -2)
   const rows: SorenessEntry[] = await db.soreness.where('date').aboveOrEqual(since).toArray()
@@ -385,7 +415,8 @@ export async function generateFor(
   if (sched.programId !== undefined && sched.programDay !== undefined) {
     const program = programById(sched.programId)
     if (!program || !program.days[sched.programDay]) return { kind: 'error', message: 'This program day no longer exists.' }
-    const workout = programWorkout(program, sched.programDay, sched.date, profile.weightUnit, (id) => exerciseById(id)?.primaryMuscles ?? [], CATALOG_VERSION)
+    const workout = programWorkout(program, sched.programDay, sched.date, profile.weightUnit, (id) => exerciseById(id)?.primaryMuscles ?? [], CATALOG_VERSION,
+      sorenessFromRating(await getSorenessRating(sched.date)))
     const reopen = opts.force && (sched.status === 'completed' || sched.status === 'partial')
     await db.scheduled.put({ ...sched, workout, availableMinutes: workout.availableMinutes, status: reopen ? 'planned' : sched.status, generatorVersion: workout.generatorVersion, updatedAt: nowIso() })
     return { kind: 'workout', workout }

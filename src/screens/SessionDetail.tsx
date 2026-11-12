@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import { exerciseById } from '../data/catalog'
-import { activeMinutes } from '../engine/history'
+import { activeMinutes, sessionBests, sessionVolume, type NewBest } from '../engine/history'
 import { estimateCalories } from '../engine/calories'
 import { formatDay } from '../engine/dates'
 import type { Profile, SetLog, WorkoutSession } from '../engine/types'
@@ -61,10 +61,31 @@ function EditRow({ l }: { l: SetLog }) {
   )
 }
 
+const NO_BESTS: NewBest[] = []
+
 function SessionBody({ session, logs, profile, editing }: { session: WorkoutSession; logs: SetLog[]; profile: Profile; editing?: boolean }) {
   const sorted = [...logs].sort((a, b) => a.slotId.localeCompare(b.slotId, undefined, { numeric: true }) || a.setNumber - b.setNumber)
+  const bests = useLiveQuery(async () => sessionBests(session, logs, await db.sessions.toArray(), await db.setLogs.toArray(), session.weightUnit), [session.id, session.updatedAt, logs.length], NO_BESTS)
+  const volume = sessionVolume(logs, session.weightUnit)
+  const counts = session.status === 'completed' || session.status === 'partial'
   return (
     <>
+      {counts && (
+        <Card className="highlights">
+          <div className="kpis">
+            <div className="kpi"><strong className="kpi-num">{activeMinutes(session)}</strong><span>minutes</span></div>
+            <div className="kpi"><strong className="kpi-num">{logs.filter((l) => l.completed).length}</strong><span>sets done</span></div>
+            {volume > 0 && <div className="kpi"><strong className="kpi-num">{volume.toLocaleString()}</strong><span>{session.weightUnit} lifted</span></div>}
+          </div>
+          {bests.length > 0 && (
+            <ul className="bests" aria-label="New bests in this workout">
+              {bests.map((b) => (
+                <li key={b.exerciseId}><span className="tag best">New best</span> <strong>{exerciseById(b.exerciseId)?.name ?? 'Exercise'}</strong> <span className="muted">{b.weight} {b.unit}, up from {b.previous}</span></li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
       <Card>
         <p><strong>{STATUS[session.status]}</strong> · {formatDay(session.date)}</p>
         <p className="muted">

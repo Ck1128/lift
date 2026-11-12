@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
-import { applyCallToToday, generateFor, recentSoreness } from '../db/repo'
+import { applyCallToToday, generateFor, getSorenessRating, recentSoreness } from '../db/repo'
+import { sorenessFromRating } from '../engine/soreness'
 import { activeProgram, openProgramDay } from '../db/programRepo'
 import { programMinutes } from '../engine/program'
 import { getSetting, setSetting, SETTING } from '../db/settings'
@@ -45,6 +46,7 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
   const [message, setMessage] = useState<string | null>(null)
   const prog = useLiveQuery(() => activeProgram(), [], undefined)
   const [pick, setPick] = useState<number | null>(null)
+  const rating = useLiveQuery(() => getSorenessRating(today), [today], null)
 
   if (mode === undefined || prog === undefined || loading || !tracks.workout) return null
   const doneToday = sessions.filter((s) => s.date === today && s.status === 'completed')
@@ -85,7 +87,14 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
     const opened = sched && sched.status === 'planned' && sched.programId === program.id && sched.programDay !== undefined ? sched.programDay : null
     const day = pick !== null && pick >= 0 && pick < total ? pick : (opened ?? due)
     const d = program.days[day]
-    const muscles = [...new Set(d.exercises.flatMap((e) => exerciseById(e.exerciseId)?.primaryMuscles ?? []))]
+    const musclesOf = (i: number) => [...new Set(program.days[i].exercises.flatMap((e) => exerciseById(e.exerciseId)?.primaryMuscles ?? []))]
+    const muscles = musclesOf(day)
+    // The plan's soreness rule: 5 or more in the muscles you are due to train means a recovery day instead.
+    const soreMap = sorenessFromRating(rating)
+    const hit = musclesOf(day).filter((m) => (soreMap[m] ?? 0) >= 2)
+    const recoveryIdx = [...program.days.keys()].filter((i) => program.days[i].recovery)
+    const swapTo = recoveryIdx.find((i) => i >= due) ?? recoveryIdx[0]
+    const tooSore = !!rating && rating.level >= 5 && !d.recovery && hit.length > 0
     // Choosing a day takes effect straight away, so the Workout tab always shows the day picked here.
     const choose = async (i: number) => {
       setPick(i)
@@ -117,6 +126,12 @@ export function TodaysCall({ profile, today, sched, minutes, setMinutes, blocked
             {program.days.map((x, i) => <option key={i} value={i}>Day {i + 1} · {x.title}{i === due ? ' · next' : ''}</option>)}
           </select>
         </div>
+        {tooSore && (
+          <div className="notice sore-note" role="note">
+            <p><strong>Soreness {rating!.level}/10</strong> in your {hit.map((m) => MUSCLE_LABEL[m].toLowerCase()).join(', ')}. The plan says to take a recovery day instead; Day {due + 1} stays next. If you train anyway, sore areas get fewer sets.</p>
+            {swapTo !== undefined && <Button variant="small" onClick={() => void choose(swapTo)}>Use a recovery day</Button>}
+          </div>
+        )}
         {day !== due && (
           <p className="hint" role="status">
             {d.recovery

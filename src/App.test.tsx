@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { db, useDatabase } from './db/schema'
@@ -1531,4 +1531,79 @@ describe('Home program', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Home · Day 9: A3 · Legs + Pull (harder)' })).toBeInTheDocument()
   })
 
+})
+
+describe('soreness meter', () => {
+  it('is a 1-10 bar on Home that saves on its own and asks where when sore', async () => {
+    await seed()
+    const user = userEvent.setup()
+    render(<App />)
+    const bar = await screen.findByRole('slider', { name: /soreness from 1/i })
+    expect(screen.getByText('Not rated yet')).toBeInTheDocument()
+    act(() => { fireEvent.change(bar, { target: { value: '7' } }) })
+    expect(screen.getByText('Very sore')).toBeInTheDocument()
+    await waitFor(async () => expect((await db.settings.get('soreness.day.2026-10-21'))?.value).toEqual({ level: 7, areas: [] }), { timeout: 3000 })
+    expect(await db.soreness.count()).toBe(10) // all over
+    await user.click(within(screen.getByRole('group', { name: 'Sore areas' })).getByRole('button', { name: 'Legs' }))
+    await waitFor(async () => expect((await db.soreness.toArray()).map((s) => s.muscle).sort()).toEqual(['calves', 'glutes', 'hamstrings', 'quads']))
+    expect(await screen.findByText(/today's workout uses it/i)).toBeInTheDocument()
+  })
+
+  it('on the Home program, 5 or more in the muscles due offers a recovery day and keeps the due day next', async () => {
+    await seed()
+    await db.settings.put({ key: 'program.active', value: { programId: 'home', day: 0, setAt: NOW.toISOString() } })
+    await db.settings.put({ key: 'soreness.day.2026-10-21', value: { level: 6, areas: ['quads', 'hamstrings', 'glutes', 'calves'] } })
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByText(/The plan says to take a recovery day instead/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Use a recovery day' }))
+    expect(screen.getByLabelText('Choose a day')).toHaveValue('2')
+    expect(screen.getByText(/does not move the plan: Day 1 stays next/)).toBeInTheDocument()
+  })
+})
+
+describe('pro training details', () => {
+  it('Home shows the week day by day, with minutes trained and the week streak', async () => {
+    await seed()
+    render(<App />)
+    const strip = await screen.findByRole('list', { name: /this week, day by day/i })
+    expect(within(strip).getAllByRole('listitem')).toHaveLength(7)
+    expect(await within(strip).findByLabelText(/Wednesday: workout planned \(today\)/)).toBeInTheDocument()
+    expect(screen.getByText('min trained')).toBeInTheDocument()
+    expect(screen.getByText('week streak')).toBeInTheDocument()
+  })
+
+  it('the player marks the exercise to do now, and the summary shows the highlights', async () => {
+    await seed()
+    const user = userEvent.setup()
+    render(<App />)
+    await startWorkout(user)
+    expect(screen.getAllByText('Up next')).toHaveLength(1)
+    const first = (await db.sessions.toArray())[0].plannedExercises.find((e) => e.kind !== 'cardio')!
+    // Finish every set of the first exercise: it is marked done and the flag moves on.
+    const sets = (await db.setLogs.toArray()).filter((l) => l.slotId === first.slotId)
+    await act(async () => { for (const l of sets) await db.setLogs.update(l.id, { completed: true, actualReps: 10, actualWeight: 20 }) })
+    expect(await screen.findByText('Done')).toBeInTheDocument()
+    expect(screen.getAllByText('Up next')).toHaveLength(1)
+    await user.click(screen.getAllByRole('button', { name: 'Finish workout' })[0])
+    await user.click(within(await screen.findByRole('dialog', { name: /finish workout/i })).getByRole('button', { name: /save and finish/i }))
+    await screen.findByRole('heading', { name: 'Workout saved' })
+    expect(screen.getByText('sets done')).toBeInTheDocument()
+    expect(screen.getByText(/lb lifted/)).toBeInTheDocument()
+  })
+
+  it('the player shows what you did last time for an exercise you have trained before', async () => {
+    await seed()
+    const user = userEvent.setup()
+    render(<App />)
+    await startWorkout(user)
+    const s = (await db.sessions.toArray())[0]
+    const first = s.plannedExercises.find((e) => e.kind !== 'cardio')!
+    // An earlier saved workout with the same exercise.
+    await act(async () => {
+      await db.sessions.add({ ...s, id: 'earlier', scheduledWorkoutId: undefined, date: '2026-10-19', startedAt: '2026-10-19T10:00:00.000Z', finishedAt: '2026-10-19T10:30:00.000Z', status: 'completed' })
+      for (const n of [1, 2]) await db.setLogs.add({ id: `e${n}`, sessionId: 'earlier', slotId: first.slotId, exerciseId: first.exerciseId, setNumber: n, plannedRepMin: 8, plannedRepMax: 10, actualReps: 10, actualWeight: 25, weightUnit: 'lb', completed: true, createdAt: 'x', updatedAt: 'x' })
+    })
+    expect(await screen.findByText(/Last time, Mon, Oct 19: 2 × 10 at 25 lb/)).toBeInTheDocument()
+  })
 })

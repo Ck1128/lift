@@ -9,6 +9,7 @@ import { ALL_MUSCLES, MUSCLE_LABEL, type Profile, type ScheduledWorkout } from '
 import { Button, Card, ConfirmDialog, ScreenHeader } from '../components/ui'
 import { ResetDay } from '../components/ResetDay'
 import { useRouter } from '../router'
+import { formatTarget } from '../engine/program'
 import { activeProgram } from '../db/programRepo'
 import { ProgramView } from '../components/ProgramView'
 
@@ -70,7 +71,7 @@ export function WeeklyPlan({ profile, today }: { profile: Profile; today: string
               <div className="day-detail">
                 {row?.workout && (
                   <ul className="plain">
-                    {row.workout.exercises.map((e) => <li key={e.slotId}>{e.name} · {e.sets} × {e.repMin}-{e.repMax}</li>)}
+                    {row.workout.exercises.map((e) => <li key={e.slotId}>{e.name} · {e.kind === 'cardio' ? `${e.durationMinutes} min` : formatTarget(e)}</li>)}
                   </ul>
                 )}
                 {row && !row.workout && row.status === 'planned' && <p className="hint">Exercises are chosen on the day, from your equipment, time and history.</p>}

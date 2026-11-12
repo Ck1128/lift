@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.0.0 - Platform: the pro refresh (branch feature/v2-complete)
+New look
+- A new theme called Platform: flat chalk and graphite surfaces, one solid colour block per screen with dark ink on it, and a condensed athletic typeface (Big Shoulders Display, open licence) for titles and numbers. Each tab keeps its own colour. Light and dark both follow the phone.
+- The tab bar is docked to the bottom edge. It no longer floats over what you are reading, so nothing hides behind it and taps cannot land on the wrong thing.
+- Buttons, chips and fields are squarer and bolder; glass blur, glows and gradients are gone, which also makes scrolling lighter on the phone.
+- Easy to undo: the theme is one file (src/theme-platform.css) loaded last.
+
+Training details
+- Home: This week is now a day-by-day strip (done, planned, missed, today) with workouts, minutes trained and your week streak.
+- Workout player: the exercise to do now is marked Up next and finished ones step back as Done. Each exercise shows what you did last time (for example "3 × 12 at 30 lb"). Set rows are bigger, with a large tick. Units and the muscle map are folded into one small card.
+- Workout saved: a highlights card with minutes, sets done and total weight lifted, plus New best for any exercise where you beat your heaviest saved set.
+
+Soreness meter
+- New Soreness today card on Home, right under Today's call: a bar you drag from 1 (fresh) to 10 (extremely sore), with an optional Where? (chest, back, shoulders, arms, core, legs; none chosen means all over). It saves on its own a moment after you let go. "Not sore today" sets it in one tap.
+- It shapes today's workout. 1-2: as planned. 3-4: as planned, a little easier. 5-7: sore areas get one fewer set, and Today's call moves to muscles that are ready. 8-10: very sore areas are left out and a recovery day is suggested. A workout already built for today and not started is rebuilt to match.
+- On the Home program, 5 or more in the muscles you are due to train shows the plan's rule on the card with a "Use a recovery day" button; the day you were due stays next. If you train anyway, sore areas get fewer sets (very sore: one easy set, or skip).
+- Soreness now counts even before any workout is logged.
+- The old per-muscle "Feeling sore?" list under Adjust is replaced by the meter.
+
+Fixes found in the full check
+- The weekly plan listed cardio as "1 × 0-0". It now shows the minutes.
+- An unused font (Bricolage Grotesque) was still being downloaded. Removed.
+- The browser asked for a tab icon that did not exist (a 404 on every load). The app icon is now used.
+
 ## 2.25.2 - Fix: the day you pick on Home is the day you get (branch feature/v2-complete)
 - Picking a day on the Home program (for example Day 4) could still open the earlier day (Day 3) if that day had been started and discarded, or if you went to the Workout tab without pressing Open. A discarded start no longer holds on to the day, and choosing a day in the list now takes effect straight away, so the Workout tab always shows the day you picked.
 - On the Home program the Workout tab is never empty: with nothing chosen for today it opens the next day in order.

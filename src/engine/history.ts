@@ -110,3 +110,52 @@ export function personalRecords(sessions: WorkoutSession[], logs: SetLog[], unit
   }
   return [...best.values()].sort((a, b) => a.exerciseId.localeCompare(b.exerciseId))
 }
+
+// ---- Session highlights: volume lifted and new bests, from saved sets only ----
+
+/** Total weight moved in one session (weight × reps over completed sets), in `unit`. Bodyweight sets add nothing. */
+export function sessionVolume(logs: SetLog[], unit: WeightUnit): number {
+  let v = 0
+  for (const l of logs) {
+    if (!l.completed || !l.actualWeight || !l.actualReps) continue
+    v += convertWeight(l.actualWeight, l.weightUnit, unit) * l.actualReps
+  }
+  return Math.round(v)
+}
+
+export interface NewBest { exerciseId: string; weight: number; previous: number; unit: WeightUnit }
+
+/**
+ * Exercises where this session's heaviest completed set beat every earlier saved session. An exercise done for the
+ * first time is not a "new best": there is nothing to beat yet.
+ */
+export function sessionBests(session: WorkoutSession, logs: SetLog[], allSessions: WorkoutSession[], allLogs: SetLog[], unit: WeightUnit): NewBest[] {
+  const earlier = new Set(allSessions.filter((s) => counted(s) && s.id !== session.id && s.startedAt < session.startedAt).map((s) => s.id))
+  const top = (rows: SetLog[]) => {
+    const m = new Map<string, number>()
+    for (const l of rows) {
+      if (!l.completed || !l.actualWeight || !(l.actualReps && l.actualReps > 0)) continue
+      const w = convertWeight(l.actualWeight, l.weightUnit, unit)
+      if (w > (m.get(l.exerciseId) ?? 0)) m.set(l.exerciseId, w)
+    }
+    return m
+  }
+  const before = top(allLogs.filter((l) => earlier.has(l.sessionId)))
+  const now = top(logs.filter((l) => l.sessionId === session.id))
+  const out: NewBest[] = []
+  for (const [exerciseId, weight] of now) {
+    const previous = before.get(exerciseId)
+    if (previous !== undefined && weight > previous + 1e-6) out.push({ exerciseId, weight: tidy(weight), previous: tidy(previous), unit })
+  }
+  return out
+}
+
+/** Weeks in a row (ending this week or last week) with at least one saved workout. */
+export function weekStreak(sessions: WorkoutSession[], today: string): number {
+  const weeks = new Set(sessions.filter(counted).map((s) => startOfWeek(s.date)))
+  let w = startOfWeek(today)
+  if (!weeks.has(w)) w = addDays(w, -7)
+  let n = 0
+  while (weeks.has(w)) { n += 1; w = addDays(w, -7) }
+  return n
+}

@@ -4,17 +4,17 @@ import { TrackSwitch } from '../components/TrackSwitch'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
 import {
-  addSoreness, changeTrainingLevel, clearSoreness, ensureScheduled, getActiveSession, profileGaps,
-  recentSoreness, scheduledOn,
+  changeTrainingLevel, ensureScheduled, getActiveSession, profileGaps, scheduledOn,
 } from '../db/repo'
-import { formatDay, startOfWeek } from '../engine/dates'
-import { ALL_MUSCLES, LEVEL_LABEL, MUSCLE_LABEL, type Muscle, type Profile } from '../engine/types'
+import { addDays, formatDay, startOfWeek, WEEKDAY_NAMES } from '../engine/dates'
+import { activeMinutes, weekStreak } from '../engine/history'
+import { LEVEL_LABEL, type Profile } from '../engine/types'
 import { tracksOf } from '../engine/tracks'
 import { Button, Card, Loading, ScreenHeader } from '../components/ui'
-import { MiniRing } from '../components/Ring'
 import { BodyBasicsCard, LevelDialog } from '../components/HomeParts'
 import { TodaysCall } from '../components/TodaysCall'
 import { ProgramPicker } from '../components/ProgramPicker'
+import { SorenessMeter } from '../components/SorenessMeter'
 import { InjuredAreas } from '../components/InjuredAreas'
 import { useQuery } from '../hooks/app'
 import { useRouter } from '../router'
@@ -36,7 +36,6 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
   const yogaSessions = useLiveQuery(() => db.yogaSessions.toArray(), [], [])
   const weekRows = useLiveQuery(() => db.scheduled.toArray(), [], [])
-  const soreness = useLiveQuery(() => recentSoreness(today), [today], {} as Partial<Record<Muscle, 1 | 2 | 3>>)
   const gaps = profileGaps(profile)
   // A finished weekly or monthly Body Story is saved the first time the app opens after Sunday or month-end.
   useEffect(() => { void ensureStories(today) }, [today])
@@ -49,6 +48,15 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
   const thisWeek = finished.filter((s) => startOfWeek(s.date) === week).length
   const last = [...finished].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
   const plannedThisWeek = weekRows.filter((r) => startOfWeek(r.date) === week && r.status !== 'skipped').length
+  const minutesThisWeek = finished.filter((s) => startOfWeek(s.date) === week).reduce((a, s) => a + activeMinutes(s), 0)
+  const streak = weekStreak(sessions, today)
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(week, i)
+    const done = finished.some((s) => s.date === date)
+    const planned = weekRows.some((r) => r.date === date && r.status === 'planned')
+    const state = done ? 'done' : planned ? (date < today ? 'missed' : 'planned') : 'rest'
+    return { date, name: WEEKDAY_NAMES[i], state, label: done ? 'workout done' : planned ? (date < today ? 'planned, not done' : 'workout planned') : 'no workout' }
+  })
   const yogaDone = yogaSessions.filter((y) => (y.status === 'completed' || y.status === 'partial') && startOfWeek(y.date) === week)
   const yogaMinutes = Math.round(yogaDone.reduce((a, y) => a + y.durationSeconds, 0) / 60)
   const yogaActive = yogaSessions.find((y) => y.status === 'in_progress')
@@ -83,6 +91,9 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
 
       {loading && <Loading label="Loading today" />}
 
+      {/* ---- soreness: shapes the card above as soon as it is saved ---- */}
+      {tracks.workout && !loading && <SorenessMeter today={today} />}
+
       {/* ---- the one main thing for today ---- */}
       {!tracks.workout && yogaCard(true)}
 
@@ -116,9 +127,18 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
       <Card title="This week">
         {tracks.workout && (
           <div className="stat">
-            <div className="week-row">
-              <MiniRing value={plannedThisWeek > 0 ? thisWeek / Math.max(plannedThisWeek, thisWeek) : 0} label={`Workouts this week: ${thisWeek}${plannedThisWeek > 0 ? ` of ${Math.max(plannedThisWeek, thisWeek)}` : ''}`}>{thisWeek}</MiniRing>
-              <span><strong>{thisWeek}</strong>{plannedThisWeek > 0 ? ` of ${Math.max(plannedThisWeek, thisWeek)}` : ''} workout{thisWeek === 1 ? '' : 's'}</span>
+            <ol className="week-strip" aria-label="This week, day by day">
+              {weekDays.map((d) => (
+                <li key={d.date} className={`wd ${d.state}${d.date === today ? ' now' : ''}`} aria-label={`${d.name}: ${d.label}${d.date === today ? ' (today)' : ''}`}>
+                  <span className="wd-l" aria-hidden="true">{d.name.slice(0, 1)}</span>
+                  <span className="wd-dot" aria-hidden="true">{d.state === 'done' ? '✓' : ''}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="kpis">
+              <div className="kpi"><strong className="kpi-num">{thisWeek}</strong><span>{plannedThisWeek > 0 ? `of ${Math.max(plannedThisWeek, thisWeek)} ` : ''}workout{thisWeek === 1 && plannedThisWeek === 0 ? '' : 's'}</span></div>
+              <div className="kpi"><strong className="kpi-num">{minutesThisWeek}</strong><span>min trained</span></div>
+              <div className="kpi"><strong className="kpi-num">{streak}</strong><span>week streak</span></div>
             </div>
             {last ? <p className="hint">Last: {last.title} on {formatDay(last.date)}</p> : <p className="hint">No workouts saved yet. Finish one and your progress shows up here.</p>}
           </div>
@@ -152,27 +172,6 @@ export function Home({ profile, today }: { profile: Profile; today: string }) {
           <details className="optional">
             <summary>Injured or recovering? {(profile.injuredMuscles ?? []).length > 0 ? `(${(profile.injuredMuscles ?? []).length})` : '(optional)'}</summary>
             <InjuredAreas profile={profile} />
-          </details>
-        )}
-        {tracks.workout && (
-          <details>
-            <summary>Feeling sore? (optional)</summary>
-            <p className="hint">Soreness is only used to trim sets for those muscles. It is not a diagnosis. If something hurts or feels wrong, rest and consider asking a qualified professional.</p>
-            {ALL_MUSCLES.map((m: Muscle) => (
-              <div className="row" key={m}>
-                <label htmlFor={`sore-${m}`}>{MUSCLE_LABEL[m]}</label>
-                <select
-                  id={`sore-${m}`}
-                  value={soreness[m] ?? 0}
-                  onChange={(e) => { const v = Number(e.target.value); void (v === 0 ? clearSoreness(m, today) : addSoreness(m, v as 1 | 2 | 3, today)) }}
-                >
-                  <option value={0}>Not sore</option>
-                  <option value={1}>Mild</option>
-                  <option value={2}>Moderate</option>
-                  <option value={3}>Very sore</option>
-                </select>
-              </div>
-            ))}
           </details>
         )}
         <div className="row">

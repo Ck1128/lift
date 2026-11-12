@@ -122,8 +122,10 @@ export function todaysCall(input: CallInput): Call {
     return { kind: 'recover', onPlan: false, light: false, headline: 'Yoga today', reasons: ['Workouts are off, so Lift suggests a yoga session.'], yoga: pairYoga([], 'recovery') }
   }
 
-  // Nothing logged yet: follow the plan. There is nothing to recover from.
-  if (!report.hasHistory) {
+  // Nothing logged yet: follow the plan, since there is nothing to recover from. Reported soreness (5 or more on the
+  // meter) still counts, so the usual checks below run instead.
+  const reportedSore = Object.values(soreness).some((v) => (v ?? 0) >= 2)
+  if (!report.hasHistory && (!reportedSore || !scheduled)) {
     if (scheduled) {
       const key = (Object.keys(FOCUS) as FocusKey[]).find((k) => sameSet(FOCUS[k].plan.muscles, scheduled.muscles))
       return { kind: 'train', plan: scheduled, focusKey: key, onPlan: true, light: false, headline: scheduled.focus, reasons: ['No workouts are logged yet, so your plan stands.'] }

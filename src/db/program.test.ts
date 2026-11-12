@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from './schema'
-import { ensureScheduled, finishSession, generateFor, getEquipment, getProfile, profileToForm, resetAllData, saveProfile, scheduledOn, startSession } from './repo'
+import { ensureScheduled, finishSession, generateFor, getSorenessRating, recentSoreness, saveSorenessRating, getEquipment, getProfile, profileToForm, resetAllData, saveProfile, scheduledOn, startSession } from './repo'
 import { activeProgram, openProgramDay, setProgram } from './programRepo'
 
 const TODAY = '2026-11-05'
@@ -59,6 +59,20 @@ describe('Home program in the database', () => {
       expect(rows[0].programId).toBe('home')
       expect((await scheduledOn(FRI))!.workout).toBeDefined()
     }
+  })
+
+  it('the soreness meter saves per-muscle soreness and reshapes an opened Home day', async () => {
+    await setProgram('home', 3, TODAY)
+    const row = (await openProgramDay(TODAY, 3))!
+    expect(row.workout!.exercises.find((e) => e.name === 'Goblet squat')!.sets).toBe(3)
+    await saveSorenessRating(TODAY, { level: 6, areas: ['quads', 'glutes'] })
+    expect(await getSorenessRating(TODAY)).toEqual({ level: 6, areas: ['quads', 'glutes'] })
+    expect(await recentSoreness(TODAY)).toEqual({ quads: 2, glutes: 2 })
+    expect((await scheduledOn(TODAY))!.workout!.exercises.find((e) => e.name === 'Goblet squat')!.sets).toBe(2)
+    // Back to fresh clears it.
+    await saveSorenessRating(TODAY, { level: 1, areas: [] })
+    expect(await recentSoreness(TODAY)).toEqual({})
+    expect((await scheduledOn(TODAY))!.workout!.exercises.find((e) => e.name === 'Goblet squat')!.sets).toBe(3)
   })
 
   it('picking another day after starting and discarding one opens the picked day, not the discarded one', async () => {

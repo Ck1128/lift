@@ -392,3 +392,21 @@ body:has(.start-bar) .rest-bar { bottom: calc(168px + env(safe-area-inset-bottom
 .guide:first-of-type { border-top: 0; }
 .guide summary { font-weight: 600; cursor: pointer; }
 .guide li { margin: 8px 0; line-height: 1.45; }
+
+/* v2.26 soreness meter */
+.soreness-card { --sore: #3f9d4a; }
+.soreness-card.s-mild { --sore: #c9a10b; }
+.soreness-card.s-sore { --sore: #e07a10; }
+.soreness-card.s-very { --sore: #d6402b; }
+.sore-read { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 10px; }
+.sore-num { font-size: 2.6rem; font-weight: 800; line-height: 1; color: var(--sore); letter-spacing: -0.03em; transition: color .2s; }
+.sore-of { color: var(--muted, #6b7280); font-weight: 600; }
+.sore-word { margin-left: auto; font-weight: 650; color: var(--sore); transition: color .2s; }
+.sore-range { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; border-radius: 999px; margin: 8px 0 4px; padding: 0; border: 0; cursor: pointer; touch-action: pan-y;
+  background: linear-gradient(90deg, #3f9d4a 0%, #c9a10b 35%, #e07a10 65%, #d6402b 100%); outline: none; }
+.sore-range:focus-visible { box-shadow: 0 0 0 3px rgba(0,0,0,.15); }
+.sore-range::-webkit-slider-thumb { -webkit-appearance: none; width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 4px solid var(--sore); box-shadow: 0 3px 10px rgba(0,0,0,.25); transition: border-color .2s; }
+.sore-range::-moz-range-thumb { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 4px solid var(--sore); box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.sore-scale { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted, #6b7280); margin-bottom: 10px; }
+.sore-note { margin: 4px 0 12px; display: grid; gap: 8px; }
+.sore-note p { margin: 0; }

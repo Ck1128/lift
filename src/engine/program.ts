@@ -1,6 +1,7 @@
 // Fixed programs: a numbered list of days (Day 1, Day 2 ...) done in order, not tied to weekdays.
 // The next day is worked out from what was actually finished, so a rest day simply means the next day waits.
-import type { GeneratedWorkout, Muscle, PlannedExercise, WeightUnit } from './types'
+import { MUSCLE_LABEL, type GeneratedWorkout, type Muscle, type PlannedExercise, type WeightUnit } from './types'
+import type { SoreMap } from './soreness'
 
 export interface ProgramExercise {
   exerciseId: string
@@ -118,8 +119,12 @@ export function programMinutes(day: ProgramDay): number {
 
 export const PROGRAM_GENERATOR = 'program-1'
 
-/** Builds the workout for one program day. `primaryOf` gives the main muscles of an exercise id. */
-export function programWorkout(program: Program, dayIndex: number, date: string, unit: WeightUnit, primaryOf: (id: string) => Muscle[], catalogVersion: string): GeneratedWorkout {
+/**
+ * Builds the workout for one program day. `primaryOf` gives the main muscles of an exercise id.
+ * `sore` (from today's soreness rating) trims the day: moderately sore areas lose one set, very sore areas drop to one
+ * easy set with a note to skip it.
+ */
+export function programWorkout(program: Program, dayIndex: number, date: string, unit: WeightUnit, primaryOf: (id: string) => Muscle[], catalogVersion: string, sore: SoreMap = {}): GeneratedWorkout {
   void unit // Loads are stored in the program's own unit; the workout converts them to the session unit.
   const day = program.days[dayIndex]
   const slots: PlannedExercise[] = []
@@ -146,18 +151,23 @@ export function programWorkout(program: Program, dayIndex: number, date: string,
       why: 'Loosens hips, hamstrings, chest and upper back.',
     })
   }
+  const trimmed = new Set<Muscle>()
   day.exercises.forEach((e, i) => {
+    const level = Math.max(0, ...primaryOf(e.exerciseId).map((m) => sore[m] ?? 0))
+    if (level >= 2) for (const m of primaryOf(e.exerciseId)) if ((sore[m] ?? 0) >= 2) trimmed.add(m)
+    const sets = level >= 3 ? 1 : level === 2 ? Math.max(1, e.sets - 1) : e.sets
+    const soreCue = level >= 3 ? 'Very sore today: one easy set at most, or skip it.' : level === 2 ? 'Sore today: one fewer set.' : undefined
     const load = e.loaded && program.load ? { ...program.load, weight: e.weight ?? program.load.weight } : undefined
     const rule = day.rounds
       ? `Circuit: one set of each exercise in order, then rest. ${day.rounds} rounds.`
       : 'Keep 2-4 reps in reserve. Controlled form.'
     slots.push({
-      slotId: `${tag}-${i + 1}`, exerciseId: e.exerciseId, name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax,
+      slotId: `${tag}-${i + 1}`, exerciseId: e.exerciseId, name: e.name, sets, repMin: e.repMin, repMax: e.repMax,
       repLabel: e.repLabel, restSeconds: day.rounds ? 15 : (e.rest ?? 60),
       suggestedWeight: load?.weight, loadUnit: load ? load.unit : undefined,
       loadNote: !load ? rule : load.weight === program.load?.weight ? `Your ${load.weight} ${load.unit} dumbbells. ${rule}` : `${load.weight} ${load.unit}: both dumbbells together. ${rule}`,
       why: e.note ?? `${program.name} program, Day ${dayIndex + 1}.`,
-      cues: e.note ? [e.note] : undefined,
+      cues: [soreCue, e.note].filter((x): x is string => !!x).length ? [soreCue, e.note].filter((x): x is string => !!x) : undefined,
     })
   })
   if (day.finish) {
@@ -174,7 +184,10 @@ export function programWorkout(program: Program, dayIndex: number, date: string,
     title: `${program.name} · Day ${dayIndex + 1}: ${day.title}`,
     date, targetMuscles: muscles, availableMinutes: minutes, estimatedMinutes: minutes, fits: true, cardioMinutes,
     exercises: slots,
-    notes: [...(day.notes ?? []), ...program.rules],
+    notes: [
+      ...(trimmed.size > 0 ? [`You rated your ${[...trimmed].map((m) => MUSCLE_LABEL[m].toLowerCase()).join(', ')} as sore today, so those exercises have fewer sets. A recovery day is the better choice at 5 or more.`] : []),
+      ...(day.notes ?? []), ...program.rules,
+    ],
     assumptions: ['About 40 seconds per set (70 for each-side sets), the rest shown for each exercise, plus the warm-up and walking. Your real pace will differ.'],
     generatorVersion: PROGRAM_GENERATOR, catalogVersion,
   }

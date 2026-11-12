@@ -20,6 +20,21 @@ import { ExerciseInfo } from '../components/ExerciseInfo'
 import { WorkoutMuscles } from '../components/WorkoutMuscles'
 import { Button, Card, Chips, ConfirmDialog, Dialog, ScreenHeader } from '../components/ui'
 import { formatTarget } from '../engine/program'
+import { buildLastPerformance } from '../engine/history'
+import { formatDay } from '../engine/dates'
+import type { LastPerformance } from '../engine/types'
+
+/** "3 × 12 at 30 lb", or each set when they differed. */
+function lastLine(l: LastPerformance): string {
+  const reps = l.sets.map((s) => s.reps)
+  const weights = new Set(l.sets.map((s) => s.weight ?? 0))
+  if (weights.size === 1) {
+    const w = l.sets[0].weight
+    const r = new Set(reps).size === 1 ? `${l.sets.length} × ${reps[0]}` : `${reps.join(', ')} reps`
+    return w ? `${r} at ${w} ${l.unit}` : r
+  }
+  return `${l.sets.map((s) => (s.weight ? `${s.reps} × ${s.weight}` : `${s.reps}`)).join(', ')} ${l.unit}`
+}
 
 const clock = (ms: number) => formatClock(ms)
 
@@ -54,6 +69,11 @@ export function Player({ session, profile, equipment, onFinished }: {
     gym: profile.preferredLocation === 'gym' ? profile.gymType : undefined,
   }), [equipment, profile.excludedExerciseIds, profile.excludedPatterns, profile.trainingLevel, profile.preferredLocation, profile.gymType])
   const inSession = session.actualExercises.map((a) => a.exerciseId)
+  // The exercise to do now: the first one that is not skipped and still has a set open.
+  const slotDone = (slotId: string) => { const mine = sorted.filter((l) => l.slotId === slotId); return mine.length > 0 && mine.every((l) => l.completed) }
+  const nextSlot = session.plannedExercises.find((p) => activeSlots.includes(p.slotId) && !slotDone(p.slotId))?.slotId
+  // What you did the last time you trained each exercise, from saved workouts only.
+  const lastTime = useLiveQuery(async () => buildLastPerformance(await db.sessions.toArray(), await db.setLogs.toArray()), [session.id], {} as Record<string, LastPerformance>)
   const estimate = sessionEstimateMinutes(session, profile.goal)
 
   // Swap one slot to another exercise. If sets are already logged for it, ask what to do with them first.
@@ -101,13 +121,15 @@ export function Player({ session, profile, equipment, onFinished }: {
         <Button variant="small" className="finish-top" onClick={() => setConfirm('finish')}>Finish workout</Button>
         {!reopened && <Button variant="small" onClick={() => setConfirm('abandon')}>Discard</Button>}
       </div>
-      <div className="field">
-        <p className="label-like">Weight units for this workout</p>
-        <Chips label="Workout weight units" options={['lb', 'kg'] as const} value={session.weightUnit} onChange={(u) => void setSessionUnit(session.id, u)} />
-        <p className="hint">Each exercise can use its own unit too. The weight itself never changes, only how it is shown.</p>
-      </div>
-
-      <Card>
+      <Card className="player-opts">
+        <details>
+          <summary>Weight units: {session.weightUnit}</summary>
+          <div className="field">
+            <p className="label-like">Weight units for this workout</p>
+            <Chips label="Workout weight units" options={['lb', 'kg'] as const} value={session.weightUnit} onChange={(u) => void setSessionUnit(session.id, u)} />
+            <p className="hint">Each exercise can use its own unit too. The weight itself never changes, only how it is shown.</p>
+          </div>
+        </details>
         <details>
           <summary>Muscles in this workout</summary>
           <WorkoutMuscles exerciseIds={session.actualExercises.filter((a) => !a.skipped && session.plannedExercises.find((p) => p.slotId === a.slotId)?.kind !== 'cardio').map((a) => a.exerciseId)} />
@@ -120,6 +142,8 @@ export function Player({ session, profile, equipment, onFinished }: {
         return (
           <ExerciseCard
             key={slot.slotId}
+            state={actual.skipped ? 'skipped' : slot.slotId === nextSlot ? 'next' : slotDone(slot.slotId) ? 'done' : 'todo'}
+            last={lastTime[actual.exerciseId]}
             slot={slot}
             actual={actual}
             sessionId={session.id}
@@ -180,7 +204,9 @@ export function Player({ session, profile, equipment, onFinished }: {
   )
 }
 
-function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace, rules, inSession, onSwap, onMachineTaken }: {
+function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onReplace, rules, inSession, onSwap, onMachineTaken, state, last }: {
+  state: 'skipped' | 'next' | 'done' | 'todo'
+  last?: LastPerformance
   slot: PlannedExercise
   actual: WorkoutSession['actualExercises'][number]
   sessionId: string
@@ -199,7 +225,9 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
   const cardio = slot.kind === 'cardio'
   const unit: WeightUnit = logs[0]?.weightUnit ?? pageUnit
   return (
-    <Card className={actual.skipped ? 'skipped' : ''}>
+    <Card className={state === 'skipped' ? 'skipped' : `ex-card ex-${state}`}>
+      {state === 'next' && <p className="ex-flag">Up next</p>}
+      {state === 'done' && <p className="ex-flag done">Done</p>}
       <div className="title-row">
         <p className="big">{cardio || actual.exerciseId === slot.exerciseId ? slot.name : (ex?.name ?? slot.name)}</p>
         <FeedbackButton component="Workout exercise" element={ex?.name ?? slot.name} />
@@ -210,6 +238,9 @@ function ExerciseCard({ slot, actual, sessionId, logs, pageUnit, onSetDone, onRe
         <p className="muted">Target {slot.durationMinutes} min{slot.intensityCue ? ` · ${slot.intensityCue}` : ''}</p>
       ) : (
         <p className="muted">Target {formatTarget(slot)} · rest {slot.restSeconds}s</p>
+      )}
+      {!cardio && last && last.sets.length > 0 && (
+        <p className="last-time">Last time, {formatDay(last.date)}: {lastLine(last)}</p>
       )}
       {actual.skipped ? (
         <div className="inline">

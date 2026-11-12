@@ -1,6 +1,7 @@
 import { db, nowIso, uid } from './schema'
 import { getSetting, setSetting, SETTING } from './settings'
-import { getProfile, ensureScheduled } from './repo'
+import { getProfile, ensureScheduled, getSorenessRating } from './repo'
+import { sorenessFromRating } from '../engine/soreness'
 import { CATALOG_VERSION, exerciseById } from '../data/catalog'
 import { programById } from '../data/programs'
 import { nextProgramDay, programFinished, programWorkout, type Program, type ProgramDone, type ProgramState } from '../engine/program'
@@ -78,7 +79,8 @@ export async function openProgramDay(date: string, dayIndex: number): Promise<Sc
   const program = state ? programById(state.programId) : undefined
   const profile = await getProfile()
   if (!program || !profile || dayIndex < 0 || dayIndex >= program.days.length) return null
-  const workout = programWorkout(program, dayIndex, date, profile.weightUnit, (id) => exerciseById(id)?.primaryMuscles ?? [], CATALOG_VERSION)
+  const workout = programWorkout(program, dayIndex, date, profile.weightUnit, (id) => exerciseById(id)?.primaryMuscles ?? [], CATALOG_VERSION,
+    sorenessFromRating(await getSorenessRating(date)))
   const day = program.days[dayIndex]
   const now = nowIso()
   const fields = {
